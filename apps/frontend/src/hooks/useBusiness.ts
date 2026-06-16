@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api, { apiCall } from '@/lib/api';
-import { mockBusinesses } from '@/lib/mock-data';
+import { mockBusinesses, type Business } from '@/lib/mock-data';
 import { useAuthStore } from '@/stores/auth.store';
 
 export function useBusiness() {
   const queryClient = useQueryClient();
   const { businesses, currentBusinessId, setCurrentBusiness, setBusinesses } = useAuthStore();
 
-  const businessesQuery = useQuery({
+  const businessesQuery = useQuery<Business[]>({
     queryKey: ['businesses'],
     queryFn: () =>
       apiCall(async () => {

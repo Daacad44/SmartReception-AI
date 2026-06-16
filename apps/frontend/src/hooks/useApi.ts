@@ -16,11 +16,49 @@ import {
   mockNotifications,
   mockAnalyticsData,
   mockBillingData,
+  type Conversation,
+  type Message,
+  type Customer,
+  type Appointment,
+  type KnowledgeDocument,
+  type TeamMember,
+  type Notification,
 } from '@/lib/mock-data';
-import type { DashboardStats } from '@/lib/types';
+import type {
+  DashboardStats,
+  RevenueOverview,
+  ConversationTrend,
+  TopService,
+  TeamPerformance,
+} from '@/lib/types';
+
+interface CustomerGrowthPoint {
+  month: string;
+  customers: number;
+}
+
+interface AnalyticsData {
+  totalMessages: number;
+  avgResponseTime: string;
+  satisfactionScore: number;
+  aiHandledPercent: number;
+  channelBreakdown: Array<{ channel: string; count: number; percent: number }>;
+  hourlyActivity: Array<{ hour: string; messages: number }>;
+  topTopics: Array<{ topic: string; count: number }>;
+}
+
+interface BillingData {
+  plan: string;
+  status: string;
+  price: number;
+  billingCycle: string;
+  nextBillingDate: string;
+  usage: Record<string, { used: number; limit: number }>;
+  invoices: Array<{ id: string; date: string; amount: number; status: string }>;
+}
 
 export function useDashboardStats() {
-  return useQuery({
+  return useQuery<DashboardStats>({
     queryKey: ['dashboard', 'stats'],
     queryFn: () =>
       apiCall(async () => {
@@ -31,7 +69,7 @@ export function useDashboardStats() {
 }
 
 export function useRevenueData() {
-  return useQuery({
+  return useQuery<RevenueOverview[]>({
     queryKey: ['dashboard', 'revenue'],
     queryFn: () =>
       apiCall(async () => {
@@ -42,7 +80,7 @@ export function useRevenueData() {
 }
 
 export function useCustomerGrowth() {
-  return useQuery({
+  return useQuery<CustomerGrowthPoint[]>({
     queryKey: ['dashboard', 'customer-growth'],
     queryFn: () =>
       apiCall(async () => {
@@ -53,7 +91,7 @@ export function useCustomerGrowth() {
 }
 
 export function useConversationTrends() {
-  return useQuery({
+  return useQuery<ConversationTrend[]>({
     queryKey: ['dashboard', 'conversation-trends'],
     queryFn: () =>
       apiCall(async () => {
@@ -64,7 +102,7 @@ export function useConversationTrends() {
 }
 
 export function useTopServices() {
-  return useQuery({
+  return useQuery<TopService[]>({
     queryKey: ['dashboard', 'top-services'],
     queryFn: () =>
       apiCall(async () => {
@@ -75,7 +113,7 @@ export function useTopServices() {
 }
 
 export function useTeamPerformance() {
-  return useQuery({
+  return useQuery<TeamPerformance[]>({
     queryKey: ['dashboard', 'team-performance'],
     queryFn: () =>
       apiCall(async () => {
@@ -86,7 +124,7 @@ export function useTeamPerformance() {
 }
 
 export function useConversations() {
-  return useQuery({
+  return useQuery<Conversation[]>({
     queryKey: ['conversations'],
     queryFn: () =>
       apiCall(async () => {
@@ -97,7 +135,7 @@ export function useConversations() {
 }
 
 export function useMessages(conversationId: string | null) {
-  return useQuery({
+  return useQuery<Message[]>({
     queryKey: ['messages', conversationId],
     queryFn: () =>
       apiCall(async () => {
@@ -109,7 +147,7 @@ export function useMessages(conversationId: string | null) {
 }
 
 export function useCustomers(search?: string) {
-  return useQuery({
+  return useQuery<Customer[]>({
     queryKey: ['customers', search],
     queryFn: () =>
       apiCall(async () => {
@@ -126,7 +164,7 @@ export function useCustomers(search?: string) {
 }
 
 export function useAppointments() {
-  return useQuery({
+  return useQuery<Appointment[]>({
     queryKey: ['appointments'],
     queryFn: () =>
       apiCall(async () => {
@@ -137,7 +175,7 @@ export function useAppointments() {
 }
 
 export function useKnowledgeDocs() {
-  return useQuery({
+  return useQuery<KnowledgeDocument[]>({
     queryKey: ['knowledge'],
     queryFn: () =>
       apiCall(async () => {
@@ -148,7 +186,7 @@ export function useKnowledgeDocs() {
 }
 
 export function useTeamMembers() {
-  return useQuery({
+  return useQuery<TeamMember[]>({
     queryKey: ['team'],
     queryFn: () =>
       apiCall(async () => {
@@ -159,7 +197,7 @@ export function useTeamMembers() {
 }
 
 export function useNotifications() {
-  return useQuery({
+  return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: () =>
       apiCall(async () => {
@@ -170,7 +208,7 @@ export function useNotifications() {
 }
 
 export function useAnalytics() {
-  return useQuery({
+  return useQuery<AnalyticsData>({
     queryKey: ['analytics'],
     queryFn: () =>
       apiCall(async () => {
@@ -181,7 +219,7 @@ export function useAnalytics() {
 }
 
 export function useBilling() {
-  return useQuery({
+  return useQuery<BillingData>({
     queryKey: ['billing'],
     queryFn: () =>
       apiCall(async () => {

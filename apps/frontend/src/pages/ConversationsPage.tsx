@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search,
   Send,
@@ -57,9 +57,11 @@ export function ConversationsPage() {
 
   const selected = conversations?.find((c) => c.id === selectedId) ?? null;
 
-  if (!selectedId && filtered && filtered.length > 0) {
-    setSelectedId(filtered[0].id);
-  }
+  useEffect(() => {
+    if (!selectedId && filtered && filtered.length > 0) {
+      setSelectedId(filtered[0].id);
+    }
+  }, [filtered, selectedId]);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] -m-6 overflow-hidden">

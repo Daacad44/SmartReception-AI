@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -85,12 +85,12 @@ export function Sidebar() {
             2,847 / 5,000 conversations used
           </p>
           <Progress value={57} className="mb-3 h-1.5 bg-white/10" />
-          <a
-            href="/billing"
+          <Link
+            to="/billing"
             className="block text-center text-xs font-medium text-accent hover:text-accent/80"
           >
             Upgrade Plan
-          </a>
+          </Link>
         </div>
       </div>
     </aside>
