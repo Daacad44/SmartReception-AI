@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api, { extractData } from '@/lib/api';
+import { useAuthReady } from '@/hooks/useAuthReady';
 import type {
   Conversation,
   Message,
@@ -230,66 +231,79 @@ export function transformFaq(raw: any): Faq {
 // ─── Query hooks ─────────────────────────────────────────────────────────────
 
 export function useDashboardStats() {
+  const authReady = useAuthReady();
   return useQuery<DashboardStats>({
     queryKey: ['dashboard', 'stats'],
     queryFn: async () => {
       const response = await api.get('/analytics/dashboard');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useRevenueData() {
+  const authReady = useAuthReady();
   return useQuery<RevenueOverview[]>({
     queryKey: ['dashboard', 'revenue'],
     queryFn: async () => {
       const response = await api.get('/analytics/revenue');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useCustomerGrowth() {
+  const authReady = useAuthReady();
   return useQuery<CustomerGrowthPoint[]>({
     queryKey: ['dashboard', 'customer-growth'],
     queryFn: async () => {
       const response = await api.get('/analytics/customer-growth');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useConversationTrends() {
+  const authReady = useAuthReady();
   return useQuery<ConversationTrend[]>({
     queryKey: ['dashboard', 'conversation-trends'],
     queryFn: async () => {
       const response = await api.get('/analytics/trends');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useTopServices() {
+  const authReady = useAuthReady();
   return useQuery<TopService[]>({
     queryKey: ['dashboard', 'top-services'],
     queryFn: async () => {
       const response = await api.get('/analytics/top-services');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useTeamPerformance() {
+  const authReady = useAuthReady();
   return useQuery<TeamPerformance[]>({
     queryKey: ['dashboard', 'team-performance'],
     queryFn: async () => {
       const response = await api.get('/analytics/team-performance');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useConversations(params?: { status?: string; search?: string }) {
+  const authReady = useAuthReady();
   return useQuery<Conversation[]>({
     queryKey: ['conversations', params],
     queryFn: async () => {
@@ -298,10 +312,12 @@ export function useConversations(params?: { status?: string; search?: string }) 
       const items = Array.isArray(data) ? data : [];
       return items.map(transformConversation);
     },
+    enabled: authReady,
   });
 }
 
 export function useMessages(conversationId: string | null) {
+  const authReady = useAuthReady();
   return useQuery<Message[]>({
     queryKey: ['messages', conversationId],
     queryFn: async () => {
@@ -310,11 +326,12 @@ export function useMessages(conversationId: string | null) {
       const messages = data.messages ?? [];
       return (messages as unknown[]).map((m) => transformMessage(m, conversationId!));
     },
-    enabled: !!conversationId,
+    enabled: authReady && !!conversationId,
   });
 }
 
 export function useCustomers(search?: string) {
+  const authReady = useAuthReady();
   return useQuery<Customer[]>({
     queryKey: ['customers', search],
     queryFn: async () => {
@@ -323,10 +340,12 @@ export function useCustomers(search?: string) {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformCustomer);
     },
+    enabled: authReady,
   });
 }
 
 export function useAppointments() {
+  const authReady = useAuthReady();
   return useQuery<Appointment[]>({
     queryKey: ['appointments'],
     queryFn: async () => {
@@ -335,10 +354,12 @@ export function useAppointments() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformAppointment);
     },
+    enabled: authReady,
   });
 }
 
 export function useKnowledgeBases() {
+  const authReady = useAuthReady();
   return useQuery<KnowledgeBase[]>({
     queryKey: ['knowledge', 'bases'],
     queryFn: async () => {
@@ -347,10 +368,12 @@ export function useKnowledgeBases() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformKnowledgeBase);
     },
+    enabled: authReady,
   });
 }
 
 export function useKnowledgeDocs(knowledgeBaseId?: string) {
+  const authReady = useAuthReady();
   return useQuery<KnowledgeDocument[]>({
     queryKey: ['knowledge', 'documents', knowledgeBaseId],
     queryFn: async () => {
@@ -369,10 +392,12 @@ export function useKnowledgeDocs(knowledgeBaseId?: string) {
       const data = extractData<{ documents?: unknown[] }>(response);
       return (data.documents ?? []).map(transformKnowledgeDocument);
     },
+    enabled: authReady,
   });
 }
 
 export function useFaqs(knowledgeBaseId?: string) {
+  const authReady = useAuthReady();
   return useQuery<Faq[]>({
     queryKey: ['knowledge', 'faqs', knowledgeBaseId],
     queryFn: async () => {
@@ -383,10 +408,12 @@ export function useFaqs(knowledgeBaseId?: string) {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformFaq);
     },
+    enabled: authReady,
   });
 }
 
 export function useTeamMembers() {
+  const authReady = useAuthReady();
   return useQuery<TeamMember[]>({
     queryKey: ['team'],
     queryFn: async () => {
@@ -395,10 +422,12 @@ export function useTeamMembers() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformTeamMember);
     },
+    enabled: authReady,
   });
 }
 
 export function useNotifications() {
+  const authReady = useAuthReady();
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
@@ -407,30 +436,36 @@ export function useNotifications() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformNotification);
     },
+    enabled: authReady,
   });
 }
 
 export function useAnalytics() {
+  const authReady = useAuthReady();
   return useQuery<AnalyticsData>({
     queryKey: ['analytics'],
     queryFn: async () => {
       const response = await api.get('/analytics');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useBilling() {
+  const authReady = useAuthReady();
   return useQuery<BillingData>({
     queryKey: ['billing'],
     queryFn: async () => {
       const response = await api.get('/billing');
       return extractData(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useBusinessSettings() {
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: ['business', 'settings'],
     queryFn: async () => {
@@ -444,10 +479,12 @@ export function useBusinessSettings() {
         website?: string | null;
       }>(response);
     },
+    enabled: authReady,
   });
 }
 
 export function useAiConfig() {
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: ['ai', 'config'],
     queryFn: async () => {
@@ -461,5 +498,6 @@ export function useAiConfig() {
         languages: string[];
       }>(response);
     },
+    enabled: authReady,
   });
 }

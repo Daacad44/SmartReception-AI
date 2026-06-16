@@ -228,9 +228,7 @@ export function useUploadDocument() {
       if (title) formData.append('title', title);
       if (knowledgeBaseId) formData.append('knowledgeBaseId', knowledgeBaseId);
 
-      const response = await api.post('/knowledge/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await api.post('/knowledge/documents/upload', formData);
       return extractData(response);
     },
     onSuccess: () => {

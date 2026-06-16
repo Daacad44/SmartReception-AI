@@ -1,6 +1,7 @@
 import { config } from '../../config';
 import { r2StorageService, isR2Configured } from './r2.service';
 import { supabaseStorageService, isSupabaseStorageConfigured } from './supabase-storage.service';
+import { ServiceUnavailableError } from '../../core/errors';
 
 export interface StorageUploadResult {
   key: string;
@@ -25,8 +26,8 @@ class UnifiedStorageService implements IStorageService {
     if (isR2Configured()) {
       return r2StorageService;
     }
-    throw new Error(
-      'No storage provider configured. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY or R2 credentials.'
+    throw new ServiceUnavailableError(
+      'File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables.'
     );
   }
 

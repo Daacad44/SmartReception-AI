@@ -43,6 +43,9 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (businessId) {
     config.headers['X-Business-Id'] = businessId;
   }
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 

@@ -3,11 +3,13 @@ import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import type { Business } from '@/lib/entities';
 import { useAuthStore } from '@/stores/auth.store';
+import { useAuthReady } from '@/hooks/useAuthReady';
 
 export function useBusiness() {
   const queryClient = useQueryClient();
   const { businesses, currentBusinessId, setCurrentBusiness, setBusinesses } = useAuthStore();
 
+  const authReady = useAuthReady();
   const currentBusinessQuery = useQuery({
     queryKey: ['business', currentBusinessId],
     queryFn: async () => {
@@ -20,7 +22,7 @@ export function useBusiness() {
         subscription?: { plan: string } | null;
       }>(response);
     },
-    enabled: !!currentBusinessId,
+    enabled: authReady && !!currentBusinessId,
   });
 
   const currentBusiness = businesses.find((b) => b.id === currentBusinessId) ?? businesses[0];

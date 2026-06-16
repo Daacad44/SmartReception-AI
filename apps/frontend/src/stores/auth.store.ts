@@ -10,6 +10,10 @@ interface AuthState {
   businesses: Business[];
   currentBusinessId: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
+  sessionReady: boolean;
+  setHasHydrated: (value: boolean) => void;
+  setSessionReady: (value: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: UserProfile) => void;
   setBusinesses: (businesses: Business[]) => void;
@@ -27,6 +31,11 @@ export const useAuthStore = create<AuthState>()(
       businesses: [],
       currentBusinessId: null,
       isAuthenticated: false,
+      hasHydrated: false,
+      sessionReady: false,
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
+      setSessionReady: (value) => set({ sessionReady: value }),
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken, isAuthenticated: true }),
@@ -54,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
           })),
           currentBusinessId: user.businesses[0]?.id ?? null,
           isAuthenticated: true,
+          sessionReady: true,
         }),
 
       logout: () =>
@@ -64,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
           businesses: [],
           currentBusinessId: null,
           isAuthenticated: false,
+          sessionReady: true,
         }),
     }),
     {
@@ -76,6 +87,18 @@ export const useAuthStore = create<AuthState>()(
         currentBusinessId: state.currentBusinessId,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          useAuthStore.getState().setHasHydrated(true);
+          return;
+        }
+
+        if (state?.isAuthenticated && !state.accessToken) {
+          useAuthStore.getState().logout();
+        }
+
+        useAuthStore.getState().setHasHydrated(true);
+      },
     }
   )
 );

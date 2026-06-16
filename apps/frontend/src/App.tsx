@@ -17,6 +17,7 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { AuthBootstrap } from '@/components/AuthBootstrap';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,8 +30,15 @@ const queryClient = new QueryClient({
 });
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (isAuthenticated) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  if (!hasHydrated) {
+    return null;
+  }
+
+  if (isAuthenticated && accessToken) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
@@ -39,6 +47,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <AuthBootstrap />
       <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>

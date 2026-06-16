@@ -9,6 +9,7 @@ import { errorHandler, notFoundHandler } from './core/error-handler';
 import routes from './routes';
 import { logger } from './core/logger';
 import { prisma } from './infrastructure/database/prisma';
+import { isSupabaseStorageConfigured } from './infrastructure/storage';
 
 export function createApp(): express.Application {
   const app = express();
@@ -63,11 +64,28 @@ export function createApp(): express.Application {
 
   app.get('/health', async (_req, res) => {
     const timestamp = new Date().toISOString();
+    const jwtConfigured =
+      Boolean(process.env.JWT_SECRET) &&
+      process.env.JWT_SECRET !== 'dev-secret-change-me';
+    const storageConfigured = isSupabaseStorageConfigured() || Boolean(process.env.R2_ACCESS_KEY_ID);
+
     try {
       await prisma.$queryRaw`SELECT 1`;
-      res.json({ status: 'ok', database: 'connected', timestamp });
+      res.json({
+        status: 'ok',
+        database: 'connected',
+        auth: jwtConfigured ? 'configured' : 'missing_jwt_secret',
+        storage: storageConfigured ? 'configured' : 'missing_supabase_service_role_key',
+        timestamp,
+      });
     } catch {
-      res.status(503).json({ status: 'degraded', database: 'disconnected', timestamp });
+      res.status(503).json({
+        status: 'degraded',
+        database: 'disconnected',
+        auth: jwtConfigured ? 'configured' : 'missing_jwt_secret',
+        storage: storageConfigured ? 'configured' : 'missing_supabase_service_role_key',
+        timestamp,
+      });
     }
   });
 

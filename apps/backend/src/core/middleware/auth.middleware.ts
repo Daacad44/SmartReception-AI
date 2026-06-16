@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
-import { UnauthorizedError } from '../errors';
+import { UnauthorizedError, AppError } from '../errors';
 import { JwtPayload } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
 
@@ -25,7 +25,12 @@ export async function authenticate(
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
+    } catch {
+      throw new UnauthorizedError('Invalid or expired token');
+    }
 
     const membership = decoded.businessId
       ? await prisma.businessMember.findUnique({
@@ -49,7 +54,11 @@ export async function authenticate(
     };
 
     next();
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+      return;
+    }
     next(new UnauthorizedError('Invalid or expired token'));
   }
 }
