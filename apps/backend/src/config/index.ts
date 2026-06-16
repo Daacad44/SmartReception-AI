@@ -4,8 +4,10 @@ dotenv.config();
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3001', 10),
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-  apiUrl: process.env.API_URL || 'http://localhost:3001',
+  frontendUrl:
+    process.env.FRONTEND_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173'),
+  apiUrl: process.env.API_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3001'),
 
   database: {
     url: process.env.DATABASE_URL!,
