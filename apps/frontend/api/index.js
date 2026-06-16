@@ -1,5 +1,5 @@
 /**
- * Vercel serverless entry — CommonJS (.cjs) because frontend package is ESM.
+ * Vercel serverless entry — CommonJS (api/package.json overrides parent ESM).
  */
 const path = require('path');
 
