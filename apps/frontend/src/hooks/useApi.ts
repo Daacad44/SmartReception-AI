@@ -149,7 +149,7 @@ export function transformKnowledgeDocument(raw: any): KnowledgeDocument {
   const statusMap: Record<string, KnowledgeDocument['status']> = {
     INDEXED: 'indexed',
     PROCESSING: 'processing',
-    PENDING: 'processing',
+    PENDING: 'pending',
     FAILED: 'failed',
   };
 

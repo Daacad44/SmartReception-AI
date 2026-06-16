@@ -19,17 +19,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    const resolved =
-      theme === 'system'
-        ? window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light'
-        : theme;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
 
-    setResolvedTheme(resolved);
-    root.classList.remove('light', 'dark');
-    root.classList.add(resolved);
-    localStorage.setItem('smartreception-theme', theme);
+    const applyTheme = () => {
+      const resolved =
+        theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
+      setResolvedTheme(resolved);
+      root.classList.remove('light', 'dark');
+      root.classList.add(resolved);
+      localStorage.setItem('smartreception-theme', theme);
+    };
+
+    applyTheme();
+    media.addEventListener('change', applyTheme);
+    return () => media.removeEventListener('change', applyTheme);
   }, [theme]);
 
   const setTheme = (t: Theme) => setThemeState(t);

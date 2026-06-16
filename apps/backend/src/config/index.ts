@@ -44,6 +44,12 @@ export const config = {
     publicUrl: process.env.R2_PUBLIC_URL || '',
   },
 
+  supabase: {
+    url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
+  },
+
   email: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
