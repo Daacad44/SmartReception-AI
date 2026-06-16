@@ -16,8 +16,8 @@ function isTokenExpired(token: string, bufferSeconds = 60): boolean {
 }
 
 /**
- * After Zustand rehydration, validate the session and refresh expired tokens
- * before protected API queries are enabled.
+ * After hydration, refresh expired tokens in the background.
+ * Does not block rendering — the axios 401 interceptor handles failures.
  */
 export function AuthBootstrap() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
@@ -25,26 +25,11 @@ export function AuthBootstrap() {
   useEffect(() => {
     if (!hasHydrated) return;
 
-    const { isAuthenticated, accessToken, refreshToken, setTokens, logout, setSessionReady } =
+    const { isAuthenticated, accessToken, refreshToken, setTokens, logout } =
       useAuthStore.getState();
 
-    if (!isAuthenticated) {
-      setSessionReady(true);
-      return;
-    }
-
-    if (!accessToken) {
-      if (!refreshToken) {
-        logout();
-      }
-      setSessionReady(true);
-      return;
-    }
-
-    if (!isTokenExpired(accessToken) || !refreshToken) {
-      setSessionReady(true);
-      return;
-    }
+    if (!isAuthenticated || !accessToken || !refreshToken) return;
+    if (!isTokenExpired(accessToken)) return;
 
     let cancelled = false;
 
@@ -52,7 +37,11 @@ export function AuthBootstrap() {
       try {
         const response = await axios.post<
           ApiResponse<{ accessToken: string; refreshToken: string }>
-        >(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+        >(
+          `${API_BASE_URL}/auth/refresh`,
+          { refreshToken },
+          { timeout: 10000 }
+        );
 
         const body = response.data;
         if (!body.success || !body.data) {
@@ -65,10 +54,6 @@ export function AuthBootstrap() {
       } catch {
         if (!cancelled) {
           logout();
-        }
-      } finally {
-        if (!cancelled) {
-          setSessionReady(true);
         }
       }
     })();

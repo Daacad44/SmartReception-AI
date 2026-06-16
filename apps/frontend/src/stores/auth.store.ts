@@ -11,9 +11,7 @@ interface AuthState {
   currentBusinessId: string | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
-  sessionReady: boolean;
   setHasHydrated: (value: boolean) => void;
-  setSessionReady: (value: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: UserProfile) => void;
   setBusinesses: (businesses: Business[]) => void;
@@ -32,10 +30,8 @@ export const useAuthStore = create<AuthState>()(
       currentBusinessId: null,
       isAuthenticated: false,
       hasHydrated: false,
-      sessionReady: false,
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
-      setSessionReady: (value) => set({ sessionReady: value }),
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken, isAuthenticated: true }),
@@ -63,7 +59,6 @@ export const useAuthStore = create<AuthState>()(
           })),
           currentBusinessId: user.businesses[0]?.id ?? null,
           isAuthenticated: true,
-          sessionReady: true,
         }),
 
       logout: () =>
@@ -74,7 +69,6 @@ export const useAuthStore = create<AuthState>()(
           businesses: [],
           currentBusinessId: null,
           isAuthenticated: false,
-          sessionReady: true,
         }),
     }),
     {
@@ -96,9 +90,16 @@ export const useAuthStore = create<AuthState>()(
         if (state?.isAuthenticated && !state.accessToken) {
           useAuthStore.getState().logout();
         }
-
-        useAuthStore.getState().setHasHydrated(true);
       },
     }
   )
 );
+
+// Reliable hydration detection (onRehydrateStorage alone can miss in some browsers)
+useAuthStore.persist.onFinishHydration(() => {
+  useAuthStore.getState().setHasHydrated(true);
+});
+
+if (useAuthStore.persist.hasHydrated()) {
+  useAuthStore.getState().setHasHydrated(true);
+}
