@@ -35,6 +35,9 @@ Password: Demo1234!
 
 ## Vercel Deployment
 
+> **Important:** In Vercel Project Settings → General → **Root Directory**, leave it empty (repository root `.`).
+> Do **not** set it to `apps/frontend` unless you only want the static frontend without the API.
+
 ### Required Environment Variables
 
 Set these in [Vercel Project Settings → Environment Variables](https://vercel.com/docs/projects/environment-variables):
