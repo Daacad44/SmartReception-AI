@@ -8,6 +8,7 @@ import { config } from './config';
 import { errorHandler, notFoundHandler } from './core/error-handler';
 import routes from './routes';
 import { logger } from './core/logger';
+import { prisma } from './infrastructure/database/prisma';
 
 export function createApp(): express.Application {
   const app = express();
@@ -60,8 +61,14 @@ export function createApp(): express.Application {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  app.get('/health', async (_req, res) => {
+    const timestamp = new Date().toISOString();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', database: 'connected', timestamp });
+    } catch {
+      res.status(503).json({ status: 'degraded', database: 'disconnected', timestamp });
+    }
   });
 
   app.use('/api/v1', routes);
