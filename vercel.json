@@ -6,9 +6,9 @@
   "outputDirectory": "apps/frontend/dist",
   "framework": null,
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "apps/backend/prisma/**"
+      "includeFiles": "apps/backend/{dist,prisma}/**"
     }
   },
   "rewrites": [

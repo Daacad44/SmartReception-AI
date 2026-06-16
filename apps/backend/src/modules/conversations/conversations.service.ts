@@ -1,7 +1,6 @@
 import { conversationsRepository } from './conversations.repository';
 import { NotFoundError } from '../../core/errors';
 import { PaginationInput, SendMessageInput } from '@smartreception/shared';
-import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 
