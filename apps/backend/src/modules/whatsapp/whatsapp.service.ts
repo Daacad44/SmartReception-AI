@@ -1,6 +1,6 @@
 import { whatsappRepository } from './whatsapp.repository';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
-import { aiQueue } from '../../infrastructure/queue/queues';
+import { getAiQueue } from '../../infrastructure/queue/queues';
 import { config } from '../../config';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
@@ -81,12 +81,15 @@ export class WhatsAppModuleService {
       });
 
       if (conversation.isAiEnabled && aiConfig?.enableAutoReply) {
-        await aiQueue.add('process-ai', {
-          businessId: account.businessId,
-          conversationId: conversation.id,
-          messageId: message.id,
-          customerMessage: msg.text.body,
-        });
+        const queue = getAiQueue();
+        if (queue) {
+          await queue.add('process-ai', {
+            businessId: account.businessId,
+            conversationId: conversation.id,
+            messageId: message.id,
+            customerMessage: msg.text.body,
+          });
+        }
       }
     }
   }

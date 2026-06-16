@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w @smartreception/backend\" \"npm run dev -w @smartreception/frontend\"",
     "build": "npm run build -w @smartreception/shared && npm run build -w @smartreception/backend && npm run build -w @smartreception/frontend",
+    "build:vercel": "npm run build -w @smartreception/shared && npm run db:generate -w @smartreception/backend && npm run build -w @smartreception/backend && VITE_API_URL=/api/v1 npm run build -w @smartreception/frontend",
     "db:generate": "npm run db:generate -w @smartreception/backend",
     "db:migrate": "npm run db:migrate -w @smartreception/backend",
     "db:push": "npm run db:push -w @smartreception/backend",

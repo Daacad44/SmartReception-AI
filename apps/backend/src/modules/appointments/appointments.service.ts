@@ -6,7 +6,7 @@ import {
   PaginationInput,
 } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
-import { reminderQueue } from '../../infrastructure/queue/queues';
+import { getReminderQueue } from '../../infrastructure/queue/queues';
 
 export class AppointmentsService {
   async list(
@@ -65,15 +65,18 @@ export class AppointmentsService {
 
     const reminderTime = new Date(startTime.getTime() - 24 * 60 * 60 * 1000);
     if (reminderTime > new Date()) {
-      await reminderQueue.add(
-        'appointment-reminder',
-        {
-          appointmentId: appointment.id,
-          businessId,
-          customerPhone: customer.phone,
-        },
-        { delay: reminderTime.getTime() - Date.now() }
-      );
+      const queue = getReminderQueue();
+      if (queue) {
+        await queue.add(
+          'appointment-reminder',
+          {
+            appointmentId: appointment.id,
+            businessId,
+            customerPhone: customer.phone,
+          },
+          { delay: reminderTime.getTime() - Date.now() }
+        );
+      }
     }
 
     await prisma.auditLog.create({

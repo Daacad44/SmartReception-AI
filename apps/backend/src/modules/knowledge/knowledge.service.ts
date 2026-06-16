@@ -2,7 +2,7 @@ import { knowledgeRepository } from './knowledge.repository';
 import { NotFoundError } from '../../core/errors';
 import { CreateFaqInput } from '@smartreception/shared';
 import { storageService } from '../../infrastructure/storage/r2.service';
-import { documentQueue } from '../../infrastructure/queue/queues';
+import { getDocumentQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
 
@@ -61,11 +61,19 @@ export class KnowledgeService {
       content: docType === 'TXT' ? file.buffer.toString('utf-8') : undefined,
     });
 
-    await documentQueue.add('process-document', {
-      documentId: document.id,
-      knowledgeBaseId: base.id,
-      businessId,
-    });
+    const queue = getDocumentQueue();
+    if (queue) {
+      await queue.add('process-document', {
+        documentId: document.id,
+        knowledgeBaseId: base.id,
+        businessId,
+      });
+    } else if (docType === 'TXT') {
+      await prisma.knowledgeDocument.update({
+        where: { id: document.id },
+        data: { status: 'INDEXED' },
+      });
+    }
 
     return document;
   }

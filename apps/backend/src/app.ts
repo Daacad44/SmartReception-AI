@@ -17,7 +17,21 @@ export function createApp(): express.Application {
   app.use(helmet());
   app.use(
     cors({
-      origin: config.frontendUrl,
+      origin: (origin, callback) => {
+        const allowed = [config.frontendUrl];
+        if (process.env.VERCEL_URL) {
+          allowed.push(`https://${process.env.VERCEL_URL}`);
+        }
+        if (
+          !origin ||
+          allowed.includes(origin) ||
+          origin.endsWith('.vercel.app')
+        ) {
+          callback(null, true);
+        } else {
+          callback(null, config.env !== 'production');
+        }
+      },
       credentials: true,
     })
   );

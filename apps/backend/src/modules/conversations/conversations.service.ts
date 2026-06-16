@@ -2,7 +2,7 @@ import { conversationsRepository } from './conversations.repository';
 import { NotFoundError } from '../../core/errors';
 import { PaginationInput, SendMessageInput } from '@smartreception/shared';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
-import { whatsappQueue } from '../../infrastructure/queue/queues';
+import { getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 
 export class ConversationsService {
@@ -55,13 +55,21 @@ export class ConversationsService {
     });
 
     if (conversation.whatsappAccount) {
-      await whatsappQueue.add('send-message', {
-        businessId,
-        conversationId,
-        messageId: message.id,
-        phoneNumber: conversation.customer.phone,
-        content: input.content,
-      });
+      const queue = getWhatsappQueue();
+      if (queue) {
+        await queue.add('send-message', {
+          businessId,
+          conversationId,
+          messageId: message.id,
+          phoneNumber: conversation.customer.phone,
+          content: input.content,
+        });
+      } else {
+        await prisma.message.update({
+          where: { id: message.id },
+          data: { status: 'SENT' },
+        });
+      }
     } else {
       await prisma.message.update({
         where: { id: message.id },
