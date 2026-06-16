@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserProfile } from '@/lib/types';
-import type { Business } from '@/lib/mock-data';
+import type { Business } from '@/lib/entities';
 
 interface AuthState {
   accessToken: string | null;

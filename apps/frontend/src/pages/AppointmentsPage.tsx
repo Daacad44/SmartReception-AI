@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppointments } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { LoadingState } from '@/components/LoadingState';
 
 const statusColors: Record<string, string> = {
   confirmed: 'bg-success/10 text-success border-success/20',
@@ -25,10 +26,15 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function AppointmentsPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 5, 16));
-  const [selectedDate, setSelectedDate] = useState('2025-06-17');
-  const { data: appointments } = useAppointments();
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(toDateString(today));
+  const { data: appointments, isLoading } = useAppointments();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -64,6 +70,10 @@ export function AppointmentsPage() {
         </Button>
       </div>
 
+      {isLoading ? (
+        <LoadingState rows={6} />
+      ) : (
+      <>
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardContent className="p-6">
@@ -92,7 +102,7 @@ export function AppointmentsPage() {
                 const ds = dateStr(day);
                 const hasApt = daysWithAppointments.has(ds);
                 const isSelected = ds === selectedDate;
-                const isToday = ds === '2025-06-16';
+                const isToday = ds === toDateString(new Date());
 
                 return (
                   <button
@@ -185,6 +195,8 @@ export function AppointmentsPage() {
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

@@ -69,11 +69,16 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
       },
-      business: {
-        id: business.id,
-        name: business.name,
-        slug: business.slug,
-      },
+      businesses: [
+        {
+          id: business.id,
+          name: business.name,
+          slug: business.slug,
+          role: 'OWNER',
+          industry: business.industry,
+          plan: 'PROFESSIONAL',
+        },
+      ],
       ...tokens,
     };
   }
@@ -124,6 +129,8 @@ export class AuthService {
         name: m.business.name,
         slug: m.business.slug,
         role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'STARTER',
       })),
       ...tokens,
     };
@@ -256,6 +263,8 @@ export class AuthService {
         name: m.business.name,
         slug: m.business.slug,
         role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'STARTER',
       })),
     };
   }

@@ -60,6 +60,18 @@ export class ConversationsController {
     }
   }
 
+  async getMessages(req: Request, res: Response, next: NextFunction) {
+    try {
+      const messages = await conversationsService.getMessages(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: messages });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async markAsRead(req: Request, res: Response, next: NextFunction) {
     try {
       const conversation = await conversationsService.markAsRead(

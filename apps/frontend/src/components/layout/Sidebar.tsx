@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useConversations } from '@/hooks/useApi';
+import { useConversations, useBilling } from '@/hooks/useApi';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -31,11 +31,19 @@ const navItems = [
 
 export function Sidebar() {
   const { data: conversations } = useConversations();
+  const { data: billing } = useBilling();
   const unreadCount = conversations?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
+  const appointmentBadge = conversations?.filter((c) => c.status === 'pending').length ?? 0;
+
+  const conversationUsage = billing?.usage?.conversations;
+  const usagePercent =
+    conversationUsage && conversationUsage.limit > 0
+      ? Math.round((conversationUsage.used / conversationUsage.limit) * 100)
+      : 0;
 
   const badges: Record<string, number> = {
     conversations: unreadCount,
-    appointments: 3,
+    appointments: appointmentBadge,
   };
 
   return (
@@ -79,12 +87,14 @@ export function Sidebar() {
         <div className="rounded-lg bg-white/5 p-4">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-accent" />
-            <span className="text-xs font-semibold">Professional Plan</span>
+            <span className="text-xs font-semibold">{billing?.plan ?? 'Starter'} Plan</span>
           </div>
           <p className="mb-3 text-[11px] text-white/50">
-            2,847 / 5,000 conversations used
+            {conversationUsage
+              ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
+              : 'Loading usage...'}
           </p>
-          <Progress value={57} className="mb-3 h-1.5 bg-white/10" />
+          <Progress value={usagePercent} className="mb-3 h-1.5 bg-white/10" />
           <Link
             to="/billing"
             className="block text-center text-xs font-medium text-accent hover:text-accent/80"

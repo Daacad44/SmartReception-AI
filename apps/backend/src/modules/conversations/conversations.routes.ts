@@ -11,6 +11,9 @@ router.use(authenticate, requireBusiness);
 router.get('/', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.list(req, res, next)
 );
+router.get('/:id/messages', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.getMessages(req, res, next)
+);
 router.get('/:id', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.get(req, res, next)
 );

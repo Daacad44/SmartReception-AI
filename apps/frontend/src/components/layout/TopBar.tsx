@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings } from 'lucide-react';
+import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -16,19 +16,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { useBusiness } from '@/hooks/useBusiness';
 import { useNotifications } from '@/hooks/useApi';
+import { useTheme } from '@/components/ThemeProvider';
 import { getInitials, formatRelativeTime } from '@/lib/utils';
 
 export function TopBar() {
   const { user, logout } = useAuth();
   const { businesses, currentBusiness, switchBusiness } = useBusiness();
   const { data: notifications } = useNotifications();
+  const { resolvedTheme, setTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const unreadNotifications = notifications?.filter((n) => !n.read).length ?? 0;
   const displayName = user ? `${user.firstName} ${user.lastName}` : 'User';
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -55,6 +57,15 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          aria-label="Toggle theme"
+        >
+          {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">

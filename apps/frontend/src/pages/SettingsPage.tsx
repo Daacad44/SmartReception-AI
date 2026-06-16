@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Bot, Bell, Shield, Globe } from 'lucide-react';
+import { Building2, Bot, Bell, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,33 +17,108 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
-import { useBusiness } from '@/hooks/useBusiness';
+import { useBusinessSettings, useAiConfig } from '@/hooks/useApi';
+import { useUpdateBusinessSettings, useUpdateAiConfig } from '@/hooks/useMutations';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
 
 const businessSchema = z.object({
   name: z.string().min(1),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
   timezone: z.string(),
 });
 
+const aiSchema = z.object({
+  greetingMessage: z.string().min(1),
+  fallbackMessage: z.string().optional(),
+  enableAutoReply: z.boolean(),
+  enableBooking: z.boolean(),
+  enableLeadQualification: z.boolean(),
+  language: z.string(),
+});
+
 type BusinessForm = z.infer<typeof businessSchema>;
+type AiForm = z.infer<typeof aiSchema>;
 
 export function SettingsPage() {
-  const { currentBusiness } = useBusiness();
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useBusinessSettings();
+  const { data: aiConfig, isLoading: aiLoading } = useAiConfig();
+  const updateSettings = useUpdateBusinessSettings();
+  const updateAiConfig = useUpdateAiConfig();
 
-  const { register, handleSubmit } = useForm<BusinessForm>({
+  const businessForm = useForm<BusinessForm>({
     resolver: zodResolver(businessSchema),
     defaultValues: {
-      name: currentBusiness?.name ?? '',
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
       timezone: 'America/New_York',
     },
   });
 
-  const onSave = () => {
-    toast.success('Settings saved successfully');
-  };
+  const aiForm = useForm<AiForm>({
+    resolver: zodResolver(aiSchema),
+    defaultValues: {
+      greetingMessage: 'Hello! How can I help you today?',
+      fallbackMessage: '',
+      enableAutoReply: true,
+      enableBooking: true,
+      enableLeadQualification: true,
+      language: 'en',
+    },
+  });
+
+  useEffect(() => {
+    if (settings) {
+      businessForm.reset({
+        name: settings.name,
+        phone: settings.phone ?? '',
+        email: settings.email ?? '',
+        address: settings.address ?? '',
+        timezone: settings.timezone,
+      });
+    }
+  }, [settings, businessForm]);
+
+  useEffect(() => {
+    if (aiConfig) {
+      aiForm.reset({
+        greetingMessage: aiConfig.greetingMessage ?? 'Hello! How can I help you today?',
+        fallbackMessage: aiConfig.fallbackMessage ?? '',
+        enableAutoReply: aiConfig.enableAutoReply,
+        enableBooking: aiConfig.enableBooking,
+        enableLeadQualification: aiConfig.enableLeadQualification,
+        language: aiConfig.languages[0] ?? 'en',
+      });
+    }
+  }, [aiConfig, aiForm]);
+
+  const onSaveBusiness = businessForm.handleSubmit(async (data) => {
+    await updateSettings.mutateAsync({
+      timezone: data.timezone,
+      phone: data.phone,
+      email: data.email || undefined,
+      address: data.address,
+    });
+  });
+
+  const onSaveAi = aiForm.handleSubmit(async (data) => {
+    await updateAiConfig.mutateAsync({
+      greetingMessage: data.greetingMessage,
+      fallbackMessage: data.fallbackMessage,
+      enableAutoReply: data.enableAutoReply,
+      enableBooking: data.enableBooking,
+      enableLeadQualification: data.enableLeadQualification,
+      languages: [data.language],
+    });
+  });
+
+  if (settingsError) {
+    return <ErrorState message="Unable to load settings." />;
+  }
 
   return (
     <div className="space-y-6">
@@ -78,42 +154,55 @@ export function SettingsPage() {
               <CardDescription>Update your business profile and contact details</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit(onSave)} className="space-y-4 max-w-lg">
-                <div className="space-y-2">
-                  <Label>Business Name</Label>
-                  <Input {...register('name')} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              {settingsLoading ? (
+                <LoadingState rows={4} />
+              ) : (
+                <form onSubmit={onSaveBusiness} className="space-y-4 max-w-lg">
                   <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input {...register('phone')} placeholder="+1 555-0100" />
+                    <Label>Business Name</Label>
+                    <Input {...businessForm.register('name')} disabled />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Phone</Label>
+                      <Input {...businessForm.register('phone')} placeholder="+1 555-0100" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input {...businessForm.register('email')} placeholder="contact@business.com" />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input {...register('email')} placeholder="contact@business.com" />
+                    <Label>Address</Label>
+                    <Textarea {...businessForm.register('address')} placeholder="123 Main St, City, State" />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Address</Label>
-                  <Textarea {...register('address')} placeholder="123 Main St, City, State" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Timezone</Label>
-                  <Select defaultValue="America/New_York">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                      <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                      <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                      <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                      <SelectItem value="Europe/London">GMT</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="bg-accent hover:bg-accent/90">Save Changes</Button>
-              </form>
+                  <div className="space-y-2">
+                    <Label>Timezone</Label>
+                    <Select
+                      value={businessForm.watch('timezone')}
+                      onValueChange={(v) => businessForm.setValue('timezone', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+                        <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
+                        <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
+                        <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                        <SelectItem value="Europe/London">GMT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="bg-accent hover:bg-accent/90"
+                    disabled={updateSettings.isPending}
+                  >
+                    Save Changes
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -125,54 +214,73 @@ export function SettingsPage() {
               <CardDescription>Customize how your AI assistant interacts with customers</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 max-w-lg">
-              <div className="space-y-2">
-                <Label>Assistant Name</Label>
-                <Input defaultValue="SmartReception Assistant" />
-              </div>
-              <div className="space-y-2">
-                <Label>Greeting Message</Label>
-                <Textarea
-                  defaultValue="Hello! Welcome to Acme Medical Clinic. How can I help you today?"
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Response Tone</Label>
-                <Select defaultValue="professional">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="friendly">Friendly</SelectItem>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="formal">Formal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Language</Label>
-                <Select defaultValue="en">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="pt">Portuguese</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Auto-escalate to human</p>
-                  <p className="text-xs text-muted-foreground">Transfer complex queries to agents</p>
-                </div>
-                <Button variant="outline" size="sm">Enabled</Button>
-              </div>
-              <Button className="bg-accent hover:bg-accent/90">Save AI Settings</Button>
+              {aiLoading ? (
+                <LoadingState rows={4} />
+              ) : (
+                <form onSubmit={onSaveAi} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Greeting Message</Label>
+                    <Textarea {...aiForm.register('greetingMessage')} rows={3} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fallback Message</Label>
+                    <Textarea {...aiForm.register('fallbackMessage')} rows={2} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Primary Language</Label>
+                    <Select
+                      value={aiForm.watch('language')}
+                      onValueChange={(v) => aiForm.setValue('language', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Spanish</SelectItem>
+                        <SelectItem value="fr">French</SelectItem>
+                        <SelectItem value="pt">Portuguese</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Auto-reply to messages</p>
+                      <p className="text-xs text-muted-foreground">AI responds automatically to incoming messages</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => aiForm.setValue('enableAutoReply', !aiForm.watch('enableAutoReply'))}
+                    >
+                      {aiForm.watch('enableAutoReply') ? 'Enabled' : 'Disabled'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Appointment booking</p>
+                      <p className="text-xs text-muted-foreground">Allow AI to schedule appointments</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => aiForm.setValue('enableBooking', !aiForm.watch('enableBooking'))}
+                    >
+                      {aiForm.watch('enableBooking') ? 'Enabled' : 'Disabled'}
+                    </Button>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="bg-accent hover:bg-accent/90"
+                    disabled={updateAiConfig.isPending}
+                  >
+                    Save AI Settings
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -181,24 +289,12 @@ export function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Choose what notifications you receive</CardDescription>
+              <CardDescription>Real-time notifications appear in the top bar</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-lg">
-              {[
-                { label: 'New conversations', desc: 'When a customer starts a new chat' },
-                { label: 'Appointment reminders', desc: 'Upcoming appointment notifications' },
-                { label: 'AI escalations', desc: 'When AI needs human assistance' },
-                { label: 'Team activity', desc: 'Updates from team members' },
-                { label: 'Weekly reports', desc: 'Summary of weekly performance' },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <Button variant="outline" size="sm">On</Button>
-                </div>
-              ))}
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Email notification preferences will be available in a future release.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -210,32 +306,9 @@ export function SettingsPage() {
               <CardDescription>Manage your account security</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 max-w-lg">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Current Password</Label>
-                  <Input type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label>New Password</Label>
-                  <Input type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Confirm New Password</Label>
-                  <Input type="password" />
-                </div>
-                <Button className="bg-accent hover:bg-accent/90">Update Password</Button>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Two-Factor Authentication</p>
-                    <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm">Enable</Button>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Use the forgot password flow on the login page to reset your password via email.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -13,28 +13,53 @@ import {
 } from '@/components/ui/table';
 import { useBilling } from '@/hooks/useApi';
 import { formatCurrency } from '@/lib/utils';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyState } from '@/components/EmptyState';
 
-const plans = [
-  {
-    name: 'Starter',
-    price: 29,
-    features: ['1,000 conversations/mo', '2 team members', 'Basic AI', 'Email support'],
-  },
-  {
-    name: 'Professional',
-    price: 99,
-    features: ['5,000 conversations/mo', '10 team members', 'Advanced AI', 'Priority support', 'Analytics'],
-    current: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 299,
-    features: ['Unlimited conversations', 'Unlimited team', 'Custom AI training', 'Dedicated support', 'SLA'],
-  },
-];
+const PLAN_FEATURES: Record<string, string[]> = {
+  FREE: ['500 conversations/mo', '1 team member', 'Basic AI'],
+  STARTER: ['1,000 conversations/mo', '2 team members', 'Basic AI', 'Email support'],
+  BUSINESS: ['3,000 conversations/mo', '5 team members', 'Advanced AI', 'Analytics'],
+  PROFESSIONAL: ['5,000 conversations/mo', '10 team members', 'Advanced AI', 'Priority support', 'Analytics'],
+  ENTERPRISE: ['Unlimited conversations', 'Unlimited team', 'Custom AI training', 'Dedicated support', 'SLA'],
+};
+
+const PLAN_PRICES: Record<string, number> = {
+  FREE: 0,
+  STARTER: 29,
+  BUSINESS: 79,
+  PROFESSIONAL: 99,
+  ENTERPRISE: 299,
+};
 
 export function BillingPage() {
-  const { data: billing } = useBilling();
+  const { data: billing, isLoading, isError } = useBilling();
+
+  if (isError) {
+    return <ErrorState message="Unable to load billing information." />;
+  }
+
+  if (isLoading) {
+    return <LoadingState rows={6} />;
+  }
+
+  const currentPlan = billing?.plan ?? 'PROFESSIONAL';
+  const plans = Object.entries(PLAN_PRICES)
+    .filter(([key]) => key !== 'FREE')
+    .map(([key, price]) => ({
+      key,
+      name: key.charAt(0) + key.slice(1).toLowerCase(),
+      price,
+      features: PLAN_FEATURES[key] ?? [],
+      current: key === currentPlan,
+    }));
+
+  const usageLabels: Record<string, string> = {
+    conversations: 'Conversations',
+    customers: 'Customers',
+    teamMembers: 'Team Members',
+  };
 
   return (
     <div className="space-y-6">
@@ -50,7 +75,7 @@ export function BillingPage() {
               <div>
                 <CardTitle>Current Plan</CardTitle>
                 <CardDescription>
-                  You are on the {billing?.plan ?? 'Professional'} plan
+                  You are on the {currentPlan.toLowerCase()} plan
                 </CardDescription>
               </div>
               <Badge variant="success" className="capitalize">
@@ -60,35 +85,32 @@ export function BillingPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-bold">${billing?.price ?? 99}</span>
+              <span className="text-4xl font-bold">${billing?.price ?? PLAN_PRICES[currentPlan] ?? 0}</span>
               <span className="text-muted-foreground">/{billing?.billingCycle ?? 'month'}</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Next billing date: {billing?.nextBillingDate ?? '2025-07-15'}
-            </p>
+            {billing?.nextBillingDate && (
+              <p className="text-sm text-muted-foreground">
+                Next billing date: {billing.nextBillingDate}
+              </p>
+            )}
 
             <div className="space-y-4">
               <h4 className="text-sm font-semibold">Usage This Period</h4>
-              {billing?.usage && Object.entries(billing.usage).map(([key, val]: [string, { used: number; limit: number }]) => {
-                const pct = (val.used / val.limit) * 100;
-                const labels: Record<string, string> = {
-                  conversations: 'Conversations',
-                  aiMessages: 'AI Messages',
-                  teamMembers: 'Team Members',
-                  storage: 'Storage (GB)',
-                };
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{labels[key] ?? key}</span>
-                      <span className="font-medium">
-                        {val.used.toLocaleString()} / {val.limit.toLocaleString()}
-                      </span>
+              {billing?.usage &&
+                Object.entries(billing.usage).map(([key, val]) => {
+                  const pct = val.limit > 0 ? (val.used / val.limit) * 100 : 0;
+                  return (
+                    <div key={key} className="space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{usageLabels[key] ?? key}</span>
+                        <span className="font-medium">
+                          {val.used.toLocaleString()} / {val.limit.toLocaleString()}
+                        </span>
+                      </div>
+                      <Progress value={Math.min(pct, 100)} className="h-2" />
                     </div>
-                    <Progress value={pct} className="h-2" />
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </CardContent>
         </Card>
@@ -97,24 +119,22 @@ export function BillingPage() {
           <CardHeader>
             <CardTitle className="text-base">Payment Method</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 rounded-lg border p-3">
-              <CreditCard className="h-8 w-8 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Visa ending in 4242</p>
-                <p className="text-xs text-muted-foreground">Expires 12/2027</p>
-              </div>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <CreditCard className="h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No payment method on file. Stripe integration coming soon.
+              </p>
             </div>
-            <Button variant="outline" className="w-full">Update Payment Method</Button>
           </CardContent>
         </Card>
       </div>
 
       <div>
         <h2 className="mb-4 text-lg font-semibold">Available Plans</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((plan) => (
-            <Card key={plan.name} className={plan.current ? 'border-accent ring-1 ring-accent' : ''}>
+            <Card key={plan.key} className={plan.current ? 'border-accent ring-1 ring-accent' : ''}>
               <CardContent className="p-6">
                 {plan.current && (
                   <Badge className="mb-3 bg-accent text-white">Current Plan</Badge>
@@ -155,36 +175,43 @@ export function BillingPage() {
           <CardTitle className="text-base">Invoice History</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {billing?.invoices.map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell className="font-medium">{inv.id}</TableCell>
-                  <TableCell>{inv.date}</TableCell>
-                  <TableCell>{formatCurrency(inv.amount)}</TableCell>
-                  <TableCell>
-                    <Badge variant="success" className="capitalize text-[10px]">
-                      {inv.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+          {!billing?.invoices?.length ? (
+            <EmptyState
+              title="No invoices yet"
+              description="Invoices will appear here once billing is activated."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {billing.invoices.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.id.slice(0, 8)}</TableCell>
+                    <TableCell>{inv.date}</TableCell>
+                    <TableCell>{formatCurrency(inv.amount)}</TableCell>
+                    <TableCell>
+                      <Badge variant="success" className="capitalize text-[10px]">
+                        {inv.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

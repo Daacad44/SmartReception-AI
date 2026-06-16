@@ -94,6 +94,14 @@ export class ConversationsService {
     return conversationsRepository.takeover(businessId, conversationId, userId);
   }
 
+  async getMessages(businessId: string, conversationId: string) {
+    const messages = await conversationsRepository.findMessages(businessId, conversationId);
+    if (!messages) {
+      throw new NotFoundError('Conversation not found');
+    }
+    return messages;
+  }
+
   async markAsRead(businessId: string, conversationId: string) {
     const conversation = await conversationsRepository.findById(businessId, conversationId);
     if (!conversation) {

@@ -16,11 +16,18 @@ import { MessageSquare, Clock, Star, Bot } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAnalytics } from '@/hooks/useApi';
 import { formatNumber } from '@/lib/utils';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const COLORS = ['#651147', '#0F172A', '#10B981', '#F59E0B', '#6B7280'];
 
 export function AnalyticsPage() {
-  const { data: analytics } = useAnalytics();
+  const { data: analytics, isLoading, isError } = useAnalytics();
+
+  if (isError) {
+    return <ErrorState message="Unable to load analytics data." />;
+  }
 
   return (
     <div className="space-y-6">
@@ -30,7 +37,9 @@ export function AnalyticsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          : [
           { label: 'Total Messages', value: formatNumber(analytics?.totalMessages ?? 0), icon: MessageSquare },
           { label: 'Avg Response Time', value: analytics?.avgResponseTime ?? '—', icon: Clock },
           { label: 'Satisfaction Score', value: `${analytics?.satisfactionScore ?? 0}/5`, icon: Star },
@@ -52,6 +61,10 @@ export function AnalyticsPage() {
         ))}
       </div>
 
+      {isLoading ? (
+        <LoadingState rows={6} />
+      ) : (
+      <>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -116,6 +129,8 @@ export function AnalyticsPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }
