@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth.store';
 
 interface UseRealtimeOptions {
@@ -13,7 +13,8 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!businessId) return;
+    const supabase = getSupabase();
+    if (!supabase || !businessId) return;
 
     const channel = supabase
       .channel(`business-${businessId}`)

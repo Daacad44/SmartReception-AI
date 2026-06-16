@@ -15,6 +15,9 @@ echo "==> Building backend..."
 npm run build -w @smartreception/backend
 
 echo "==> Building frontend..."
-VITE_API_URL=/api/v1 npm run build -w @smartreception/frontend
+export VITE_API_URL="${VITE_API_URL:-/api/v1}"
+export VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://hlngecipthlecwqozwhe.supabase.co}"
+# VITE_SUPABASE_ANON_KEY: set in Vercel env or apps/frontend/.env.local (optional — has code fallback)
+npm run build -w @smartreception/frontend
 
 echo "==> Build complete."
