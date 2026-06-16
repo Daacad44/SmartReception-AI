@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import type { LoginCredentials, RegisterData, UserProfile } from '@/lib/types';
 import { useAuthStore } from '@/stores/auth.store';
+import { useAuthReady } from '@/hooks/useAuthReady';
 
 interface LoginResponse {
   user: {
@@ -126,6 +127,7 @@ export function useAuth() {
     navigate('/login');
   };
 
+  const authReady = useAuthReady();
   const profileQuery = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
@@ -133,7 +135,7 @@ export function useAuth() {
       const data = extractData<ProfileResponse>(response);
       return mapProfileToUserProfile(data);
     },
-    enabled: isAuthenticated,
+    enabled: authReady,
   });
 
   return {
