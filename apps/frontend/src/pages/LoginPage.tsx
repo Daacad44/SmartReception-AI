@@ -24,7 +24,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: 'sarah@acmeclinic.com', password: 'password123' },
+    defaultValues: { email: '', password: '' },
   });
 
   return (

@@ -16,6 +16,7 @@ import { TeamPage } from '@/pages/TeamPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { useAuthStore } from '@/stores/auth.store';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,7 +38,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>
           <Routes>
@@ -80,6 +82,7 @@ export default function App() {
         </BrowserRouter>
         <Toaster position="top-right" richColors />
       </TooltipProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

@@ -124,6 +124,25 @@ export class ConversationsRepository {
     });
   }
 
+  async findMessages(businessId: string, conversationId: string) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, businessId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      return null;
+    }
+
+    return prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        sentByUser: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
   async findConversationWithWhatsApp(businessId: string, id: string) {
     return prisma.conversation.findFirst({
       where: { id, businessId },

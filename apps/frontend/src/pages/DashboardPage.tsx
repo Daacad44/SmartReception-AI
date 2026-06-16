@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import {
   MessageSquare,
   Users,
@@ -37,7 +38,8 @@ import {
   useConversations,
 } from '@/hooks/useApi';
 import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativeTime } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { ErrorState } from '@/components/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function KpiCard({
   title,
@@ -85,13 +87,22 @@ const statusColors: Record<string, string> = {
 };
 
 export function DashboardPage() {
-  const { data: stats } = useDashboardStats();
-  const { data: revenue } = useRevenueData();
-  const { data: customerGrowth } = useCustomerGrowth();
-  const { data: trends } = useConversationTrends();
-  const { data: topServices } = useTopServices();
-  const { data: teamPerf } = useTeamPerformance();
-  const { data: conversations } = useConversations();
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useDashboardStats();
+  const { data: revenue, isLoading: revenueLoading } = useRevenueData();
+  const { data: customerGrowth, isLoading: growthLoading } = useCustomerGrowth();
+  const { data: trends, isLoading: trendsLoading } = useConversationTrends();
+  const { data: topServices, isLoading: servicesLoading } = useTopServices();
+  const { data: teamPerf, isLoading: teamLoading } = useTeamPerformance();
+  const { data: conversations, isLoading: convsLoading } = useConversations();
+
+  const chartsLoading = revenueLoading || growthLoading || trendsLoading;
+
+  const aiHandlingCount = conversations?.filter((c) => c.status === 'ai_handling').length ?? 0;
+  const maxBookings = topServices?.[0]?.bookingCount ?? 1;
+
+  if (statsError) {
+    return <ErrorState message="Unable to load dashboard data. Check your API connection." />;
+  }
 
   return (
     <div className="space-y-6">
@@ -113,10 +124,16 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {statsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+        ) : (
+          <>
         <KpiCard title="Total Conversations" value={stats?.totalConversations ?? 0} growth={stats?.conversationGrowth ?? 0} icon={MessageSquare} />
         <KpiCard title="Active Customers" value={stats?.activeCustomers ?? 0} growth={stats?.customerGrowth ?? 0} icon={Users} />
         <KpiCard title="Appointments Today" value={stats?.appointmentsToday ?? 0} growth={stats?.appointmentGrowth ?? 0} icon={Calendar} />
         <KpiCard title="AI Resolution Rate" value={stats?.aiResolutionRate ?? 0} growth={stats?.aiGrowth ?? 0} icon={Bot} format="percent" />
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -126,8 +143,11 @@ export function DashboardPage() {
             <CardDescription>Monthly revenue for the past year</CardDescription>
           </CardHeader>
           <CardContent>
+            {chartsLoading ? (
+              <Skeleton className="h-[280px] w-full" />
+            ) : (
             <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={revenue}>
+              <AreaChart data={revenue ?? []}>
                 <defs>
                   <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#651147" stopOpacity={0.3} />
@@ -141,6 +161,7 @@ export function DashboardPage() {
                 <Area type="monotone" dataKey="revenue" stroke="#651147" fill="url(#revenueGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -150,8 +171,11 @@ export function DashboardPage() {
             <CardDescription>Total active customers over time</CardDescription>
           </CardHeader>
           <CardContent>
+            {chartsLoading ? (
+              <Skeleton className="h-[280px] w-full" />
+            ) : (
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={customerGrowth}>
+              <LineChart data={customerGrowth ?? []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
@@ -159,6 +183,7 @@ export function DashboardPage() {
                 <Line type="monotone" dataKey="customers" stroke="#0F172A" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -170,8 +195,11 @@ export function DashboardPage() {
             <CardDescription>Daily conversation volume this week</CardDescription>
           </CardHeader>
           <CardContent>
+            {trendsLoading ? (
+              <Skeleton className="h-[240px] w-full" />
+            ) : (
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={trends}>
+              <BarChart data={trends ?? []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#6B7280" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
@@ -179,6 +207,7 @@ export function DashboardPage() {
                 <Bar dataKey="count" fill="#651147" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -209,7 +238,10 @@ export function DashboardPage() {
             <Link to="/appointments" className="text-xs text-accent hover:underline">View all</Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {topServices?.map((service, i) => (
+            {servicesLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : (
+            topServices?.map((service, i) => (
               <div key={service.serviceId} className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">
                   {i + 1}
@@ -218,9 +250,10 @@ export function DashboardPage() {
                   <p className="text-sm font-medium">{service.name}</p>
                   <p className="text-xs text-muted-foreground">{service.bookingCount} bookings</p>
                 </div>
-                <Progress value={(service.bookingCount / 342) * 100} className="h-1.5 w-16" />
+                <Progress value={maxBookings > 0 ? (service.bookingCount / maxBookings) * 100 : 0} className="h-1.5 w-16" />
               </div>
-            ))}
+            ))
+            )}
           </CardContent>
         </Card>
 
@@ -229,7 +262,10 @@ export function DashboardPage() {
             <CardTitle className="text-base">Team Performance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {teamPerf?.map((member) => (
+            {teamLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : (
+            teamPerf?.map((member) => (
               <div key={member.userId} className="flex items-center gap-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-navy text-white text-xs">
@@ -246,7 +282,8 @@ export function DashboardPage() {
                   {member.resolutionRate}%
                 </Badge>
               </div>
-            ))}
+            ))
+            )}
           </CardContent>
         </Card>
 
@@ -273,13 +310,14 @@ export function DashboardPage() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Conversations Handled</span>
-                <span className="font-medium">1,840</span>
+                <span className="font-medium">{stats?.totalConversations ?? 0}</span>
               </div>
-              <Progress value={65} className="h-2" />
+              <Progress value={stats?.aiResolutionRate ?? 0} className="h-2" />
             </div>
             <div className="rounded-lg bg-muted p-3">
               <p className="text-xs text-muted-foreground">
-                AI is actively handling 4 conversations. Average response time: 1.2s
+                AI is actively handling {aiHandlingCount} conversation{aiHandlingCount !== 1 ? 's' : ''}.
+                Resolution rate: {stats?.aiResolutionRate ?? 0}%
               </p>
             </div>
           </CardContent>
@@ -299,6 +337,9 @@ export function DashboardPage() {
           </Link>
         </CardHeader>
         <CardContent>
+          {convsLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : (
           <div className="space-y-3">
             {conversations?.slice(0, 5).map((conv) => (
               <div key={conv.id} className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
@@ -325,6 +366,7 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
+          )}
         </CardContent>
       </Card>
     </div>

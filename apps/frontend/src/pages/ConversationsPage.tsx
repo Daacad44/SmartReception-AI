@@ -25,8 +25,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useConversations, useMessages } from '@/hooks/useApi';
+import { useSendMessage, useTakeoverConversation } from '@/hooks/useMutations';
+import { useRealtime } from '@/hooks/useRealtime';
+import { LoadingState } from '@/components/LoadingState';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { cn, getInitials, formatRelativeTime } from '@/lib/utils';
-import type { Conversation } from '@/lib/mock-data';
+import type { Conversation } from '@/lib/entities';
 
 const statusColors: Record<string, string> = {
   open: 'bg-warning/10 text-warning border-warning/20',
@@ -43,8 +48,20 @@ export function ConversationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [message, setMessage] = useState('');
 
-  const { data: conversations } = useConversations();
-  const { data: messages } = useMessages(selectedId);
+  const { data: conversations, isLoading, isError, refetch } = useConversations();
+  const { data: messages, isLoading: messagesLoading } = useMessages(selectedId);
+  const sendMessage = useSendMessage();
+  const takeover = useTakeoverConversation();
+
+  useRealtime({ conversationId: selectedId });
+
+  const handleSend = () => {
+    if (!selectedId || !message.trim()) return;
+    sendMessage.mutate(
+      { conversationId: selectedId, content: message.trim() },
+      { onSuccess: () => setMessage('') }
+    );
+  };
 
   const filtered = conversations?.filter((c) => {
     const matchesSearch =
@@ -96,14 +113,22 @@ export function ConversationsPage() {
           </div>
         </div>
         <ScrollArea className="flex-1">
-          {filtered?.map((conv) => (
+          {isLoading ? (
+            <LoadingState rows={4} />
+          ) : isError ? (
+            <ErrorState message="Failed to load conversations" onRetry={() => refetch()} />
+          ) : filtered?.length === 0 ? (
+            <EmptyState title="No conversations" description="New WhatsApp messages will appear here." />
+          ) : (
+            filtered?.map((conv) => (
             <ConversationItem
               key={conv.id}
               conversation={conv}
               isSelected={conv.id === selectedId}
               onClick={() => setSelectedId(conv.id)}
             />
-          ))}
+          ))
+          )}
         </ScrollArea>
       </div>
 
@@ -134,9 +159,9 @@ export function ConversationsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Assign to agent</DropdownMenuItem>
-                    <DropdownMenuItem>Mark as resolved</DropdownMenuItem>
-                    <DropdownMenuItem>Transfer to AI</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => selectedId && takeover.mutate(selectedId)}>
+                      Take over from AI
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">Block contact</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -144,6 +169,9 @@ export function ConversationsPage() {
             </div>
 
             <ScrollArea className="flex-1 p-4">
+              {messagesLoading ? (
+                <LoadingState rows={6} />
+              ) : (
               <div className="space-y-3">
                 {messages?.map((msg) => (
                   <div
@@ -188,6 +216,7 @@ export function ConversationsPage() {
                   </div>
                 ))}
               </div>
+              )}
             </ScrollArea>
 
             <div className="border-t bg-white p-3">
@@ -203,11 +232,16 @@ export function ConversationsPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      setMessage('');
+                      handleSend();
                     }
                   }}
                 />
-                <Button size="icon" className="shrink-0 bg-accent hover:bg-accent/90">
+                <Button
+                  size="icon"
+                  className="shrink-0 bg-accent hover:bg-accent/90"
+                  disabled={sendMessage.isPending || !message.trim()}
+                  onClick={handleSend}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>

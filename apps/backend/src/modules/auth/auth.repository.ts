@@ -80,7 +80,11 @@ export class AuthRepository {
   async getUserBusinesses(userId: string) {
     return prisma.businessMember.findMany({
       where: { userId, isActive: true },
-      include: { business: true },
+      include: {
+        business: {
+          include: { subscription: true },
+        },
+      },
     });
   }
 }

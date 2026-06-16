@@ -1,5 +1,6 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import type { ApiResponse } from '@/lib/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -10,6 +11,28 @@ export const api = axios.create({
   },
   timeout: 15000,
 });
+
+export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
+  const body = response.data;
+  if (!body.success) {
+    throw new Error(body.error || body.message || 'Request failed');
+  }
+  if (body.data === undefined) {
+    throw new Error('No data in response');
+  }
+  return body.data;
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as ApiResponse | undefined;
+    return data?.error || data?.message || error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'An unexpected error occurred';
+}
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
@@ -65,12 +88,14 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-        const newAccessToken = data.data?.accessToken ?? data.accessToken;
-        const newRefreshToken = data.data?.refreshToken ?? data.refreshToken;
-        useAuthStore.getState().setTokens(newAccessToken, newRefreshToken);
-        processQueue(null, newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
+          `${API_BASE_URL}/auth/refresh`,
+          { refreshToken }
+        );
+        const tokens = extractData(response);
+        useAuthStore.getState().setTokens(tokens.accessToken, tokens.refreshToken);
+        processQueue(null, tokens.accessToken);
+        originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
@@ -84,16 +109,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-export async function apiCall<T>(
-  fn: () => Promise<T>,
-  fallback: T
-): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fallback;
-  }
-}
 
 export default api;
