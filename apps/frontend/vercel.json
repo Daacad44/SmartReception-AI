@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "functions": {
-    "api/index.cjs": {
+    "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "api/_bundle/**"
     }
