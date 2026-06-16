@@ -14,6 +14,13 @@ npm run db:generate -w @smartreception/backend
 echo "==> Building backend..."
 npm run build -w @smartreception/backend
 
+echo "==> Preparing API serverless bundle..."
+API_BUNDLE="apps/frontend/api/_bundle"
+rm -rf "$API_BUNDLE"
+mkdir -p "$API_BUNDLE"
+cp -r apps/backend/dist "$API_BUNDLE/dist"
+cp -r apps/backend/prisma "$API_BUNDLE/prisma"
+
 echo "==> Building frontend..."
 export VITE_API_URL="${VITE_API_URL:-/api/v1}"
 export VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://hlngecipthlecwqozwhe.supabase.co}"

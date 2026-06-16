@@ -13,6 +13,7 @@ apps/*/.env.local
 apps/*/.env.*.local
 !.env.example
 !apps/*/.env.example
+apps/frontend/api/_bundle/
 
 *.log
 .DS_Store
