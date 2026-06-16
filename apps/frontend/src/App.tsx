@@ -1,10 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { LazyRoute } from '@/components/LazyRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
@@ -37,14 +37,6 @@ const SettingsPage = lazy(() =>
 const BillingPage = lazy(() =>
   import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
 );
-
-function PageLoader() {
-  return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-accent" aria-label="Loading page" />
-    </div>
-  );
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,73 +97,73 @@ export default function App() {
               <Route
                 path="/dashboard"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <DashboardPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/conversations"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <ConversationsPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/customers"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <CustomersPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/appointments"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <AppointmentsPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/knowledge"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <KnowledgeBasePage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/analytics"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <AnalyticsPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/team"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <TeamPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/settings"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <SettingsPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
               <Route
                 path="/billing"
                 element={
-                  <Suspense fallback={<PageLoader />}>
+                  <LazyRoute>
                     <BillingPage />
-                  </Suspense>
+                  </LazyRoute>
                 }
               />
             </Route>
