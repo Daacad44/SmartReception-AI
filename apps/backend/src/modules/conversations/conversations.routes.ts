@@ -1,0 +1,27 @@
+import { Router } from 'express';
+import { conversationsController } from './conversations.controller';
+import { authenticate } from '../../core/middleware/auth.middleware';
+import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { PERMISSIONS } from '@smartreception/shared';
+
+const router = Router();
+
+router.use(authenticate, requireBusiness);
+
+router.get('/', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.list(req, res, next)
+);
+router.get('/:id', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.get(req, res, next)
+);
+router.post('/:id/messages', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.sendMessage(req, res, next)
+);
+router.post('/:id/takeover', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.takeover(req, res, next)
+);
+router.patch('/:id/read', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.markAsRead(req, res, next)
+);
+
+export default router;

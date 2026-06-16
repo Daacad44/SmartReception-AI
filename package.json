@@ -1,0 +1,25 @@
+{
+  "name": "smartreception-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered WhatsApp business automation platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @smartreception/backend\" \"npm run dev -w @smartreception/frontend\"",
+    "build": "npm run build -w @smartreception/shared && npm run build -w @smartreception/backend && npm run build -w @smartreception/frontend",
+    "db:generate": "npm run db:generate -w @smartreception/backend",
+    "db:migrate": "npm run db:migrate -w @smartreception/backend",
+    "db:push": "npm run db:push -w @smartreception/backend",
+    "db:seed": "npm run db:seed -w @smartreception/backend",
+    "lint": "npm run lint -w @smartreception/backend && npm run lint -w @smartreception/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
