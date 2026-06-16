@@ -76,6 +76,16 @@ export class TeamRepository {
     });
   }
 
+  async updateInvitation(
+    id: string,
+    data: { token: string; expiresAt: Date; role: UserRole }
+  ) {
+    return prisma.teamInvitation.update({
+      where: { id },
+      data,
+    });
+  }
+
   async findUserByEmail(email: string) {
     return prisma.user.findUnique({ where: { email } });
   }

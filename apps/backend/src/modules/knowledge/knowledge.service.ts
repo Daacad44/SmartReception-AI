@@ -1,16 +1,20 @@
 import { knowledgeRepository } from './knowledge.repository';
-import { NotFoundError } from '../../core/errors';
+import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateFaqInput } from '@smartreception/shared';
-import { storageService } from '../../infrastructure/storage/r2.service';
+import { storageService } from '../../infrastructure/storage';
 import { getDocumentQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
+import { processDocumentContent } from './document-processor';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  'application/msword': 'DOCX',
   'text/plain': 'TXT',
 };
+
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt'];
 
 export class KnowledgeService {
   async listBases(businessId: string) {
@@ -31,6 +35,15 @@ export class KnowledgeService {
     title?: string,
     knowledgeBaseId?: string
   ) {
+    if (!file?.buffer?.length) {
+      throw new ValidationError('File is empty');
+    }
+
+    const ext = file.originalname.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
+    }
+
     const base =
       knowledgeBaseId
         ? await knowledgeRepository.findBaseById(businessId, knowledgeBaseId)
@@ -40,15 +53,15 @@ export class KnowledgeService {
       throw new NotFoundError('Knowledge base not found');
     }
 
-    const docType = MIME_TO_TYPE[file.mimetype];
+    const docType = MIME_TO_TYPE[file.mimetype] ?? MIME_TO_TYPE[this.mimeFromExtension(ext)];
     if (!docType) {
-      throw new NotFoundError('Unsupported file type. Allowed: PDF, DOCX, TXT');
+      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
     }
 
-    const { url } = await storageService.upload(
+    const { key, url } = await storageService.upload(
       file.buffer,
       file.originalname,
-      file.mimetype,
+      file.mimetype || 'application/octet-stream',
       `knowledge/${businessId}`
     );
 
@@ -56,9 +69,8 @@ export class KnowledgeService {
       knowledgeBaseId: base.id,
       title: title || file.originalname,
       type: docType,
-      fileUrl: url,
+      fileUrl: url.includes('http') ? url : `supabase://knowledge-documents/${key}`,
       fileSize: file.size,
-      content: docType === 'TXT' ? file.buffer.toString('utf-8') : undefined,
     });
 
     const queue = getDocumentQueue();
@@ -68,14 +80,26 @@ export class KnowledgeService {
         knowledgeBaseId: base.id,
         businessId,
       });
-    } else if (docType === 'TXT') {
-      await prisma.knowledgeDocument.update({
-        where: { id: document.id },
-        data: { status: 'INDEXED' },
-      });
+      return document;
     }
 
-    return document;
+    const { content, status } = await processDocumentContent(file.buffer, docType);
+    const updated = await knowledgeRepository.updateDocument(document.id, {
+      content: content || (docType === 'TXT' ? file.buffer.toString('utf-8').slice(0, 50000) : undefined),
+      status,
+    });
+
+    return updated;
+  }
+
+  private mimeFromExtension(ext: string): string {
+    const map: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+      '.txt': 'text/plain',
+    };
+    return map[ext] ?? '';
   }
 
   async listFaqs(businessId: string, knowledgeBaseId?: string) {

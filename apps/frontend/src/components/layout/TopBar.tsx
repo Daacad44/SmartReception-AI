@@ -40,7 +40,7 @@ export function TopBar() {
           onBlur={() => setSearchOpen(false)}
         />
         {searchOpen && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border bg-white p-4 shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border bg-card p-4 shadow-lg">
             <p className="text-xs text-muted-foreground">Quick search</p>
             <div className="mt-2 space-y-1">
               {['Conversations', 'Customers', 'Appointments', 'Knowledge Base'].map((item) => (

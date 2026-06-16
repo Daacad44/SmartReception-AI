@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useConversations, useBilling } from '@/hooks/useApi';
+import { useConversations, useBilling, useAppointments } from '@/hooks/useApi';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -31,9 +31,11 @@ const navItems = [
 
 export function Sidebar() {
   const { data: conversations } = useConversations();
+  const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
   const unreadCount = conversations?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
-  const appointmentBadge = conversations?.filter((c) => c.status === 'pending').length ?? 0;
+  const upcomingAppointments =
+    appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
 
   const conversationUsage = billing?.usage?.conversations;
   const usagePercent =
@@ -43,7 +45,7 @@ export function Sidebar() {
 
   const badges: Record<string, number> = {
     conversations: unreadCount,
-    appointments: appointmentBadge,
+    appointments: upcomingAppointments,
   };
 
   return (

@@ -57,6 +57,8 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 | `VITE_API_URL` | `/api/v1` |
 | `VITE_SUPABASE_URL` | `https://hlngecipthlecwqozwhe.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon (publishable) key from Project Settings → API |
+| `SUPABASE_URL` | `https://hlngecipthlecwqozwhe.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (backend storage uploads) |
 
 ### Local development
 

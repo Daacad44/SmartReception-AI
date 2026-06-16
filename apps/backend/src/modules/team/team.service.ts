@@ -29,7 +29,16 @@ export class TeamService {
 
     const existingInvite = await teamRepository.findInvitationByEmail(businessId, input.email);
     if (existingInvite) {
-      throw new ConflictError('Invitation already sent to this email');
+      const token = tokenService.generateSecureToken();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const invitation = await teamRepository.updateInvitation(existingInvite.id, {
+        token,
+        expiresAt,
+        role: input.role as UserRole,
+      });
+      const business = await prisma.business.findUnique({ where: { id: businessId } });
+      await emailService.sendTeamInvitation(input.email, business?.name || 'SmartReception', token);
+      return invitation;
     }
 
     const token = tokenService.generateSecureToken();
