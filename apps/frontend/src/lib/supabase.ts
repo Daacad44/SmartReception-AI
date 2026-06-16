@@ -1,10 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { isSupabaseConfigured, SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+let client: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are not configured');
+/** Lazily create Supabase client so the app never crashes when env vars are missing. */
+export function getSupabase(): SupabaseClient | null {
+  if (!isSupabaseConfigured) {
+    console.warn('Supabase is not configured — realtime features disabled');
+    return null;
+  }
+
+  if (!client) {
+    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      realtime: { params: { eventsPerSecond: 10 } },
+    });
+  }
+
+  return client;
 }
-
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');

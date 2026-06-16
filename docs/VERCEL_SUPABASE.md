@@ -54,8 +54,20 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp webhook verify token |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp Cloud API token (optional) |
 | `REDIS_URL` | Upstash Redis URL (optional, for background jobs) |
+| `VITE_API_URL` | `/api/v1` |
+| `VITE_SUPABASE_URL` | `https://hlngecipthlecwqozwhe.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon (publishable) key from Project Settings → API |
 
-### Deploy
+### Local development
+
+Copy the frontend env template and add your anon key (file is gitignored):
+
+```bash
+cp apps/frontend/.env.example apps/frontend/.env.local
+# Edit apps/frontend/.env.local — set VITE_SUPABASE_ANON_KEY from Supabase Dashboard → API
+```
+
+Never commit `.env.local` or root `.env` — they are listed in `.gitignore`.
 
 ```bash
 # Via Vercel CLI
