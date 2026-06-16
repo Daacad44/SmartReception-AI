@@ -3,5 +3,16 @@
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "cd ../.. && bash scripts/vercel-build.sh",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30,
+      "includeFiles": "../backend/prisma/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

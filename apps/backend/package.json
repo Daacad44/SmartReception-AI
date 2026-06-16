@@ -19,6 +19,7 @@
     "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@prisma/client": "^6.3.1",
     "@smartreception/shared": "*",
+    "@vercel/node": "^5.8.17",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.34.8",
     "compression": "^1.7.5",
