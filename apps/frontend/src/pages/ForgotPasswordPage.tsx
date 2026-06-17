@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bot, Mail, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ const schema = z.object({
 type ForgotPasswordForm = z.infer<typeof schema>;
 
 export function ForgotPasswordPage() {
+  const navigate = useNavigate();
   const { forgotPassword, isSendingReset } = useAuth();
   const {
     register,
@@ -34,10 +35,17 @@ export function ForgotPasswordPage() {
             <Bot className="h-6 w-6 text-white" />
           </div>
           <CardTitle className="text-2xl">Forgot password</CardTitle>
-          <CardDescription>We&apos;ll send you a reset link that expires in 15 minutes</CardDescription>
+          <CardDescription>We&apos;ll send a 6-digit code to your email (expires in 10 minutes)</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit((data) => forgotPassword(data.email))} className="space-y-4">
+          <form
+            onSubmit={handleSubmit((data) =>
+              forgotPassword(data.email, {
+                onSuccess: () => navigate(`/reset-password?email=${encodeURIComponent(data.email)}`),
+              })
+            )}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -47,7 +55,7 @@ export function ForgotPasswordPage() {
               {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
             </div>
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isSendingReset}>
-              {isSendingReset ? 'Sending...' : 'Send reset link'}
+              {isSendingReset ? 'Sending...' : 'Send reset code'}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-muted-foreground">

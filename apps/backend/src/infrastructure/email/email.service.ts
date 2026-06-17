@@ -64,6 +64,21 @@ export class EmailService {
     logger.info(`[Email Dev] From: ${this.fromAddress}, To: ${to}, Subject: ${subject}`);
   }
 
+  async sendOtpEmail(
+    email: string,
+    code: string,
+    firstName: string,
+    purpose: 'verification' | 'password_reset'
+  ): Promise<void> {
+    const { subject, html } = templates.otpEmail({
+      firstName,
+      code,
+      expiryMinutes: 10,
+      purpose,
+    });
+    await this.send(email, subject, html);
+  }
+
   async sendVerificationEmail(
     email: string,
     token: string,

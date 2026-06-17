@@ -105,7 +105,7 @@ export function useAuth() {
       const message = getErrorMessage(error);
       toast.error(message);
       if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
-        navigate(`/check-email?email=${encodeURIComponent(variables.email)}`);
+        navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
       }
     },
   });
@@ -116,21 +116,34 @@ export function useAuth() {
       return extractData<RegisterResponse>(response);
     },
     onSuccess: (data) => {
-      toast.success('Account created! Please verify your email.');
-      navigate(`/check-email?email=${encodeURIComponent(data.email)}`);
+      toast.success('Account created! Enter the code sent to your email.');
+      navigate(`/verify-otp?email=${encodeURIComponent(data.email)}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
   });
 
-  const resendVerificationMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await api.post('/auth/resend-verification', { email });
+  const verifyOtpMutation = useMutation({
+    mutationFn: async ({ email, code }: { email: string; code: string }) => {
+      const response = await api.post('/auth/verify-otp', { email, code });
       return extractData<{ message: string }>(response);
     },
     onSuccess: () => {
-      toast.success('Verification email sent');
+      toast.success('Email verified successfully!');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const resendOtpMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await api.post('/auth/resend-otp', { email });
+      return extractData<{ message: string }>(response);
+    },
+    onSuccess: () => {
+      toast.success('Verification code sent');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -143,7 +156,7 @@ export function useAuth() {
       return extractData(response);
     },
     onSuccess: () => {
-      toast.success('If the email exists, a reset link has been sent');
+      toast.success('If the email exists, a reset code has been sent');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -151,8 +164,16 @@ export function useAuth() {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async ({ token, password }: { token: string; password: string }) => {
-      const response = await api.post('/auth/reset-password', { token, password });
+    mutationFn: async ({
+      email,
+      code,
+      password,
+    }: {
+      email: string;
+      code: string;
+      password: string;
+    }) => {
+      const response = await api.post('/auth/reset-password', { email, code, password });
       return extractData(response);
     },
     onSuccess: () => {
@@ -191,13 +212,15 @@ export function useAuth() {
     isAuthenticated,
     login: loginMutation.mutate,
     register: registerMutation.mutate,
-    resendVerification: resendVerificationMutation.mutate,
+    verifyOtp: verifyOtpMutation.mutate,
+    resendOtp: resendOtpMutation.mutate,
     forgotPassword: forgotPasswordMutation.mutate,
     resetPassword: resetPasswordMutation.mutate,
     logout,
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
-    isResendingVerification: resendVerificationMutation.isPending,
+    isVerifyingOtp: verifyOtpMutation.isPending,
+    isResendingOtp: resendOtpMutation.isPending,
     isSendingReset: forgotPasswordMutation.isPending,
     isResettingPassword: resetPasswordMutation.isPending,
     profile: profileQuery.data,

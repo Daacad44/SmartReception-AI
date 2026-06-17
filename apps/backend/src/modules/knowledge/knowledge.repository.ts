@@ -38,6 +38,7 @@ export class KnowledgeRepository {
     category?: string;
     question?: string;
     answer?: string;
+    status?: 'UPLOADED' | 'PENDING' | 'PROCESSING' | 'INDEXING' | 'INDEXED' | 'FAILED';
   }) {
     return prisma.knowledgeDocument.create({ data });
   }
@@ -56,7 +57,8 @@ export class KnowledgeRepository {
     data: {
       title?: string;
       content?: string;
-      status?: string;
+      status?: 'UPLOADED' | 'PENDING' | 'PROCESSING' | 'INDEXING' | 'INDEXED' | 'FAILED';
+      processingError?: string | null;
       category?: string;
       question?: string;
       answer?: string;
@@ -67,7 +69,8 @@ export class KnowledgeRepository {
       data: {
         title: data.title,
         content: data.content,
-        status: data.status as 'PENDING' | 'PROCESSING' | 'INDEXED' | 'FAILED' | undefined,
+        status: data.status as 'UPLOADED' | 'PENDING' | 'PROCESSING' | 'INDEXING' | 'INDEXED' | 'FAILED' | undefined,
+        processingError: data.processingError,
         category: data.category,
         question: data.question,
         answer: data.answer,

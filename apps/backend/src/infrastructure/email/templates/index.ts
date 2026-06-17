@@ -1,5 +1,48 @@
 import { BRAND, renderButton, renderEmailLayout, renderSecurityNotice } from './layout';
 
+function renderOtpCard(code: string): string {
+  return `<div style="margin:32px auto;max-width:320px;padding:28px 24px;background:${BRAND.primaryColor};border-radius:16px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94A3B8;">Verification Code</p>
+    <p style="margin:0;font-size:42px;font-weight:700;letter-spacing:0.35em;color:#ffffff;font-family:'Courier New',monospace;">${code}</p>
+  </div>`;
+}
+
+interface OtpEmailData {
+  firstName: string;
+  code: string;
+  expiryMinutes: number;
+  purpose: 'verification' | 'password_reset';
+}
+
+export function otpEmail(data: OtpEmailData): { subject: string; html: string } {
+  const isVerify = data.purpose === 'verification';
+  const title = isVerify ? 'Verify your email' : 'Reset your password';
+  const message = isVerify
+    ? `Hi ${data.firstName}, use this code to verify your ${BRAND.productName} account:`
+    : `Hi ${data.firstName}, use this code to reset your ${BRAND.productName} password:`;
+
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">${title}</h1>
+    <p style="margin:0 0 8px;font-size:15px;color:#475569;line-height:1.7;">${message}</p>
+    ${renderOtpCard(data.code)}
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;text-align:center;">
+      This code expires in <strong>${data.expiryMinutes} minutes</strong>.
+    </p>
+    ${renderSecurityNotice('Never share this code with anyone. ' + BRAND.productName + ' will never ask for your code by phone or chat.')}
+  `;
+
+  return {
+    subject: isVerify
+      ? `${data.code} is your ${BRAND.productName} verification code`
+      : `${data.code} is your ${BRAND.productName} password reset code`,
+    html: renderEmailLayout({
+      preheader: `Your verification code is ${data.code}`,
+      title,
+      body,
+    }),
+  };
+}
+
 interface VerificationEmailData {
   firstName: string;
   businessName: string;

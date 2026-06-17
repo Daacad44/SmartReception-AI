@@ -8,7 +8,7 @@ import { LazyRoute } from '@/components/LazyRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
-import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
+import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
@@ -91,7 +91,7 @@ export default function App() {
                 </PublicRoute>
               }
             />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/verify-otp" element={<VerifyOtpPage />} />
             <Route path="/check-email" element={<CheckEmailPage />} />
             <Route
               path="/forgot-password"
