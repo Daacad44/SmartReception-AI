@@ -16,6 +16,7 @@ export class AuthRepository {
     firstName: string;
     lastName: string;
     emailVerifyToken?: string;
+    emailVerifyExpires?: Date;
   }): Promise<User> {
     return prisma.user.create({ data });
   }

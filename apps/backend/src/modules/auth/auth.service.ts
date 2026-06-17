@@ -2,9 +2,18 @@ import { authRepository } from './auth.repository';
 import { passwordService } from '../../infrastructure/auth/password.service';
 import { tokenService } from '../../infrastructure/auth/token.service';
 import { emailService } from '../../infrastructure/email/email.service';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../../core/errors';
+import { generateSecureToken, hashToken } from '../../infrastructure/email/token.util';
+import {
+  ConflictError,
+  UnauthorizedError,
+  NotFoundError,
+  EmailNotVerifiedError,
+} from '../../core/errors';
 import { RegisterInput, LoginInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+
+const VERIFY_EXPIRY_HOURS = 24;
+const RESET_EXPIRY_MINUTES = 15;
 
 function slugify(text: string): string {
   return text
@@ -21,14 +30,16 @@ export class AuthService {
     }
 
     const passwordHash = await passwordService.hash(input.password);
-    const emailVerifyToken = tokenService.generateSecureToken();
+    const rawVerifyToken = generateSecureToken();
+    const emailVerifyExpires = new Date(Date.now() + VERIFY_EXPIRY_HOURS * 60 * 60 * 1000);
 
     const user = await authRepository.createUser({
       email: input.email,
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
-      emailVerifyToken,
+      emailVerifyToken: hashToken(rawVerifyToken),
+      emailVerifyExpires,
     });
 
     let slug = slugify(input.businessName);
@@ -43,14 +54,10 @@ export class AuthService {
       industry: input.industry,
     });
 
-    await emailService.sendVerificationEmail(user.email, emailVerifyToken);
-
-    const tokens = await tokenService.createTokenPair(
-      user.id,
-      user.email,
-      business.id,
-      'OWNER'
-    );
+    await emailService.sendVerificationEmail(user.email, rawVerifyToken, {
+      firstName: user.firstName,
+      businessName: business.name,
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -59,31 +66,18 @@ export class AuthService {
         action: 'CREATE',
         entity: 'User',
         entityId: user.id,
+        newData: { event: 'registration', emailSent: true },
       },
     });
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      businesses: [
-        {
-          id: business.id,
-          name: business.name,
-          slug: business.slug,
-          role: 'OWNER',
-          industry: business.industry,
-          plan: 'PROFESSIONAL',
-        },
-      ],
-      ...tokens,
+      message: 'Registration successful. Please check your email to verify your account.',
+      email: user.email,
+      requiresVerification: true,
     };
   }
 
-  async login(input: LoginInput) {
+  async login(input: LoginInput, ipAddress?: string) {
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
       throw new UnauthorizedError('Invalid credentials');
@@ -92,6 +86,10 @@ export class AuthService {
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedError('Invalid credentials');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new EmailNotVerifiedError();
     }
 
     const memberships = await authRepository.getUserBusinesses(user.id);
@@ -113,8 +111,14 @@ export class AuthService {
         action: 'LOGIN',
         entity: 'User',
         entityId: user.id,
+        ipAddress,
+        newData: { event: 'login' },
       },
     });
+
+    emailService
+      .sendLoginAlert(user.email, { firstName: user.firstName, ipAddress })
+      .catch(() => undefined);
 
     return {
       user: {
@@ -136,6 +140,35 @@ export class AuthService {
     };
   }
 
+  async resendVerification(email: string) {
+    const user = await authRepository.findUserByEmail(email);
+    if (!user || user.isEmailVerified) {
+      return { message: 'If the account exists and is unverified, a new email has been sent' };
+    }
+
+    const rawVerifyToken = generateSecureToken();
+    const emailVerifyExpires = new Date(Date.now() + VERIFY_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    await authRepository.updateUser(user.id, {
+      emailVerifyToken: hashToken(rawVerifyToken),
+      emailVerifyExpires,
+    });
+
+    await emailService.sendResendVerificationEmail(user.email, rawVerifyToken, user.firstName);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'UPDATE',
+        entity: 'User',
+        entityId: user.id,
+        newData: { event: 'verification_resent' },
+      },
+    });
+
+    return { message: 'If the account exists and is unverified, a new email has been sent' };
+  }
+
   async refresh(refreshToken: string) {
     const stored = await authRepository.findRefreshToken(refreshToken);
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
@@ -146,6 +179,10 @@ export class AuthService {
     const user = await authRepository.findUserById(decoded.userId);
     if (!user || !user.isActive) {
       throw new UnauthorizedError('User not found');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new EmailNotVerifiedError();
     }
 
     await tokenService.revokeRefreshToken(refreshToken);
@@ -181,21 +218,31 @@ export class AuthService {
     const user = await authRepository.findUserByEmail(email);
     if (!user) return;
 
-    const resetToken = tokenService.generateSecureToken();
-    const expires = new Date(Date.now() + 60 * 60 * 1000);
+    const rawResetToken = generateSecureToken();
+    const expires = new Date(Date.now() + RESET_EXPIRY_MINUTES * 60 * 1000);
 
     await authRepository.updateUser(user.id, {
-      resetPasswordToken: resetToken,
+      resetPasswordToken: hashToken(rawResetToken),
       resetPasswordExpires: expires,
     });
 
-    await emailService.sendPasswordResetEmail(email, resetToken);
+    await emailService.sendPasswordResetEmail(email, rawResetToken, user.firstName);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'UPDATE',
+        entity: 'User',
+        entityId: user.id,
+        newData: { event: 'password_reset_requested' },
+      },
+    });
   }
 
   async resetPassword(token: string, password: string) {
     const user = await prisma.user.findFirst({
       where: {
-        resetPasswordToken: token,
+        resetPasswordToken: hashToken(token),
         resetPasswordExpires: { gt: new Date() },
       },
     });
@@ -210,21 +257,70 @@ export class AuthService {
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
+
+    await tokenService.revokeAllUserTokens(user.id);
+
+    await emailService.sendPasswordChangedEmail(user.email, user.firstName);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'UPDATE',
+        entity: 'User',
+        entityId: user.id,
+        newData: { event: 'password_reset_completed' },
+      },
+    });
   }
 
   async verifyEmail(token: string) {
     const user = await prisma.user.findFirst({
-      where: { emailVerifyToken: token },
+      where: {
+        emailVerifyToken: hashToken(token),
+        emailVerifyExpires: { gt: new Date() },
+      },
+      include: {
+        businessMemberships: {
+          include: { business: true },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
-      throw new NotFoundError('Invalid verification token');
+      throw new NotFoundError('Invalid or expired verification token');
     }
 
     await authRepository.updateUser(user.id, {
       isEmailVerified: true,
       emailVerifyToken: null,
+      emailVerifyExpires: null,
     });
+
+    const businessName = user.businessMemberships[0]?.business.name ?? 'your business';
+
+    await emailService.sendWelcomeEmail(user.email, {
+      firstName: user.firstName,
+      businessName,
+    });
+
+    await emailService.sendAccountActivatedEmail(user.email, {
+      firstName: user.firstName,
+      businessName,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        businessId: user.businessMemberships[0]?.businessId,
+        userId: user.id,
+        action: 'UPDATE',
+        entity: 'User',
+        entityId: user.id,
+        newData: { event: 'email_verified' },
+      },
+    });
+
+    return { message: 'Email verified successfully. You can now sign in.' };
   }
 
   async switchBusiness(userId: string, businessId: string) {

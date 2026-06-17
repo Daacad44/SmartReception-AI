@@ -34,6 +34,14 @@ export function getErrorMessage(error: unknown): string {
   return 'An unexpected error occurred';
 }
 
+export function getErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as ApiResponse | undefined;
+    return data?.code;
+  }
+  return undefined;
+}
+
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {

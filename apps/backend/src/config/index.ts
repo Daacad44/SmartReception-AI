@@ -55,6 +55,13 @@ export const config = {
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'noreply@smartreception.ai',
+    from: process.env.EMAIL_FROM || 'SmartReception AI <noreply@botandev.com>',
+    fromName: process.env.EMAIL_FROM_NAME || 'SmartReception AI',
+    fromEmail: process.env.EMAIL_FROM_ADDRESS || 'noreply@botandev.com',
+    supportEmail: process.env.EMAIL_SUPPORT || 'support@botandev.com',
+  },
+
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
   },
 } as const;

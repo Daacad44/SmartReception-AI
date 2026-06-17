@@ -178,6 +178,7 @@ model User {
   phone             String?
   isEmailVerified   Boolean   @default(false)
   emailVerifyToken  String?
+  emailVerifyExpires DateTime?
   resetPasswordToken String?
   resetPasswordExpires DateTime?
   lastLoginAt       DateTime?
