@@ -2,7 +2,7 @@ import { knowledgeRepository } from './knowledge.repository';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateFaqInput } from '@smartreception/shared';
 import { storageService } from '../../infrastructure/storage';
-import { scheduleDocumentProcessing, processDocumentById } from '../../infrastructure/documents/document-processing.service';
+import { scheduleDocumentProcessing } from '../../infrastructure/documents/document-processing.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
 
