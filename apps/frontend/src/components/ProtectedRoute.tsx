@@ -13,10 +13,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const setHasHydrated = useAuthStore((s) => s.setHasHydrated);
 
-  // Safety net: never block the UI indefinitely if persist hydration stalls
   useEffect(() => {
     if (hasHydrated) return;
-    const timer = window.setTimeout(() => setHasHydrated(true), 3000);
+    const timer = window.setTimeout(() => setHasHydrated(true), 1000);
     return () => window.clearTimeout(timer);
   }, [hasHydrated, setHasHydrated]);
 

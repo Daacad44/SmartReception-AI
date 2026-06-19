@@ -20,6 +20,10 @@ interface AuthState {
   logout: () => void;
 }
 
+function markHydrated() {
+  useAuthStore.getState().setHasHydrated(true);
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -59,9 +63,10 @@ export const useAuthStore = create<AuthState>()(
           })),
           currentBusinessId: user.businesses[0]?.id ?? null,
           isAuthenticated: true,
+          hasHydrated: true,
         }),
 
-      logout: () =>
+      logout: () => {
         set({
           accessToken: null,
           refreshToken: null,
@@ -69,7 +74,9 @@ export const useAuthStore = create<AuthState>()(
           businesses: [],
           currentBusinessId: null,
           isAuthenticated: false,
-        }),
+          hasHydrated: true,
+        });
+      },
     }),
     {
       name: 'smartreception-auth',
@@ -82,24 +89,17 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          useAuthStore.getState().setHasHydrated(true);
-          return;
-        }
-
-        if (state?.isAuthenticated && !state.accessToken) {
+        if (!error && state?.isAuthenticated && !state.accessToken) {
           useAuthStore.getState().logout();
         }
+        markHydrated();
       },
     }
   )
 );
 
-// Reliable hydration detection (onRehydrateStorage alone can miss in some browsers)
-useAuthStore.persist.onFinishHydration(() => {
-  useAuthStore.getState().setHasHydrated(true);
-});
+useAuthStore.persist.onFinishHydration(markHydrated);
 
 if (useAuthStore.persist.hasHydrated()) {
-  useAuthStore.getState().setHasHydrated(true);
+  markHydrated();
 }

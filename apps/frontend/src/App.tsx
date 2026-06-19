@@ -14,7 +14,6 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { AuthBootstrap } from '@/components/AuthBootstrap';
 
 const DashboardPage = lazy(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
@@ -70,131 +69,130 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthBootstrap />
       <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <LoginPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <RegisterPage />
-                </PublicRoute>
-              }
-            />
-            <Route path="/verify-otp" element={<VerifyOtpPage />} />
-            <Route path="/check-email" element={<CheckEmailPage />} />
-            <Route
-              path="/forgot-password"
-              element={
-                <PublicRoute>
-                  <ForgotPasswordPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/reset-password"
-              element={
-                <PublicRoute>
-                  <ResetPasswordPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
+        <TooltipProvider>
+          <BrowserRouter>
+            <Routes>
               <Route
-                path="/dashboard"
+                path="/login"
                 element={
-                  <LazyRoute>
-                    <DashboardPage />
-                  </LazyRoute>
+                  <PublicRoute>
+                    <LoginPage />
+                  </PublicRoute>
                 }
               />
               <Route
-                path="/conversations"
+                path="/register"
                 element={
-                  <LazyRoute>
-                    <ConversationsPage />
-                  </LazyRoute>
+                  <PublicRoute>
+                    <RegisterPage />
+                  </PublicRoute>
+                }
+              />
+              <Route path="/verify-otp" element={<VerifyOtpPage />} />
+              <Route path="/check-email" element={<CheckEmailPage />} />
+              <Route
+                path="/forgot-password"
+                element={
+                  <PublicRoute>
+                    <ForgotPasswordPage />
+                  </PublicRoute>
                 }
               />
               <Route
-                path="/customers"
+                path="/reset-password"
                 element={
-                  <LazyRoute>
-                    <CustomersPage />
-                  </LazyRoute>
+                  <PublicRoute>
+                    <ResetPasswordPage />
+                  </PublicRoute>
                 }
               />
               <Route
-                path="/appointments"
                 element={
-                  <LazyRoute>
-                    <AppointmentsPage />
-                  </LazyRoute>
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
                 }
-              />
-              <Route
-                path="/knowledge"
-                element={
-                  <LazyRoute>
-                    <KnowledgeBasePage />
-                  </LazyRoute>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <LazyRoute>
-                    <AnalyticsPage />
-                  </LazyRoute>
-                }
-              />
-              <Route
-                path="/team"
-                element={
-                  <LazyRoute>
-                    <TeamPage />
-                  </LazyRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <LazyRoute>
-                    <SettingsPage />
-                  </LazyRoute>
-                }
-              />
-              <Route
-                path="/billing"
-                element={
-                  <LazyRoute>
-                    <BillingPage />
-                  </LazyRoute>
-                }
-              />
-            </Route>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster position="top-right" richColors />
-      </TooltipProvider>
+              >
+                <Route
+                  path="/dashboard"
+                  element={
+                    <LazyRoute>
+                      <DashboardPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/conversations"
+                  element={
+                    <LazyRoute>
+                      <ConversationsPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/customers"
+                  element={
+                    <LazyRoute>
+                      <CustomersPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/appointments"
+                  element={
+                    <LazyRoute>
+                      <AppointmentsPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/knowledge"
+                  element={
+                    <LazyRoute>
+                      <KnowledgeBasePage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/analytics"
+                  element={
+                    <LazyRoute>
+                      <AnalyticsPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/team"
+                  element={
+                    <LazyRoute>
+                      <TeamPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <LazyRoute>
+                      <SettingsPage />
+                    </LazyRoute>
+                  }
+                />
+                <Route
+                  path="/billing"
+                  element={
+                    <LazyRoute>
+                      <BillingPage />
+                    </LazyRoute>
+                  }
+                />
+              </Route>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster position="top-right" richColors />
+        </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
