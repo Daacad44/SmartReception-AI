@@ -88,7 +88,7 @@ export class KnowledgeService {
       return document;
     }
 
-    await processDocumentById(documentId, businessId);
+    scheduleDocumentProcessing(documentId, document.knowledgeBaseId, businessId);
     return knowledgeRepository.findDocument(businessId, documentId);
   }
 

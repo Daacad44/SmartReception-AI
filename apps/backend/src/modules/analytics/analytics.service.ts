@@ -28,6 +28,20 @@ export class AnalyticsService {
   async getTeamPerformance(businessId: string) {
     return analyticsRepository.getTeamPerformance(businessId);
   }
+
+  async getDashboardBundle(businessId: string) {
+    const [stats, revenue, customerGrowth, trends, topServices, teamPerformance] =
+      await Promise.all([
+        analyticsRepository.getDashboardStats(businessId),
+        analyticsRepository.getRevenueOverview(businessId),
+        analyticsRepository.getCustomerGrowth(businessId),
+        analyticsRepository.getConversationTrends(businessId, 30),
+        analyticsRepository.getTopServices(businessId),
+        analyticsRepository.getTeamPerformance(businessId),
+      ]);
+
+    return { stats, revenue, customerGrowth, trends, topServices, teamPerformance };
+  }
 }
 
 export const analyticsService = new AnalyticsService();

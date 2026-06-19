@@ -36,104 +36,63 @@ export class AnalyticsRepository {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-    const [
-      totalConversations,
-      activeCustomers,
-      appointmentsToday,
-      aiMessages,
-      totalMessages,
-      recentConversations,
-      recentCustomers,
-      recentAppointments,
-      recentAiMessages,
-      recentTotalMessages,
-      prevConversations,
-      prevCustomers,
-      prevAppointments,
-      prevAiMessages,
-      prevTotalMessages,
-    ] = await Promise.all([
-      prisma.conversation.count({ where: { businessId } }),
-      prisma.customer.count({ where: { businessId, isActive: true } }),
-      prisma.appointment.count({
-        where: {
-          businessId,
-          startTime: { gte: todayStart },
-          status: { notIn: ['CANCELLED'] },
-        },
-      }),
-      prisma.message.count({
-        where: { isAiGenerated: true, conversation: { businessId } },
-      }),
-      prisma.message.count({
-        where: { conversation: { businessId } },
-      }),
-      prisma.conversation.count({
-        where: { businessId, createdAt: { gte: thirtyDaysAgo } },
-      }),
-      prisma.customer.count({
-        where: { businessId, createdAt: { gte: thirtyDaysAgo } },
-      }),
-      prisma.appointment.count({
-        where: {
-          businessId,
-          createdAt: { gte: thirtyDaysAgo },
-          status: { notIn: ['CANCELLED'] },
-        },
-      }),
-      prisma.message.count({
-        where: {
-          isAiGenerated: true,
-          conversation: { businessId },
-          createdAt: { gte: thirtyDaysAgo },
-        },
-      }),
-      prisma.message.count({
-        where: {
-          conversation: { businessId },
-          createdAt: { gte: thirtyDaysAgo },
-        },
-      }),
-      prisma.conversation.count({
-        where: { businessId, createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
-      }),
-      prisma.customer.count({
-        where: { businessId, createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
-      }),
-      prisma.appointment.count({
-        where: {
-          businessId,
-          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-          status: { notIn: ['CANCELLED'] },
-        },
-      }),
-      prisma.message.count({
-        where: {
-          isAiGenerated: true,
-          conversation: { businessId },
-          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-        },
-      }),
-      prisma.message.count({
-        where: {
-          conversation: { businessId },
-          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-        },
-      }),
-    ]);
+    type StatsRow = {
+      totalConversations: bigint;
+      activeCustomers: bigint;
+      appointmentsToday: bigint;
+      aiMessages: bigint;
+      totalMessages: bigint;
+      recentConversations: bigint;
+      recentCustomers: bigint;
+      recentAppointments: bigint;
+      recentAiMessages: bigint;
+      recentTotalMessages: bigint;
+      prevConversations: bigint;
+      prevCustomers: bigint;
+      prevAppointments: bigint;
+      prevAiMessages: bigint;
+      prevTotalMessages: bigint;
+    };
+
+    const [row] = await prisma.$queryRaw<StatsRow[]>`
+      SELECT
+        (SELECT COUNT(*)::bigint FROM conversations WHERE "businessId" = ${businessId}) AS "totalConversations",
+        (SELECT COUNT(*)::bigint FROM customers WHERE "businessId" = ${businessId} AND "isActive" = true) AS "activeCustomers",
+        (SELECT COUNT(*)::bigint FROM appointments WHERE "businessId" = ${businessId} AND "startTime" >= ${todayStart} AND status NOT IN ('CANCELLED')) AS "appointmentsToday",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."isAiGenerated" = true) AS "aiMessages",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId}) AS "totalMessages",
+        (SELECT COUNT(*)::bigint FROM conversations WHERE "businessId" = ${businessId} AND "createdAt" >= ${thirtyDaysAgo}) AS "recentConversations",
+        (SELECT COUNT(*)::bigint FROM customers WHERE "businessId" = ${businessId} AND "createdAt" >= ${thirtyDaysAgo}) AS "recentCustomers",
+        (SELECT COUNT(*)::bigint FROM appointments WHERE "businessId" = ${businessId} AND "createdAt" >= ${thirtyDaysAgo} AND status NOT IN ('CANCELLED')) AS "recentAppointments",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."isAiGenerated" = true AND m."createdAt" >= ${thirtyDaysAgo}) AS "recentAiMessages",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."createdAt" >= ${thirtyDaysAgo}) AS "recentTotalMessages",
+        (SELECT COUNT(*)::bigint FROM conversations WHERE "businessId" = ${businessId} AND "createdAt" >= ${sixtyDaysAgo} AND "createdAt" < ${thirtyDaysAgo}) AS "prevConversations",
+        (SELECT COUNT(*)::bigint FROM customers WHERE "businessId" = ${businessId} AND "createdAt" >= ${sixtyDaysAgo} AND "createdAt" < ${thirtyDaysAgo}) AS "prevCustomers",
+        (SELECT COUNT(*)::bigint FROM appointments WHERE "businessId" = ${businessId} AND "createdAt" >= ${sixtyDaysAgo} AND "createdAt" < ${thirtyDaysAgo} AND status NOT IN ('CANCELLED')) AS "prevAppointments",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."isAiGenerated" = true AND m."createdAt" >= ${sixtyDaysAgo} AND m."createdAt" < ${thirtyDaysAgo}) AS "prevAiMessages",
+        (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."createdAt" >= ${sixtyDaysAgo} AND m."createdAt" < ${thirtyDaysAgo}) AS "prevTotalMessages"
+    `;
+
+    const n = (v: bigint) => Number(v);
+    const totalMessages = n(row.totalMessages);
+    const aiMessages = n(row.aiMessages);
+    const recentTotalMessages = n(row.recentTotalMessages);
+    const recentAiMessages = n(row.recentAiMessages);
+    const prevTotalMessages = n(row.prevTotalMessages);
+    const prevAiMessages = n(row.prevAiMessages);
 
     const aiResolutionRate = totalMessages > 0 ? (aiMessages / totalMessages) * 100 : 0;
     const recentAiRate = recentTotalMessages > 0 ? (recentAiMessages / recentTotalMessages) * 100 : 0;
     const prevAiRate = prevTotalMessages > 0 ? (prevAiMessages / prevTotalMessages) * 100 : 0;
 
     return {
-      totalConversations,
-      activeCustomers,
-      appointmentsToday,
+      totalConversations: n(row.totalConversations),
+      activeCustomers: n(row.activeCustomers),
+      appointmentsToday: n(row.appointmentsToday),
       aiResolutionRate: Math.round(aiResolutionRate * 10) / 10,
-      conversationGrowth: Math.round(calcGrowth(recentConversations, prevConversations) * 10) / 10,
-      customerGrowth: Math.round(calcGrowth(recentCustomers, prevCustomers) * 10) / 10,
-      appointmentGrowth: Math.round(calcGrowth(recentAppointments, prevAppointments) * 10) / 10,
+      conversationGrowth: Math.round(calcGrowth(n(row.recentConversations), n(row.prevConversations)) * 10) / 10,
+      customerGrowth: Math.round(calcGrowth(n(row.recentCustomers), n(row.prevCustomers)) * 10) / 10,
+      appointmentGrowth: Math.round(calcGrowth(n(row.recentAppointments), n(row.prevAppointments)) * 10) / 10,
       aiGrowth: Math.round(calcGrowth(recentAiRate, prevAiRate) * 10) / 10,
     };
   }

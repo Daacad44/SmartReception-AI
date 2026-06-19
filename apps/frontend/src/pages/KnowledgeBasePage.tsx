@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useKnowledgeDocs, useKnowledgeBases } from '@/hooks/useApi';
+import { useKnowledgeDocs, useKnowledgeBases, isInitialLoading } from '@/hooks/useApi';
 import { useUploadDocument, useDeleteDocument } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -93,8 +93,15 @@ export function KnowledgeBasePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: bases } = useKnowledgeBases();
-  const { data: documents, isLoading, isError } = useKnowledgeDocs(bases?.[0]?.id);
+  const { data: bases, isError: basesError } = useKnowledgeBases();
+  const {
+    data: documents,
+    isPending,
+    isFetching,
+    isError: docsError,
+    refetch,
+  } = useKnowledgeDocs(bases?.[0]?.id);
+  const docsLoading = isInitialLoading(isPending, isFetching, documents);
   const uploadDocument = useUploadDocument();
   const deleteDocument = useDeleteDocument();
 
@@ -136,8 +143,13 @@ export function KnowledgeBasePage() {
     }
   };
 
-  if (isError) {
-    return <ErrorState message="Unable to load knowledge base documents." />;
+  if (basesError || docsError) {
+    return (
+      <ErrorState
+        message="Unable to load knowledge base documents."
+        onRetry={() => refetch()}
+      />
+    );
   }
 
   return (
@@ -251,7 +263,7 @@ export function KnowledgeBasePage() {
         />
       </div>
 
-      {isLoading ? (
+      {docsLoading ? (
         <LoadingState rows={4} />
       ) : !filtered?.length ? (
         <EmptyState
