@@ -45,3 +45,9 @@ export class ServiceUnavailableError extends AppError {
     super(503, message, 'SERVICE_UNAVAILABLE');
   }
 }
+
+export class EmailNotVerifiedError extends AppError {
+  constructor(message = 'Please verify your email before signing in') {
+    super(403, message, 'EMAIL_NOT_VERIFIED');
+  }
+}

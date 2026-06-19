@@ -6,6 +6,7 @@ import {
   refreshTokenSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  resendVerificationSchema,
 } from '@smartreception/shared';
 
 export class AuthController {
@@ -22,7 +23,18 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const input = loginSchema.parse(req.body);
-      const result = await authService.login(input);
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+      const result = await authService.login(input, ipAddress);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = resendVerificationSchema.parse(req.body);
+      const result = await authService.resendVerification(email);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -72,8 +84,8 @@ export class AuthController {
   async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { token } = req.query;
-      await authService.verifyEmail(token as string);
-      res.json({ success: true, message: 'Email verified successfully' });
+      const result = await authService.verifyEmail(token as string);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

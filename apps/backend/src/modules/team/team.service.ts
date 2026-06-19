@@ -37,7 +37,13 @@ export class TeamService {
         role: input.role as UserRole,
       });
       const business = await prisma.business.findUnique({ where: { id: businessId } });
-      await emailService.sendTeamInvitation(input.email, business?.name || 'SmartReception', token);
+      const inviter = await prisma.user.findUnique({ where: { id: invitedBy } });
+      await emailService.sendTeamInvitation(input.email, {
+        businessName: business?.name || 'SmartReception',
+        inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : 'A team member',
+        role: input.role,
+        token,
+      });
       return invitation;
     }
 
@@ -53,8 +59,14 @@ export class TeamService {
     });
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
+    const inviter = await prisma.user.findUnique({ where: { id: invitedBy } });
 
-    await emailService.sendTeamInvitation(input.email, business?.name || 'SmartReception', token);
+    await emailService.sendTeamInvitation(input.email, {
+      businessName: business?.name || 'SmartReception',
+      inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : 'A team member',
+      role: input.role,
+      token,
+    });
 
     await prisma.auditLog.create({
       data: {
