@@ -1,46 +1,29 @@
-import { useSearchParams, Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/hooks/useAuth';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 export function CheckEmailPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const email = searchParams.get('email') || '';
-  const { resendVerification, isResendingVerification } = useAuth();
+
+  useEffect(() => {
+    if (email) {
+      navigate(`/verify-otp?email=${encodeURIComponent(email)}`, { replace: true });
+    }
+  }, [email, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md border-0 shadow-xl">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
-            <Mail className="h-6 w-6 text-accent" />
-          </div>
-          <CardTitle className="text-2xl">Check your email</CardTitle>
-          <CardDescription>
-            We sent a verification link to <strong>{email}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            Click the link in the email to verify your account. You must verify before signing in.
-          </p>
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={!email || isResendingVerification}
-            onClick={() => resendVerification(email)}
-          >
-            {isResendingVerification ? 'Sending...' : 'Resend verification email'}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Already verified?{' '}
-            <Link to="/login" className="font-medium text-accent hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-screen items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      {!email && (
+        <p className="ml-3 text-sm text-muted-foreground">
+          <Link to="/register" className="text-accent hover:underline">
+            Register
+          </Link>{' '}
+          to get started
+        </p>
+      )}
     </div>
   );
 }

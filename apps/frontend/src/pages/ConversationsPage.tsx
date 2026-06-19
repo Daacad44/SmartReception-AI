@@ -83,7 +83,7 @@ export function ConversationsPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] -m-6 overflow-hidden">
       {/* Left pane - conversation list */}
-      <div className="flex w-80 flex-col border-r bg-white">
+      <div className="flex w-80 flex-col border-r bg-card">
         <div className="border-b p-4 space-y-3">
           <h2 className="text-lg font-semibold">Conversations</h2>
           <div className="relative">
@@ -133,10 +133,10 @@ export function ConversationsPage() {
       </div>
 
       {/* Center pane - messages */}
-      <div className="flex flex-1 flex-col bg-[#E5DDD5]">
+      <div className="flex flex-1 flex-col bg-muted/40 dark:bg-muted/20">
         {selected ? (
           <>
-            <div className="flex items-center justify-between border-b bg-white px-4 py-3">
+            <div className="flex items-center justify-between border-b bg-card px-4 py-3">
               <div className="flex items-center gap-3">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="bg-accent/10 text-accent text-sm">
@@ -185,10 +185,10 @@ export function ConversationsPage() {
                       className={cn(
                         'max-w-[70%] rounded-lg px-3 py-2 shadow-sm',
                         msg.sender === 'customer'
-                          ? 'bg-white'
+                          ? 'bg-card border border-border'
                           : msg.sender === 'ai'
-                            ? 'bg-[#DCF8C6] border border-success/20'
-                            : 'bg-[#DCF8C6]'
+                            ? 'bg-success/10 border border-success/20 dark:bg-success/20'
+                            : 'bg-accent/10 border border-accent/20 dark:bg-accent/20'
                       )}
                     >
                       {msg.sender !== 'customer' && (
@@ -219,7 +219,7 @@ export function ConversationsPage() {
               )}
             </ScrollArea>
 
-            <div className="border-t bg-white p-3">
+            <div className="border-t bg-card p-3">
               <div className="flex items-end gap-2">
                 <Button variant="ghost" size="icon" className="shrink-0">
                   <Paperclip className="h-4 w-4" />
@@ -255,7 +255,7 @@ export function ConversationsPage() {
       </div>
 
       {/* Right pane - contact details */}
-      <div className="flex w-72 flex-col border-l bg-white">
+      <div className="flex w-72 flex-col border-l bg-card">
         {selected ? (
           <ScrollArea className="flex-1 p-4">
             <div className="text-center">

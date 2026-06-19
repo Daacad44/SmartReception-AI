@@ -16,14 +16,20 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 
-const registerSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  businessName: z.string().min(1, 'Business name is required'),
-  industry: z.string().min(1, 'Please select an industry'),
-});
+const registerSchema = z
+  .object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Please enter a valid email'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(8, 'Please confirm your password'),
+    businessName: z.string().min(1, 'Business name is required'),
+    industry: z.string().min(1, 'Please select an industry'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -101,6 +107,16 @@ export function RegisterPage() {
                   <Input type="password" className="pl-9" {...register('password')} />
                 </div>
                 {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input type="password" className="pl-9" {...register('confirmPassword')} />
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Business Name</Label>

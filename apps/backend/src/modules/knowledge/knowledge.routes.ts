@@ -25,6 +25,12 @@ router.post(
   upload.single('file'),
   (req, res, next) => knowledgeController.uploadDocument(req, res, next)
 );
+router.post('/documents/:id/process', authorize(PERMISSIONS['knowledge:write']), (req, res, next) =>
+  knowledgeController.processDocument(req, res, next)
+);
+router.get('/documents/:id/status', authorize(PERMISSIONS['knowledge:read']), (req, res, next) =>
+  knowledgeController.getDocumentStatus(req, res, next)
+);
 router.get('/faqs', authorize(PERMISSIONS['knowledge:read']), (req, res, next) =>
   knowledgeController.listFaqs(req, res, next)
 );

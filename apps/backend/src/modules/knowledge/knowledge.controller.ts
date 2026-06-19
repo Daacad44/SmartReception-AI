@@ -88,6 +88,30 @@ export class KnowledgeController {
     }
   }
 
+  async processDocument(req: Request, res: Response, next: NextFunction) {
+    try {
+      const document = await knowledgeService.processDocument(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: document });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDocumentStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = await knowledgeService.getDocumentStatus(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: status });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
       await knowledgeService.deleteDocument(
