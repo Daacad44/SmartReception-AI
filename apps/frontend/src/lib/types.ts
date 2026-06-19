@@ -30,6 +30,15 @@ export interface DashboardStats {
   aiGrowth: number;
 }
 
+export interface DashboardBundle {
+  stats: DashboardStats;
+  revenue: RevenueOverview[];
+  customerGrowth: Array<{ month: string; customers: number }>;
+  trends: ConversationTrend[];
+  topServices: TopService[];
+  teamPerformance: TeamPerformance[];
+}
+
 export interface ConversationTrend {
   date: string;
   count: number;

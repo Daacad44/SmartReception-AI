@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useAuthQuery, isInitialLoading } from '@/hooks/useAuthQuery';
 import api, { extractData } from '@/lib/api';
-import { useAuthReady } from '@/hooks/useAuthReady';
 import type {
   Conversation,
   Message,
@@ -17,11 +16,14 @@ import type {
 } from '@/lib/entities';
 import type {
   DashboardStats,
+  DashboardBundle,
   RevenueOverview,
   ConversationTrend,
   TopService,
   TeamPerformance,
 } from '@/lib/types';
+
+export { isInitialLoading };
 
 // ─── Transformers ────────────────────────────────────────────────────────────
 
@@ -233,81 +235,82 @@ export function transformFaq(raw: any): Faq {
 
 // ─── Query hooks ─────────────────────────────────────────────────────────────
 
-export function useDashboardStats() {
-  const authReady = useAuthReady();
-  return useQuery<DashboardStats>({
-    queryKey: ['dashboard', 'stats'],
+const ANALYTICS_TIMEOUT = 30_000;
+
+export function useDashboardBundle() {
+  return useAuthQuery<DashboardBundle>({
+    queryKey: ['dashboard', 'bundle'],
     queryFn: async () => {
-      const response = await api.get('/analytics/dashboard');
+      const response = await api.get('/analytics/dashboard-bundle', {
+        timeout: ANALYTICS_TIMEOUT,
+      });
       return extractData(response);
     },
-    enabled: authReady,
+  });
+}
+
+export function useDashboardStats() {
+  return useAuthQuery<DashboardStats>({
+    queryKey: ['dashboard', 'stats'],
+    queryFn: async () => {
+      const response = await api.get('/analytics/dashboard', { timeout: ANALYTICS_TIMEOUT });
+      return extractData(response);
+    },
   });
 }
 
 export function useRevenueData() {
-  const authReady = useAuthReady();
-  return useQuery<RevenueOverview[]>({
+  return useAuthQuery<RevenueOverview[]>({
     queryKey: ['dashboard', 'revenue'],
     queryFn: async () => {
-      const response = await api.get('/analytics/revenue');
+      const response = await api.get('/analytics/revenue', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useCustomerGrowth() {
-  const authReady = useAuthReady();
-  return useQuery<CustomerGrowthPoint[]>({
+  return useAuthQuery<CustomerGrowthPoint[]>({
     queryKey: ['dashboard', 'customer-growth'],
     queryFn: async () => {
-      const response = await api.get('/analytics/customer-growth');
+      const response = await api.get('/analytics/customer-growth', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useConversationTrends() {
-  const authReady = useAuthReady();
-  return useQuery<ConversationTrend[]>({
+  return useAuthQuery<ConversationTrend[]>({
     queryKey: ['dashboard', 'conversation-trends'],
     queryFn: async () => {
-      const response = await api.get('/analytics/trends');
+      const response = await api.get('/analytics/trends', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useTopServices() {
-  const authReady = useAuthReady();
-  return useQuery<TopService[]>({
+  return useAuthQuery<TopService[]>({
     queryKey: ['dashboard', 'top-services'],
     queryFn: async () => {
-      const response = await api.get('/analytics/top-services');
+      const response = await api.get('/analytics/top-services', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useTeamPerformance() {
-  const authReady = useAuthReady();
-  return useQuery<TeamPerformance[]>({
+  return useAuthQuery<TeamPerformance[]>({
     queryKey: ['dashboard', 'team-performance'],
     queryFn: async () => {
-      const response = await api.get('/analytics/team-performance');
+      const response = await api.get('/analytics/team-performance', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useConversations(params?: { status?: string; search?: string }) {
-  const authReady = useAuthReady();
-  return useQuery<Conversation[]>({
+  return useAuthQuery<Conversation[]>({
     queryKey: ['conversations', params],
     queryFn: async () => {
       const response = await api.get('/conversations', { params: { limit: 100, ...params } });
@@ -315,13 +318,11 @@ export function useConversations(params?: { status?: string; search?: string }) 
       const items = Array.isArray(data) ? data : [];
       return items.map(transformConversation);
     },
-    enabled: authReady,
   });
 }
 
 export function useMessages(conversationId: string | null) {
-  const authReady = useAuthReady();
-  return useQuery<Message[]>({
+  return useAuthQuery<Message[]>({
     queryKey: ['messages', conversationId],
     queryFn: async () => {
       const response = await api.get(`/conversations/${conversationId}`);
@@ -329,13 +330,12 @@ export function useMessages(conversationId: string | null) {
       const messages = data.messages ?? [];
       return (messages as unknown[]).map((m) => transformMessage(m, conversationId!));
     },
-    enabled: authReady && !!conversationId,
+    enabled: !!conversationId,
   });
 }
 
 export function useCustomers(search?: string) {
-  const authReady = useAuthReady();
-  return useQuery<Customer[]>({
+  return useAuthQuery<Customer[]>({
     queryKey: ['customers', search],
     queryFn: async () => {
       const response = await api.get('/customers', { params: { search, limit: 100 } });
@@ -343,13 +343,11 @@ export function useCustomers(search?: string) {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformCustomer);
     },
-    enabled: authReady,
   });
 }
 
 export function useAppointments() {
-  const authReady = useAuthReady();
-  return useQuery<Appointment[]>({
+  return useAuthQuery<Appointment[]>({
     queryKey: ['appointments'],
     queryFn: async () => {
       const response = await api.get('/appointments', { params: { limit: 100 } });
@@ -357,13 +355,11 @@ export function useAppointments() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformAppointment);
     },
-    enabled: authReady,
   });
 }
 
 export function useKnowledgeBases() {
-  const authReady = useAuthReady();
-  return useQuery<KnowledgeBase[]>({
+  return useAuthQuery<KnowledgeBase[]>({
     queryKey: ['knowledge', 'bases'],
     queryFn: async () => {
       const response = await api.get('/knowledge/bases');
@@ -371,33 +367,28 @@ export function useKnowledgeBases() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformKnowledgeBase);
     },
-    enabled: authReady,
   });
 }
 
 const PROCESSING_STATUSES = new Set(['uploaded', 'processing', 'indexing', 'pending']);
 
 export function useKnowledgeDocs(knowledgeBaseId?: string) {
-  const authReady = useAuthReady();
-  return useQuery<KnowledgeDocument[]>({
-    queryKey: ['knowledge', 'documents', knowledgeBaseId],
+  return useAuthQuery<KnowledgeDocument[]>({
+    queryKey: ['knowledge', 'documents', knowledgeBaseId ?? 'default'],
     queryFn: async () => {
-      if (knowledgeBaseId) {
-        const response = await api.get(`/knowledge/bases/${knowledgeBaseId}`);
-        const data = extractData<{ documents?: unknown[] }>(response);
-        return (data.documents ?? []).map(transformKnowledgeDocument);
+      let baseId = knowledgeBaseId;
+
+      if (!baseId) {
+        const basesResponse = await api.get('/knowledge/bases');
+        const bases = extractData(basesResponse) as unknown[];
+        if (!bases.length) return [];
+        baseId = (bases[0] as { id: string }).id;
       }
 
-      const basesResponse = await api.get('/knowledge/bases');
-      const bases = extractData(basesResponse) as unknown[];
-      if (!bases.length) return [];
-
-      const baseId = (bases[0] as { id: string }).id;
       const response = await api.get(`/knowledge/bases/${baseId}`);
       const data = extractData<{ documents?: unknown[] }>(response);
       return (data.documents ?? []).map(transformKnowledgeDocument);
     },
-    enabled: authReady,
     refetchInterval: (query) => {
       const docs = query.state.data;
       if (!docs?.some((d) => PROCESSING_STATUSES.has(d.status))) {
@@ -409,8 +400,7 @@ export function useKnowledgeDocs(knowledgeBaseId?: string) {
 }
 
 export function useFaqs(knowledgeBaseId?: string) {
-  const authReady = useAuthReady();
-  return useQuery<Faq[]>({
+  return useAuthQuery<Faq[]>({
     queryKey: ['knowledge', 'faqs', knowledgeBaseId],
     queryFn: async () => {
       const response = await api.get('/knowledge/faqs', {
@@ -420,13 +410,11 @@ export function useFaqs(knowledgeBaseId?: string) {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformFaq);
     },
-    enabled: authReady,
   });
 }
 
 export function useTeamMembers() {
-  const authReady = useAuthReady();
-  return useQuery<TeamMember[]>({
+  return useAuthQuery<TeamMember[]>({
     queryKey: ['team'],
     queryFn: async () => {
       const response = await api.get('/team');
@@ -434,13 +422,11 @@ export function useTeamMembers() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformTeamMember);
     },
-    enabled: authReady,
   });
 }
 
 export function useNotifications() {
-  const authReady = useAuthReady();
-  return useQuery<Notification[]>({
+  return useAuthQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
       const response = await api.get('/notifications');
@@ -448,37 +434,31 @@ export function useNotifications() {
       const items = Array.isArray(data) ? data : [];
       return items.map(transformNotification);
     },
-    enabled: authReady,
   });
 }
 
 export function useAnalytics() {
-  const authReady = useAuthReady();
-  return useQuery<AnalyticsData>({
+  return useAuthQuery<AnalyticsData>({
     queryKey: ['analytics'],
     queryFn: async () => {
-      const response = await api.get('/analytics');
+      const response = await api.get('/analytics', { timeout: ANALYTICS_TIMEOUT });
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useBilling() {
-  const authReady = useAuthReady();
-  return useQuery<BillingData>({
+  return useAuthQuery<BillingData>({
     queryKey: ['billing'],
     queryFn: async () => {
       const response = await api.get('/billing');
       return extractData(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useBusinessSettings() {
-  const authReady = useAuthReady();
-  return useQuery({
+  return useAuthQuery({
     queryKey: ['business', 'settings'],
     queryFn: async () => {
       const response = await api.get('/business/settings');
@@ -491,13 +471,11 @@ export function useBusinessSettings() {
         website?: string | null;
       }>(response);
     },
-    enabled: authReady,
   });
 }
 
 export function useAiConfig() {
-  const authReady = useAuthReady();
-  return useQuery({
+  return useAuthQuery({
     queryKey: ['ai', 'config'],
     queryFn: async () => {
       const response = await api.get('/ai/config');
@@ -510,6 +488,5 @@ export function useAiConfig() {
         languages: string[];
       }>(response);
     },
-    enabled: authReady,
   });
 }

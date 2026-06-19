@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 
-const HYDRATION_TIMEOUT_MS = 800;
+const HYDRATION_TIMEOUT_MS = 3000;
 
 export function HydrationGate({ children }: { children: ReactNode }) {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
@@ -10,8 +10,21 @@ export function HydrationGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (hasHydrated) return;
-    const timer = window.setTimeout(() => setHasHydrated(true), HYDRATION_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
+
+    const markHydrated = () => setHasHydrated(true);
+
+    if (useAuthStore.persist.hasHydrated()) {
+      markHydrated();
+      return;
+    }
+
+    const unsubFinish = useAuthStore.persist.onFinishHydration(markHydrated);
+    const timer = window.setTimeout(markHydrated, HYDRATION_TIMEOUT_MS);
+
+    return () => {
+      unsubFinish();
+      window.clearTimeout(timer);
+    };
   }, [hasHydrated, setHasHydrated]);
 
   if (!hasHydrated) {

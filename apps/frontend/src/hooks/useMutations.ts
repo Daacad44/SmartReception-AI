@@ -233,8 +233,8 @@ export function useUploadDocument() {
       });
       const document = extractData<{ id: string }>(response);
 
-      // Trigger background processing (fire-and-forget for serverless)
-      api.post(`/knowledge/documents/${document.id}/process`).catch(() => undefined);
+      // Trigger background processing (fire-and-forget, short timeout)
+      api.post(`/knowledge/documents/${document.id}/process`, undefined, { timeout: 8000 }).catch(() => undefined);
 
       return document;
     },

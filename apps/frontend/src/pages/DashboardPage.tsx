@@ -28,18 +28,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import {
-  useDashboardStats,
-  useRevenueData,
-  useCustomerGrowth,
-  useConversationTrends,
-  useTopServices,
-  useTeamPerformance,
-  useConversations,
-} from '@/hooks/useApi';
+import { useDashboardBundle, useConversations, isInitialLoading } from '@/hooks/useApi';
 import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativeTime } from '@/lib/utils';
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QuerySection } from '@/components/QuerySection';
 
 function KpiCard({
   title,
@@ -86,22 +79,46 @@ const statusColors: Record<string, string> = {
   ai_handling: 'bg-primary/10 text-primary',
 };
 
-export function DashboardPage() {
-  const { data: stats, isLoading: statsLoading, isError: statsError } = useDashboardStats();
-  const { data: revenue, isLoading: revenueLoading } = useRevenueData();
-  const { data: customerGrowth, isLoading: growthLoading } = useCustomerGrowth();
-  const { data: trends, isLoading: trendsLoading } = useConversationTrends();
-  const { data: topServices, isLoading: servicesLoading } = useTopServices();
-  const { data: teamPerf, isLoading: teamLoading } = useTeamPerformance();
-  const { data: conversations, isLoading: convsLoading } = useConversations();
+function hasChartData<T>(data: T[] | undefined, key: keyof T): boolean {
+  return Boolean(data?.length && data.some((item) => Number(item[key]) > 0));
+}
 
-  const chartsLoading = revenueLoading || growthLoading || trendsLoading;
+export function DashboardPage() {
+  const {
+    data: bundle,
+    isPending,
+    isFetching,
+    isError,
+    refetch,
+  } = useDashboardBundle();
+  const {
+    data: conversations,
+    isPending: convsPending,
+    isFetching: convsFetching,
+    isError: convsError,
+    refetch: refetchConversations,
+  } = useConversations();
+
+  const bundleLoading = isInitialLoading(isPending, isFetching, bundle);
+  const convsLoading = isInitialLoading(convsPending, convsFetching, conversations);
+
+  const stats = bundle?.stats;
+  const revenue = bundle?.revenue;
+  const customerGrowth = bundle?.customerGrowth;
+  const trends = bundle?.trends;
+  const topServices = bundle?.topServices;
+  const teamPerf = bundle?.teamPerformance;
 
   const aiHandlingCount = conversations?.filter((c) => c.status === 'ai_handling').length ?? 0;
   const maxBookings = topServices?.[0]?.bookingCount ?? 1;
 
-  if (statsError) {
-    return <ErrorState message="Unable to load dashboard data. Check your API connection." />;
+  if (isError && !bundle) {
+    return (
+      <ErrorState
+        message="Unable to load dashboard data. Check your API connection."
+        onRetry={() => refetch()}
+      />
+    );
   }
 
   return (
@@ -112,26 +129,30 @@ export function DashboardPage() {
           <p className="text-muted-foreground">Welcome back! Here&apos;s what&apos;s happening today.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            New Appointment
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/appointments">
+              <Plus className="mr-2 h-4 w-4" />
+              New Appointment
+            </Link>
           </Button>
-          <Button size="sm" className="bg-accent hover:bg-accent/90">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            View Inbox
+          <Button size="sm" className="bg-accent hover:bg-accent/90" asChild>
+            <Link to="/conversations">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              View Inbox
+            </Link>
           </Button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statsLoading ? (
+        {bundleLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
-        <KpiCard title="Total Conversations" value={stats?.totalConversations ?? 0} growth={stats?.conversationGrowth ?? 0} icon={MessageSquare} />
-        <KpiCard title="Active Customers" value={stats?.activeCustomers ?? 0} growth={stats?.customerGrowth ?? 0} icon={Users} />
-        <KpiCard title="Appointments Today" value={stats?.appointmentsToday ?? 0} growth={stats?.appointmentGrowth ?? 0} icon={Calendar} />
-        <KpiCard title="AI Resolution Rate" value={stats?.aiResolutionRate ?? 0} growth={stats?.aiGrowth ?? 0} icon={Bot} format="percent" />
+            <KpiCard title="Total Conversations" value={stats?.totalConversations ?? 0} growth={stats?.conversationGrowth ?? 0} icon={MessageSquare} />
+            <KpiCard title="Active Customers" value={stats?.activeCustomers ?? 0} growth={stats?.customerGrowth ?? 0} icon={Users} />
+            <KpiCard title="Appointments Today" value={stats?.appointmentsToday ?? 0} growth={stats?.appointmentGrowth ?? 0} icon={Calendar} />
+            <KpiCard title="AI Resolution Rate" value={stats?.aiResolutionRate ?? 0} growth={stats?.aiGrowth ?? 0} icon={Bot} format="percent" />
           </>
         )}
       </div>
@@ -143,47 +164,59 @@ export function DashboardPage() {
             <CardDescription>Monthly revenue for the past year</CardDescription>
           </CardHeader>
           <CardContent>
-            {chartsLoading ? (
-              <Skeleton className="h-[280px] w-full" />
-            ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={revenue ?? []}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#651147" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#651147" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" tickFormatter={(v) => `$${v / 1000}k`} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Area type="monotone" dataKey="revenue" stroke="#651147" fill="url(#revenueGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-            )}
+            <QuerySection
+              isLoading={bundleLoading}
+              isError={isError}
+              errorMessage="Failed to load revenue data"
+              isEmpty={!hasChartData(revenue, 'revenue')}
+              emptyMessage="No revenue recorded yet"
+              onRetry={() => refetch()}
+              skeleton={<Skeleton className="h-[280px] w-full" />}
+            >
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={revenue ?? []}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#651147" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#651147" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" tickFormatter={(v) => `$${v}`} />
+                  <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
+                  <Area type="monotone" dataKey="revenue" stroke="#651147" fill="url(#revenueGrad)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </QuerySection>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Customer Growth</CardTitle>
-            <CardDescription>Total active customers over time</CardDescription>
+            <CardDescription>New customers added each month</CardDescription>
           </CardHeader>
           <CardContent>
-            {chartsLoading ? (
-              <Skeleton className="h-[280px] w-full" />
-            ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={customerGrowth ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <Tooltip />
-                <Line type="monotone" dataKey="customers" stroke="#0F172A" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-            )}
+            <QuerySection
+              isLoading={bundleLoading}
+              isError={isError}
+              errorMessage="Failed to load customer growth"
+              isEmpty={!hasChartData(customerGrowth, 'customers')}
+              emptyMessage="No new customers yet"
+              onRetry={() => refetch()}
+              skeleton={<Skeleton className="h-[280px] w-full" />}
+            >
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={customerGrowth ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" allowDecimals={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="customers" stroke="#0F172A" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </QuerySection>
           </CardContent>
         </Card>
       </div>
@@ -192,22 +225,33 @@ export function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Conversation Trends</CardTitle>
-            <CardDescription>Daily conversation volume this week</CardDescription>
+            <CardDescription>Daily conversation volume (last 30 days)</CardDescription>
           </CardHeader>
           <CardContent>
-            {trendsLoading ? (
-              <Skeleton className="h-[240px] w-full" />
-            ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={trends ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <Tooltip />
-                <Bar dataKey="count" fill="#651147" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            )}
+            <QuerySection
+              isLoading={bundleLoading}
+              isError={isError}
+              errorMessage="Failed to load conversation trends"
+              isEmpty={!hasChartData(trends, 'count')}
+              emptyMessage="No conversations recorded yet"
+              onRetry={() => refetch()}
+              skeleton={<Skeleton className="h-[240px] w-full" />}
+            >
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={trends ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10 }}
+                    stroke="#6B7280"
+                    tickFormatter={(v) => String(v).slice(5)}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" allowDecimals={false} />
+                  <Tooltip labelFormatter={(v) => String(v)} />
+                  <Bar dataKey="count" fill="#651147" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </QuerySection>
           </CardContent>
         </Card>
 
@@ -217,14 +261,16 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {[
-              { label: 'Send Broadcast', icon: MessageSquare },
-              { label: 'Add Customer', icon: Users },
-              { label: 'Schedule Appointment', icon: Calendar },
-              { label: 'Upload Document', icon: Plus },
+              { label: 'View Inbox', icon: MessageSquare, to: '/conversations' },
+              { label: 'Add Customer', icon: Users, to: '/customers' },
+              { label: 'Schedule Appointment', icon: Calendar, to: '/appointments' },
+              { label: 'Upload Document', icon: Plus, to: '/knowledge' },
             ].map((action) => (
-              <Button key={action.label} variant="outline" className="w-full justify-start">
-                <action.icon className="mr-2 h-4 w-4" />
-                {action.label}
+              <Button key={action.label} variant="outline" className="w-full justify-start" asChild>
+                <Link to={action.to}>
+                  <action.icon className="mr-2 h-4 w-4" />
+                  {action.label}
+                </Link>
               </Button>
             ))}
           </CardContent>
@@ -238,22 +284,28 @@ export function DashboardPage() {
             <Link to="/appointments" className="text-xs text-accent hover:underline">View all</Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {servicesLoading ? (
-              <Skeleton className="h-32 w-full" />
-            ) : (
-            topServices?.map((service, i) => (
-              <div key={service.serviceId} className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                  {i + 1}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{service.name}</p>
-                  <p className="text-xs text-muted-foreground">{service.bookingCount} bookings</p>
+            <QuerySection
+              isLoading={bundleLoading}
+              isError={isError}
+              errorMessage="Failed to load services"
+              isEmpty={!topServices?.length}
+              emptyMessage="No service bookings yet"
+              onRetry={() => refetch()}
+              skeleton={<Skeleton className="h-32 w-full" />}
+            >
+              {topServices?.map((service, i) => (
+                <div key={service.serviceId} className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{service.name}</p>
+                    <p className="text-xs text-muted-foreground">{service.bookingCount} bookings</p>
+                  </div>
+                  <Progress value={maxBookings > 0 ? (service.bookingCount / maxBookings) * 100 : 0} className="h-1.5 w-16" />
                 </div>
-                <Progress value={maxBookings > 0 ? (service.bookingCount / maxBookings) * 100 : 0} className="h-1.5 w-16" />
-              </div>
-            ))
-            )}
+              ))}
+            </QuerySection>
           </CardContent>
         </Card>
 
@@ -262,28 +314,34 @@ export function DashboardPage() {
             <CardTitle className="text-base">Team Performance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {teamLoading ? (
-              <Skeleton className="h-32 w-full" />
-            ) : (
-            teamPerf?.map((member) => (
-              <div key={member.userId} className="flex items-center gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-navy text-white text-xs">
-                    {getInitials(member.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{member.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {member.conversationCount} conversations
-                  </p>
+            <QuerySection
+              isLoading={bundleLoading}
+              isError={isError}
+              errorMessage="Failed to load team performance"
+              isEmpty={!teamPerf?.length}
+              emptyMessage="No team activity yet"
+              onRetry={() => refetch()}
+              skeleton={<Skeleton className="h-32 w-full" />}
+            >
+              {teamPerf?.map((member) => (
+                <div key={member.userId} className="flex items-center gap-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-navy text-white text-xs">
+                      {getInitials(member.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{member.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {member.conversationCount} conversations
+                    </p>
+                  </div>
+                  <Badge variant="success" className="text-[10px]">
+                    {member.resolutionRate}%
+                  </Badge>
                 </div>
-                <Badge variant="success" className="text-[10px]">
-                  {member.resolutionRate}%
-                </Badge>
-              </div>
-            ))
-            )}
+              ))}
+            </QuerySection>
           </CardContent>
         </Card>
 
@@ -309,10 +367,10 @@ export function DashboardPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Conversations Handled</span>
+                <span className="text-muted-foreground">Total Conversations</span>
                 <span className="font-medium">{stats?.totalConversations ?? 0}</span>
               </div>
-              <Progress value={stats?.aiResolutionRate ?? 0} className="h-2" />
+              <Progress value={Math.min((stats?.totalConversations ?? 0) * 10, 100)} className="h-2" />
             </div>
             <div className="rounded-lg bg-muted p-3">
               <p className="text-xs text-muted-foreground">
@@ -337,36 +395,42 @@ export function DashboardPage() {
           </Link>
         </CardHeader>
         <CardContent>
-          {convsLoading ? (
-            <Skeleton className="h-48 w-full" />
-          ) : (
-          <div className="space-y-3">
-            {conversations?.slice(0, 5).map((conv) => (
-              <div key={conv.id} className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-accent/10 text-accent text-sm">
-                    {getInitials(conv.customerName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{conv.customerName}</p>
-                    <Badge className={`text-[10px] ${statusColors[conv.status]}`}>
-                      {conv.status.replace('_', ' ')}
-                    </Badge>
+          <QuerySection
+            isLoading={convsLoading}
+            isError={convsError}
+            errorMessage="Failed to load conversations"
+            isEmpty={!conversations?.length}
+            emptyMessage="No conversations yet"
+            onRetry={() => refetchConversations()}
+            skeleton={<Skeleton className="h-48 w-full" />}
+          >
+            <div className="space-y-3">
+              {conversations?.slice(0, 5).map((conv) => (
+                <div key={conv.id} className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-accent/10 text-accent text-sm">
+                      {getInitials(conv.customerName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{conv.customerName}</p>
+                      <Badge className={`text-[10px] ${statusColors[conv.status]}`}>
+                        {conv.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">{formatRelativeTime(conv.lastMessageAt)}</p>
+                    {conv.unreadCount > 0 && (
+                      <Badge className="mt-1 bg-accent text-white text-[10px]">{conv.unreadCount}</Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">{formatRelativeTime(conv.lastMessageAt)}</p>
-                  {conv.unreadCount > 0 && (
-                    <Badge className="mt-1 bg-accent text-white text-[10px]">{conv.unreadCount}</Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
+              ))}
+            </div>
+          </QuerySection>
         </CardContent>
       </Card>
     </div>

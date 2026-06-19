@@ -70,6 +70,15 @@ export class AnalyticsController {
       next(error);
     }
   }
+
+  async dashboardBundle(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getDashboardBundle(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const analyticsController = new AnalyticsController();
