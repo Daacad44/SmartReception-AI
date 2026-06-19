@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import api, { extractData, getErrorMessage } from '@/lib/api';
+import api, { extractData, getErrorMessage, getErrorCode } from '@/lib/api';
 import type { LoginCredentials, RegisterData, UserProfile } from '@/lib/types';
 import { useAuthStore } from '@/stores/auth.store';
 import { useAuthReady } from '@/hooks/useAuthReady';
@@ -26,12 +26,19 @@ interface LoginResponse {
   refreshToken: string;
 }
 
+interface RegisterResponse {
+  message: string;
+  email: string;
+  requiresVerification: boolean;
+}
+
 interface ProfileResponse {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   avatarUrl?: string | null;
+  isEmailVerified?: boolean;
   businesses: Array<{
     id: string;
     name: string;
@@ -94,21 +101,83 @@ export function useAuth() {
       toast.success('Welcome back!');
       navigate('/dashboard');
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
+    onError: (error, variables) => {
+      const message = getErrorMessage(error);
+      toast.error(message);
+      if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
+        navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
+      }
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
       const response = await api.post('/auth/register', data);
-      return extractData<LoginResponse>(response);
+      return extractData<RegisterResponse>(response);
     },
     onSuccess: (data) => {
-      const profile = mapLoginToProfile(data);
-      login(data.accessToken, data.refreshToken, profile);
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      toast.success('Account created! Enter the code sent to your email.');
+      navigate(`/verify-otp?email=${encodeURIComponent(data.email)}`);
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const verifyOtpMutation = useMutation({
+    mutationFn: async ({ email, code }: { email: string; code: string }) => {
+      const response = await api.post('/auth/verify-otp', { email, code });
+      return extractData<{ message: string }>(response);
+    },
+    onSuccess: () => {
+      toast.success('Email verified successfully!');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const resendOtpMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await api.post('/auth/resend-otp', { email });
+      return extractData<{ message: string }>(response);
+    },
+    onSuccess: () => {
+      toast.success('Verification code sent');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await api.post('/auth/forgot-password', { email });
+      return extractData(response);
+    },
+    onSuccess: () => {
+      toast.success('If the email exists, a reset code has been sent');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({
+      email,
+      code,
+      password,
+    }: {
+      email: string;
+      code: string;
+      password: string;
+    }) => {
+      const response = await api.post('/auth/reset-password', { email, code, password });
+      return extractData(response);
+    },
+    onSuccess: () => {
+      toast.success('Password reset successfully. Please sign in.');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -143,9 +212,17 @@ export function useAuth() {
     isAuthenticated,
     login: loginMutation.mutate,
     register: registerMutation.mutate,
+    verifyOtp: verifyOtpMutation.mutate,
+    resendOtp: resendOtpMutation.mutate,
+    forgotPassword: forgotPasswordMutation.mutate,
+    resetPassword: resetPasswordMutation.mutate,
     logout,
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
+    isVerifyingOtp: verifyOtpMutation.isPending,
+    isResendingOtp: resendOtpMutation.isPending,
+    isSendingReset: forgotPasswordMutation.isPending,
+    isResettingPassword: resetPasswordMutation.isPending,
     profile: profileQuery.data,
   };
 }

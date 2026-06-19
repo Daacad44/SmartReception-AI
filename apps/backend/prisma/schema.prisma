@@ -95,8 +95,10 @@ enum DocumentType {
 }
 
 enum DocumentStatus {
+  UPLOADED
   PENDING
   PROCESSING
+  INDEXING
   INDEXED
   FAILED
 }
@@ -178,8 +180,15 @@ model User {
   phone             String?
   isEmailVerified   Boolean   @default(false)
   emailVerifyToken  String?
+  emailVerifyExpires DateTime?
+  emailOtpHash      String?
+  emailOtpExpires   DateTime?
+  emailOtpAttempts  Int       @default(0)
   resetPasswordToken String?
   resetPasswordExpires DateTime?
+  resetOtpHash      String?
+  resetOtpExpires   DateTime?
+  resetOtpAttempts  Int       @default(0)
   lastLoginAt       DateTime?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
@@ -449,10 +458,11 @@ model KnowledgeDocument {
   knowledgeBaseId String
   title           String
   type            DocumentType
-  status          DocumentStatus @default(PENDING)
+  status          DocumentStatus @default(UPLOADED)
   fileUrl         String?
   fileSize        Int?
   content         String?
+  processingError String?
   category        String?
   question        String?
   answer          String?

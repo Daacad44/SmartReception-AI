@@ -148,8 +148,10 @@ export function transformKnowledgeDocument(raw: any): KnowledgeDocument {
     FAQ: 'txt',
   };
   const statusMap: Record<string, KnowledgeDocument['status']> = {
+    UPLOADED: 'uploaded',
     INDEXED: 'indexed',
     PROCESSING: 'processing',
+    INDEXING: 'indexing',
     PENDING: 'pending',
     FAILED: 'failed',
   };
@@ -168,6 +170,7 @@ export function transformKnowledgeDocument(raw: any): KnowledgeDocument {
     type: typeMap[raw.type] ?? 'txt',
     size,
     status: statusMap[raw.status] ?? 'processing',
+    processingError: raw.processingError ?? undefined,
     uploadedAt: raw.createdAt,
     uploadedBy: raw.uploadedBy ?? '—',
   };
@@ -372,6 +375,8 @@ export function useKnowledgeBases() {
   });
 }
 
+const PROCESSING_STATUSES = new Set(['uploaded', 'processing', 'indexing', 'pending']);
+
 export function useKnowledgeDocs(knowledgeBaseId?: string) {
   const authReady = useAuthReady();
   return useQuery<KnowledgeDocument[]>({
@@ -393,6 +398,13 @@ export function useKnowledgeDocs(knowledgeBaseId?: string) {
       return (data.documents ?? []).map(transformKnowledgeDocument);
     },
     enabled: authReady,
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (!docs?.some((d) => PROCESSING_STATUSES.has(d.status))) {
+        return false;
+      }
+      return 2000;
+    },
   });
 }
 

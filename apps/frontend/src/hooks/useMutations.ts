@@ -228,12 +228,19 @@ export function useUploadDocument() {
       if (title) formData.append('title', title);
       if (knowledgeBaseId) formData.append('knowledgeBaseId', knowledgeBaseId);
 
-      const response = await api.post('/knowledge/documents/upload', formData);
-      return extractData(response);
+      const response = await api.post('/knowledge/documents/upload', formData, {
+        timeout: 60000,
+      });
+      const document = extractData<{ id: string }>(response);
+
+      // Trigger background processing (fire-and-forget for serverless)
+      api.post(`/knowledge/documents/${document.id}/process`).catch(() => undefined);
+
+      return document;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['knowledge'] });
-      toast.success('Document uploaded');
+      toast.success('Document uploaded — processing in background');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

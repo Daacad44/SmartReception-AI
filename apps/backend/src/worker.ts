@@ -1,6 +1,4 @@
 import { Job } from 'bullmq';
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
 import {
   createWorker,
   QUEUE_NAMES,
@@ -9,6 +7,7 @@ import {
   ReminderJobData,
   WhatsAppJobData,
 } from './infrastructure/queue/queues';
+import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
 import { aiService } from './infrastructure/ai/openai.service';
 import { whatsappService } from './infrastructure/whatsapp/whatsapp.service';
@@ -118,70 +117,7 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
 
 async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
   const { documentId, businessId } = job.data;
-
-  const document = await prisma.knowledgeDocument.findFirst({
-    where: {
-      id: documentId,
-      knowledgeBase: { businessId },
-    },
-  });
-
-  if (!document) {
-    logger.warn(`Document ${documentId} not found`);
-    return;
-  }
-
-  await prisma.knowledgeDocument.update({
-    where: { id: documentId },
-    data: { status: 'PROCESSING' },
-  });
-
-  try {
-    let content = document.content || '';
-
-    if (!content && document.fileUrl) {
-      const response = await fetch(document.fileUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch document: ${response.statusText}`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-
-      switch (document.type) {
-        case 'PDF': {
-          const parsed = await pdfParse(buffer);
-          content = parsed.text;
-          break;
-        }
-        case 'DOCX': {
-          const result = await mammoth.extractRawText({ buffer });
-          content = result.value;
-          break;
-        }
-        case 'TXT':
-          content = buffer.toString('utf-8');
-          break;
-        default:
-          throw new Error(`Unsupported document type: ${document.type}`);
-      }
-    }
-
-    await prisma.knowledgeDocument.update({
-      where: { id: documentId },
-      data: {
-        content: content.slice(0, 50000),
-        status: 'INDEXED',
-      },
-    });
-
-    logger.info(`Document ${documentId} processed and indexed`);
-  } catch (error) {
-    logger.error(`Document processing failed for ${documentId}:`, error);
-    await prisma.knowledgeDocument.update({
-      where: { id: documentId },
-      data: { status: 'FAILED' },
-    });
-  }
+  await processDocumentById(documentId, businessId);
 }
 
 async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {

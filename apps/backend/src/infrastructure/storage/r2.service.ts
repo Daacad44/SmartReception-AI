@@ -61,6 +61,23 @@ export class R2StorageService {
     );
   }
 
+  async download(keyOrUrl: string): Promise<Buffer> {
+    const key = this.resolveKey(keyOrUrl);
+    const response = await getS3Client().send(
+      new GetObjectCommand({
+        Bucket: config.r2.bucketName,
+        Key: key,
+      })
+    );
+
+    if (!response.Body) {
+      throw new Error('Storage download failed: empty response');
+    }
+
+    const bytes = await response.Body.transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
   async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: config.r2.bucketName,

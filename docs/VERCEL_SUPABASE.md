@@ -59,6 +59,10 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon (publishable) key from Project Settings → API |
 | `SUPABASE_URL` | `https://hlngecipthlecwqozwhe.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (backend storage uploads) |
+| `RESEND_API_KEY` | Resend API key for authentication emails |
+| `EMAIL_FROM_NAME` | `SmartReception AI` |
+| `EMAIL_FROM_ADDRESS` | `noreply@botandev.com` |
+| `EMAIL_SUPPORT` | `support@botandev.com` |
 
 ### Local development
 

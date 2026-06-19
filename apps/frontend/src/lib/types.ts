@@ -3,6 +3,7 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   message?: string;
   error?: string;
+  code?: string;
   meta?: PaginationMeta;
 }
 
@@ -61,6 +62,7 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
+  confirmPassword: string;
   firstName: string;
   lastName: string;
   businessName: string;

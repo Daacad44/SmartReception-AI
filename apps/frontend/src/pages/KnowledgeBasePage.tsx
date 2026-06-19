@@ -52,11 +52,22 @@ const typeIcons: Record<string, React.ElementType> = {
   url: LinkIcon,
 };
 
-const statusVariant: Record<string, 'success' | 'warning' | 'destructive'> = {
+const statusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'secondary'> = {
   indexed: 'success',
+  uploaded: 'secondary',
   processing: 'warning',
-  failed: 'destructive',
+  indexing: 'warning',
   pending: 'warning',
+  failed: 'destructive',
+};
+
+const statusProgress: Record<string, number> = {
+  uploaded: 15,
+  pending: 25,
+  processing: 50,
+  indexing: 80,
+  indexed: 100,
+  failed: 0,
 };
 
 function validateFile(file: File): string | null {
@@ -181,9 +192,9 @@ export function KnowledgeBasePage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading and indexing...
+                    Uploading file...
                   </div>
-                  <Progress value={66} className="h-1" />
+                  <Progress value={40} className="h-1" />
                 </div>
               )}
             </div>
@@ -221,7 +232,9 @@ export function KnowledgeBasePage() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-warning">
-              {documents?.filter((d) => d.status === 'processing' || d.status === 'pending').length ?? 0}
+              {documents?.filter((d) =>
+                ['uploaded', 'processing', 'indexing', 'pending'].includes(d.status)
+              ).length ?? 0}
             </p>
             <p className="text-sm text-muted-foreground">Processing</p>
           </CardContent>
@@ -257,44 +270,59 @@ export function KnowledgeBasePage() {
           </div>
           {filtered.map((doc) => {
             const Icon = typeIcons[doc.type] ?? FileText;
+            const isProcessing = ['uploaded', 'processing', 'indexing', 'pending'].includes(doc.status);
             return (
               <div
                 key={doc.id}
-                className="grid grid-cols-[1fr_100px_100px_120px_140px_40px] gap-4 items-center border-b px-4 py-3 last:border-0 hover:bg-muted/50"
+                className="border-b px-4 py-3 last:border-0 hover:bg-muted/50"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-                    <Icon className="h-4 w-4 text-accent" />
+                <div className="grid grid-cols-[1fr_100px_100px_120px_140px_40px] gap-4 items-center">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                      {isProcessing ? (
+                        <Loader2 className="h-4 w-4 text-accent animate-spin" />
+                      ) : (
+                        <Icon className="h-4 w-4 text-accent" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground">by {doc.uploadedBy}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{doc.title}</p>
-                    <p className="text-xs text-muted-foreground">by {doc.uploadedBy}</p>
-                  </div>
+                  <span className="text-sm uppercase">{doc.type}</span>
+                  <span className="text-sm text-muted-foreground">{doc.size}</span>
+                  <Badge variant={statusVariant[doc.status] ?? 'warning'} className="w-fit text-[10px] capitalize">
+                    {doc.status}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(doc.uploadedAt).toLocaleDateString()}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => deleteDocument.mutate(doc.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <span className="text-sm uppercase">{doc.type}</span>
-                <span className="text-sm text-muted-foreground">{doc.size}</span>
-                <Badge variant={statusVariant[doc.status] ?? 'warning'} className="w-fit text-[10px] capitalize">
-                  {doc.status}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(doc.uploadedAt).toLocaleDateString()}
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => deleteDocument.mutate(doc.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {isProcessing && (
+                  <div className="mt-2 pl-12 pr-4">
+                    <Progress value={statusProgress[doc.status] ?? 30} className="h-1" />
+                  </div>
+                )}
+                {doc.status === 'failed' && doc.processingError && (
+                  <p className="mt-1 pl-12 text-xs text-destructive">{doc.processingError}</p>
+                )}
               </div>
             );
           })}

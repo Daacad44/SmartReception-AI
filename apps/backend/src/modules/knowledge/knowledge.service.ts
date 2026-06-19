@@ -2,10 +2,9 @@ import { knowledgeRepository } from './knowledge.repository';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateFaqInput } from '@smartreception/shared';
 import { storageService } from '../../infrastructure/storage';
-import { getDocumentQueue } from '../../infrastructure/queue/queues';
+import { scheduleDocumentProcessing, processDocumentById } from '../../infrastructure/documents/document-processing.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
-import { processDocumentContent } from './document-processor';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
@@ -71,25 +70,40 @@ export class KnowledgeService {
       type: docType,
       fileUrl: url.includes('http') ? url : `supabase://knowledge-documents/${key}`,
       fileSize: file.size,
+      status: 'UPLOADED',
     });
 
-    const queue = getDocumentQueue();
-    if (queue) {
-      await queue.add('process-document', {
-        documentId: document.id,
-        knowledgeBaseId: base.id,
-        businessId,
-      });
+    scheduleDocumentProcessing(document.id, base.id, businessId);
+
+    return document;
+  }
+
+  async processDocument(businessId: string, documentId: string) {
+    const document = await knowledgeRepository.findDocument(businessId, documentId);
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    if (document.status === 'INDEXED') {
       return document;
     }
 
-    const { content, status } = await processDocumentContent(file.buffer, docType);
-    const updated = await knowledgeRepository.updateDocument(document.id, {
-      content: content || (docType === 'TXT' ? file.buffer.toString('utf-8').slice(0, 50000) : undefined),
-      status,
-    });
+    await processDocumentById(documentId, businessId);
+    return knowledgeRepository.findDocument(businessId, documentId);
+  }
 
-    return updated;
+  async getDocumentStatus(businessId: string, documentId: string) {
+    const document = await knowledgeRepository.findDocument(businessId, documentId);
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    return {
+      id: document.id,
+      status: document.status,
+      processingError: document.processingError,
+      updatedAt: document.updatedAt,
+    };
   }
 
   private mimeFromExtension(ext: string): string {
@@ -120,9 +134,8 @@ export class KnowledgeService {
       answer: input.answer,
       category: input.category,
       content: `Q: ${input.question}\nA: ${input.answer}`,
+      status: 'INDEXED',
     });
-
-    await knowledgeRepository.updateDocument(document.id, { status: 'INDEXED' });
 
     await prisma.auditLog.create({
       data: {

@@ -6,6 +6,8 @@ import {
   refreshTokenSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyOtpSchema,
+  resendOtpSchema,
 } from '@smartreception/shared';
 
 export class AuthController {
@@ -22,7 +24,28 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const input = loginSchema.parse(req.body);
-      const result = await authService.login(input);
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+      const result = await authService.login(input, ipAddress);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, code } = verifyOtpSchema.parse(req.body);
+      const result = await authService.verifyOtp(email, code);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = resendOtpSchema.parse(req.body);
+      const result = await authService.resendOtp(email);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -53,7 +76,7 @@ export class AuthController {
     try {
       const { email } = forgotPasswordSchema.parse(req.body);
       await authService.forgotPassword(email);
-      res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
+      res.json({ success: true, message: 'If the email exists, a reset code has been sent' });
     } catch (error) {
       next(error);
     }
@@ -61,19 +84,9 @@ export class AuthController {
 
   async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const { token, password } = resetPasswordSchema.parse(req.body);
-      await authService.resetPassword(token, password);
+      const { email, code, password } = resetPasswordSchema.parse(req.body);
+      await authService.resetPassword(email, code, password);
       res.json({ success: true, message: 'Password reset successfully' });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async verifyEmail(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { token } = req.query;
-      await authService.verifyEmail(token as string);
-      res.json({ success: true, message: 'Email verified successfully' });
     } catch (error) {
       next(error);
     }

@@ -81,7 +81,8 @@ export interface KnowledgeDocument {
   title: string;
   type: 'pdf' | 'doc' | 'txt' | 'url';
   size: string;
-  status: 'indexed' | 'processing' | 'pending' | 'failed';
+  status: 'uploaded' | 'indexed' | 'processing' | 'indexing' | 'pending' | 'failed';
+  processingError?: string;
   uploadedAt: string;
   uploadedBy: string;
 }

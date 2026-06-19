@@ -16,6 +16,7 @@ export interface IStorageService {
     folder?: string
   ): Promise<StorageUploadResult>;
   delete(keyOrUrl: string): Promise<void>;
+  download(keyOrUrl: string): Promise<Buffer>;
 }
 
 class UnifiedStorageService implements IStorageService {
@@ -37,6 +38,14 @@ class UnifiedStorageService implements IStorageService {
 
   delete(keyOrUrl: string) {
     return this.provider.delete(keyOrUrl);
+  }
+
+  download(keyOrUrl: string) {
+    const provider = this.provider as IStorageService & { download?: (k: string) => Promise<Buffer> };
+    if (provider.download) {
+      return provider.download(keyOrUrl);
+    }
+    throw new ServiceUnavailableError('Storage download is not supported by the configured provider');
   }
 }
 
