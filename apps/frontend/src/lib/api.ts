@@ -49,7 +49,9 @@ function redirectToLogin() {
 }
 
 function clearSession() {
-  useAuthStore.getState().logout();
+  const { isAuthenticated, logout } = useAuthStore.getState();
+  if (!isAuthenticated) return;
+  logout();
   redirectToLogin();
 }
 
