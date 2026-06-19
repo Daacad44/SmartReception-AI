@@ -372,7 +372,7 @@ export function useAppointments(params?: { status?: string; customerId?: string 
     queryKey: ['appointments', params],
     queryFn: async () => {
       const response = await api.get('/appointments', {
-        params: { limit: 200, ...params },
+        params: { limit: 100, ...params },
       });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
