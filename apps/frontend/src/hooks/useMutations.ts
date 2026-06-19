@@ -119,6 +119,8 @@ export function useUpdateAppointment() {
         endTime?: string;
         status?: string;
         notes?: string;
+        customerId?: string;
+        serviceId?: string;
       };
     }) => {
       const response = await api.patch(`/appointments/${id}`, data);
@@ -180,6 +182,110 @@ export function useMarkConversationRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useTransferToAi() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await api.post(`/conversations/${conversationId}/transfer-ai`);
+      return extractData(response);
+    },
+    onSuccess: (_data, conversationId) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+      toast.success('Conversation transferred to AI');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useAddCustomerNote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ customerId, content }: { customerId: string; content: string }) => {
+      const response = await api.post(`/customers/${customerId}/notes`, { content });
+      return extractData(response);
+    },
+    onSuccess: (_data, { customerId }) => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      toast.success('Note added');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useAssignCustomerTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ customerId, tagIds }: { customerId: string; tagIds: string[] }) => {
+      const response = await api.put(`/customers/${customerId}/tags`, { tagIds });
+      return extractData(response);
+    },
+    onSuccess: (_data, { customerId }) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      toast.success('Tags updated');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useCreateCustomerTag() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { name: string; color?: string }) => {
+      const response = await api.post('/customers/tags', data);
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', 'tags'] });
+      toast.success('Tag created');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useChangePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (plan: string) => {
+      const response = await api.post('/billing/change-plan', { plan });
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billing'] });
+      toast.success('Plan updated');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useAcceptInvite() {
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const response = await api.post('/team/accept-invite', { token });
+      return extractData(response);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

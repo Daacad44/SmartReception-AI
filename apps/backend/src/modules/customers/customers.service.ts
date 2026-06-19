@@ -6,6 +6,7 @@ import {
   PaginationInput,
 } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+import { billingService } from '../billing/billing.service';
 
 export class CustomersService {
   async list(businessId: string, params: PaginationInput & { tagId?: string }) {
@@ -36,6 +37,8 @@ export class CustomersService {
   }
 
   async create(businessId: string, input: CreateCustomerInput, userId: string) {
+    await billingService.assertWithinLimit(businessId, 'customers');
+
     const existing = await customersRepository.findByPhone(businessId, input.phone);
     if (existing) {
       throw new ConflictError('Customer with this phone number already exists');
@@ -162,6 +165,112 @@ export class CustomersService {
       throw new NotFoundError('Customer not found');
     }
     return customersRepository.getNotes(customerId);
+  }
+
+  async getTimeline(businessId: string, customerId: string) {
+    const customer = await customersRepository.findById(businessId, customerId);
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    const [notes, appointments, conversations, auditLogs] = await Promise.all([
+      customersRepository.getNotes(customerId),
+      prisma.appointment.findMany({
+        where: { businessId, customerId },
+        orderBy: { startTime: 'desc' },
+        take: 20,
+        select: { id: true, title: true, status: true, startTime: true, endTime: true },
+      }),
+      prisma.conversation.findMany({
+        where: { businessId, customerId },
+        orderBy: { lastMessageAt: 'desc' },
+        take: 20,
+        select: { id: true, status: true, lastMessageAt: true, unreadCount: true },
+      }),
+      prisma.auditLog.findMany({
+        where: { businessId, entity: 'Customer', entityId: customerId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          user: { select: { firstName: true, lastName: true } },
+        },
+      }),
+    ]);
+
+    const events = [
+      ...notes.map((n) => ({
+        id: n.id,
+        type: 'note' as const,
+        title: 'Note added',
+        description: n.content,
+        timestamp: n.createdAt.toISOString(),
+      })),
+      ...appointments.map((a) => ({
+        id: a.id,
+        type: 'appointment' as const,
+        title: a.title,
+        description: `Status: ${a.status}`,
+        timestamp: a.startTime.toISOString(),
+      })),
+      ...conversations.map((c) => ({
+        id: c.id,
+        type: 'conversation' as const,
+        title: 'Conversation',
+        description: `Status: ${c.status}`,
+        timestamp: (c.lastMessageAt ?? new Date()).toISOString(),
+      })),
+      ...auditLogs.map((l) => ({
+        id: l.id,
+        type: 'activity' as const,
+        title: `${l.action} ${l.entity}`,
+        description: l.user
+          ? `By ${l.user.firstName} ${l.user.lastName}`
+          : 'System activity',
+        timestamp: l.createdAt.toISOString(),
+      })),
+    ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+    return events;
+  }
+
+  async getInsights(businessId: string, customerId: string) {
+    const customer = await customersRepository.findById(businessId, customerId);
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    const [appointmentStats, messageCount, lastConversation] = await Promise.all([
+      prisma.appointment.groupBy({
+        by: ['status'],
+        where: { businessId, customerId },
+        _count: { id: true },
+      }),
+      prisma.message.count({
+        where: { conversation: { businessId, customerId } },
+      }),
+      prisma.conversation.findFirst({
+        where: { businessId, customerId },
+        orderBy: { lastMessageAt: 'desc' },
+        select: { lastMessageAt: true, status: true },
+      }),
+    ]);
+
+    const appointmentByStatus = Object.fromEntries(
+      appointmentStats.map((s) => [s.status, s._count.id])
+    );
+
+    return {
+      leadScore: customer.leadScore,
+      status: customer.leadScore >= 80 ? 'vip' : customer.isActive ? 'active' : 'inactive',
+      totalConversations: customer._count.conversations,
+      totalAppointments: customer._count.appointments,
+      completedAppointments: appointmentByStatus.COMPLETED ?? 0,
+      cancelledAppointments: appointmentByStatus.CANCELLED ?? 0,
+      totalMessages: messageCount,
+      lastActivity: customer.lastContactAt?.toISOString() ?? customer.updatedAt.toISOString(),
+      lastConversationStatus: lastConversation?.status ?? null,
+      tags: customer.tags.map((t) => t.tag),
+    };
   }
 }
 

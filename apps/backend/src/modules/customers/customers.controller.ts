@@ -145,6 +145,30 @@ export class CustomersController {
       next(error);
     }
   }
+
+  async getTimeline(req: Request, res: Response, next: NextFunction) {
+    try {
+      const timeline = await customersService.getTimeline(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: timeline });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getInsights(req: Request, res: Response, next: NextFunction) {
+    try {
+      const insights = await customersService.getInsights(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: insights });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const customersController = new CustomersController();

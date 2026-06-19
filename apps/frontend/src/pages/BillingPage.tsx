@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBilling } from '@/hooks/useApi';
+import { useChangePlan } from '@/hooks/useMutations';
 import { formatCurrency } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
@@ -35,6 +36,7 @@ const PLAN_PRICES: Record<string, number> = {
 
 export function BillingPage() {
   const { data: billing, isLoading, isError } = useBilling();
+  const changePlan = useChangePlan();
 
   if (isError) {
     return <ErrorState message="Unable to load billing information." />;
@@ -155,7 +157,8 @@ export function BillingPage() {
                 <Button
                   className={`mt-6 w-full ${plan.current ? '' : 'bg-accent hover:bg-accent/90'}`}
                   variant={plan.current ? 'outline' : 'default'}
-                  disabled={plan.current}
+                  disabled={plan.current || changePlan.isPending}
+                  onClick={() => changePlan.mutate(plan.key)}
                 >
                   {plan.current ? 'Current Plan' : (
                     <>

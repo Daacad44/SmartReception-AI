@@ -109,6 +109,15 @@ export class ConversationsService {
 
     return conversationsRepository.markAsRead(businessId, conversationId);
   }
+
+  async transferToAi(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return conversationsRepository.transferToAi(businessId, conversationId);
+  }
 }
 
 export const conversationsService = new ConversationsService();

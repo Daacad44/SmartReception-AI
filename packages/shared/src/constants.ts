@@ -68,6 +68,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 export const SUBSCRIPTION_PLANS = {
   FREE: 'FREE',
   STARTER: 'STARTER',
+  BUSINESS: 'BUSINESS',
   PROFESSIONAL: 'PROFESSIONAL',
   ENTERPRISE: 'ENTERPRISE',
 } as const;

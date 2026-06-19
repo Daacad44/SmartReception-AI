@@ -43,6 +43,10 @@ export async function authenticate(
         })
       : null;
 
+    if (decoded.businessId && membership && !membership.isActive) {
+      throw new UnauthorizedError('Your account has been deactivated for this business');
+    }
+
     const { ROLE_PERMISSIONS } = await import('@smartreception/shared');
     const role = membership?.role || 'VIEWER';
     const permissions = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];

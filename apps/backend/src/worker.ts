@@ -80,6 +80,40 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
     });
   }
 
+  const bookAction = aiResponse.actions.find((a) => a.type === 'book_appointment');
+  if (bookAction?.data) {
+    const data = bookAction.data as { title?: string; startTime?: string; endTime?: string };
+    if (data.startTime && data.endTime) {
+      const start = new Date(data.startTime);
+      const end = new Date(data.endTime);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+        await prisma.appointment.create({
+          data: {
+            businessId,
+            customerId: conversation.customerId,
+            title: data.title || 'AI Booked Appointment',
+            startTime: start,
+            endTime: end,
+            status: 'SCHEDULED',
+          },
+        });
+        logger.info(`AI booked appointment for conversation ${conversationId}`);
+      }
+    }
+  }
+
+  const qualifyAction = aiResponse.actions.find((a) => a.type === 'qualify_lead');
+  if (qualifyAction?.data) {
+    const score = Number(qualifyAction.data.score);
+    if (!isNaN(score) && score >= 0 && score <= 100) {
+      await prisma.customer.update({
+        where: { id: conversation.customerId },
+        data: { leadScore: Math.round(score) },
+      });
+      logger.info(`AI updated lead score for customer ${conversation.customerId}: ${score}`);
+    }
+  }
+
   logger.info(`AI response sent for conversation ${conversationId}, inbound message ${messageId}`);
 }
 

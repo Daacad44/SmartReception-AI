@@ -36,6 +36,7 @@ enum Industry {
 enum SubscriptionPlan {
   FREE
   STARTER
+  BUSINESS
   PROFESSIONAL
   ENTERPRISE
 }

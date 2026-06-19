@@ -117,6 +117,20 @@ export class ConversationsRepository {
     });
   }
 
+  async transferToAi(businessId: string, id: string) {
+    return prisma.conversation.update({
+      where: { id, businessId },
+      data: {
+        assignedToId: null,
+        isAiEnabled: true,
+        status: 'OPEN',
+      },
+      include: {
+        customer: true,
+      },
+    });
+  }
+
   async markAsRead(businessId: string, id: string) {
     return prisma.conversation.update({
       where: { id, businessId },

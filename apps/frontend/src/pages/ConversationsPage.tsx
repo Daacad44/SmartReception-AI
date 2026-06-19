@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Send,
@@ -25,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useConversations, useMessages } from '@/hooks/useApi';
-import { useSendMessage, useTakeoverConversation } from '@/hooks/useMutations';
+import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
 import { useRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -43,17 +44,45 @@ const statusColors: Record<string, string> = {
 const statusFilters = ['all', 'open', 'pending', 'ai_handling', 'resolved'] as const;
 
 export function ConversationsPage() {
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
 
-  const { data: conversations, isLoading, isError, refetch } = useConversations();
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: conversations, isLoading, isError, refetch } = useConversations({
+    status: statusFilter,
+    search: debouncedSearch || undefined,
+  });
   const { data: messages, isLoading: messagesLoading } = useMessages(selectedId);
   const sendMessage = useSendMessage();
   const takeover = useTakeoverConversation();
+  const transferToAi = useTransferToAi();
+  const markRead = useMarkConversationRead();
 
   useRealtime({ conversationId: selectedId });
+
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId(id);
+    markRead.mutate(id);
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!message.trim()) {
+      setIsTyping(false);
+      return;
+    }
+    setIsTyping(true);
+    const t = setTimeout(() => setIsTyping(false), 1500);
+    return () => clearTimeout(t);
+  }, [message]);
 
   const handleSend = () => {
     if (!selectedId || !message.trim()) return;
@@ -63,22 +92,15 @@ export function ConversationsPage() {
     );
   };
 
-  const filtered = conversations?.filter((c) => {
-    const matchesSearch =
-      !search ||
-      c.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = conversations;
 
   const selected = conversations?.find((c) => c.id === selectedId) ?? null;
 
   useEffect(() => {
     if (!selectedId && filtered && filtered.length > 0) {
-      setSelectedId(filtered[0].id);
+      handleSelect(filtered[0].id);
     }
-  }, [filtered, selectedId]);
+  }, [filtered, selectedId, handleSelect]);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] -m-6 overflow-hidden">
@@ -125,7 +147,7 @@ export function ConversationsPage() {
               key={conv.id}
               conversation={conv}
               isSelected={conv.id === selectedId}
-              onClick={() => setSelectedId(conv.id)}
+              onClick={() => handleSelect(conv.id)}
             />
           ))
           )}
@@ -152,6 +174,9 @@ export function ConversationsPage() {
                 <Badge className={statusColors[selected.status]}>
                   {selected.status.replace('_', ' ')}
                 </Badge>
+                {isTyping && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Agent typing...</span>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -209,7 +234,12 @@ export function ConversationsPage() {
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {msg.sender !== 'customer' && (
-                          <CheckCheck className="h-3 w-3 text-success" />
+                          <CheckCheck
+                            className={cn(
+                              'h-3 w-3',
+                              msg.status === 'read' ? 'text-success' : 'text-muted-foreground'
+                            )}
+                          />
                         )}
                       </div>
                     </div>
@@ -315,15 +345,31 @@ export function ConversationsPage() {
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Quick Actions</p>
                 <div className="space-y-2">
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/appointments?customer=${selected.customerId}`)}
+                  >
                     <Calendar className="mr-2 h-4 w-4" />
                     Schedule Appointment
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/customers?highlight=${selected.customerId}`)}
+                  >
                     <User className="mr-2 h-4 w-4" />
                     View Customer Profile
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => selectedId && transferToAi.mutate(selectedId)}
+                    disabled={selected.status === 'ai_handling'}
+                  >
                     <Bot className="mr-2 h-4 w-4" />
                     Transfer to AI
                   </Button>

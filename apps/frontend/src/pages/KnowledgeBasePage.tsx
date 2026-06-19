@@ -28,11 +28,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useKnowledgeDocs, useKnowledgeBases, isInitialLoading } from '@/hooks/useApi';
-import { useUploadDocument, useDeleteDocument } from '@/hooks/useMutations';
+import { useKnowledgeDocs, useKnowledgeBases, useFaqs, isInitialLoading } from '@/hooks/useApi';
+import { useUploadDocument, useDeleteDocument, useCreateFaq } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -90,10 +93,15 @@ function validateFile(file: File): string | null {
 export function KnowledgeBasePage() {
   const [search, setSearch] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [faqForm, setFaqForm] = useState({ question: '', answer: '', category: '' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bases, isError: basesError } = useKnowledgeBases();
+  const baseId = bases?.[0]?.id;
+  const { data: faqs } = useFaqs(baseId);
+  const createFaq = useCreateFaq();
   const {
     data: documents,
     isPending,
@@ -226,6 +234,13 @@ export function KnowledgeBasePage() {
         </Dialog>
       </div>
 
+      <Tabs defaultValue="documents" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="faqs">FAQs ({faqs?.length ?? 0})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="documents" className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4 text-center">
@@ -340,6 +355,89 @@ export function KnowledgeBasePage() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="faqs" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              FAQs are used by the AI assistant for instant answers.
+            </p>
+            <Button className="bg-accent hover:bg-accent/90" onClick={() => setFaqOpen(true)}>
+              Add FAQ
+            </Button>
+          </div>
+          {!faqs?.length ? (
+            <EmptyState title="No FAQs yet" description="Create FAQs to help your AI answer common questions." />
+          ) : (
+            <div className="space-y-3">
+              {faqs.map((faq) => (
+                <Card key={faq.id}>
+                  <CardContent className="p-4">
+                    <p className="font-medium text-sm">{faq.question}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{faq.answer}</p>
+                    {faq.category && (
+                      <Badge variant="outline" className="mt-2 text-[10px]">{faq.category}</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={faqOpen} onOpenChange={setFaqOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add FAQ</DialogTitle>
+            <DialogDescription>Create a question and answer for AI retrieval.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Question</Label>
+              <Input
+                value={faqForm.question}
+                onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Answer</Label>
+              <Textarea
+                value={faqForm.answer}
+                onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category (optional)</Label>
+              <Input
+                value={faqForm.category}
+                onChange={(e) => setFaqForm({ ...faqForm, category: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaqOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-accent hover:bg-accent/90"
+              disabled={!faqForm.question || !faqForm.answer || !baseId || createFaq.isPending}
+              onClick={async () => {
+                if (!baseId) return;
+                await createFaq.mutateAsync({
+                  knowledgeBaseId: baseId,
+                  question: faqForm.question,
+                  answer: faqForm.answer,
+                  category: faqForm.category || undefined,
+                });
+                setFaqForm({ question: '', answer: '', category: '' });
+                setFaqOpen(false);
+              }}
+            >
+              Create FAQ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

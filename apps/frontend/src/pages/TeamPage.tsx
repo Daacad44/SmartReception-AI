@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTeamMembers } from '@/hooks/useApi';
-import { useInviteTeamMember, useRemoveTeamMember } from '@/hooks/useMutations';
+import { useInviteTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/hooks/useMutations';
 import { getInitials } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -48,6 +48,7 @@ export function TeamPage() {
   const { data: members, isLoading, isError } = useTeamMembers();
   const inviteMember = useInviteTeamMember();
   const removeMember = useRemoveTeamMember();
+  const updateMember = useUpdateTeamMember();
 
   const handleInvite = async () => {
     if (!inviteForm.email.trim()) return;
@@ -93,11 +94,17 @@ export function TeamPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => updateMember.mutate({ memberId: member.id, role: 'MANAGER' })}>
+                        Set Manager
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => updateMember.mutate({ memberId: member.id, role: 'AGENT' })}>
+                        Set Agent
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => removeMember.mutate(member.id)}
                       >
-                        Remove
+                        Deactivate
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
