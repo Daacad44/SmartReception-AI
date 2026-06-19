@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { routeParam } from '../../core/utils';
 import { teamService } from './team.service';
-import { inviteTeamMemberSchema, updateTeamMemberSchema } from '@smartreception/shared';
+import { inviteTeamMemberSchema, updateTeamMemberSchema, acceptInviteSchema } from '@smartreception/shared';
 
 export class TeamController {
   async listMembers(req: Request, res: Response, next: NextFunction) {
@@ -61,6 +61,16 @@ export class TeamController {
     try {
       const invitations = await teamService.listInvitations(req.user!.businessId!);
       res.json({ success: true, data: invitations });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async acceptInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = acceptInviteSchema.parse(req.body);
+      const result = await teamService.acceptInvite(token, req.user!.userId);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

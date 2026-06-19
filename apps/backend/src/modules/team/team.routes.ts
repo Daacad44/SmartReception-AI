@@ -6,6 +6,10 @@ import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
 
+router.post('/accept-invite', authenticate, (req, res, next) =>
+  teamController.acceptInvite(req, res, next)
+);
+
 router.use(authenticate, requireBusiness);
 
 router.get('/', authorize(PERMISSIONS['team:read']), (req, res, next) =>

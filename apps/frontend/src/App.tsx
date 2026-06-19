@@ -43,6 +43,7 @@ const SettingsPage = lazy(() =>
 const BillingPage = lazy(() =>
   import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
 );
+import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,7 @@ export default function App() {
                   }
                 />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
                 <Route
                   path="/forgot-password"

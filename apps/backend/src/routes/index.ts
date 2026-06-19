@@ -13,6 +13,7 @@ import teamRoutes from '../modules/team/team.routes';
 import whatsappRoutes from '../modules/whatsapp/whatsapp.routes';
 import aiRoutes from '../modules/ai/ai.routes';
 import servicesRoutes from '../modules/services/services.routes';
+import auditRoutes from '../modules/audit/audit.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/team', teamRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/ai', aiRoutes);
 router.use('/services', servicesRoutes);
+router.use('/audit', auditRoutes);
 
 export default router;

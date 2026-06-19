@@ -1,0 +1,2 @@
+-- Add BUSINESS subscription tier
+ALTER TYPE "SubscriptionPlan" ADD VALUE IF NOT EXISTS 'BUSINESS' AFTER 'STARTER';

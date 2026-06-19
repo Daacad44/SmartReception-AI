@@ -7,6 +7,7 @@ const PLAN_LIMITS: Record<
 > = {
   FREE: { conversations: 100, customers: 50, teamMembers: 1 },
   STARTER: { conversations: 1000, customers: 500, teamMembers: 3 },
+  BUSINESS: { conversations: 3000, customers: 1500, teamMembers: 5 },
   PROFESSIONAL: { conversations: 5000, customers: 2000, teamMembers: 10 },
   ENTERPRISE: { conversations: 50000, customers: 20000, teamMembers: 100 },
 };
@@ -14,6 +15,7 @@ const PLAN_LIMITS: Record<
 const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   FREE: 0,
   STARTER: 29,
+  BUSINESS: 79,
   PROFESSIONAL: 99,
   ENTERPRISE: 299,
 };

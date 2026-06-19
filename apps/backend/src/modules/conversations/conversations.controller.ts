@@ -83,6 +83,18 @@ export class ConversationsController {
       next(error);
     }
   }
+
+  async transferToAi(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.transferToAi(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const conversationsController = new ConversationsController();

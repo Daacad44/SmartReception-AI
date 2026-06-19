@@ -125,6 +125,7 @@ export class AppointmentsService {
       startTime: input.startTime ? startTime : undefined,
       endTime: input.endTime ? endTime : undefined,
       notes: input.notes,
+      ...(input.status && { status: input.status }),
     });
 
     await prisma.auditLog.create({

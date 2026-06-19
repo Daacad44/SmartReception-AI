@@ -76,7 +76,17 @@ export const createAppointmentSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
-export const updateAppointmentSchema = createAppointmentSchema.partial();
+export const updateAppointmentSchema = createAppointmentSchema.partial().extend({
+  status: z.enum(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']).optional(),
+});
+
+export const acceptInviteSchema = z.object({
+  token: z.string().min(1),
+});
+
+export const changePlanSchema = z.object({
+  plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
+});
 
 export const sendMessageSchema = z.object({
   content: z.string().min(1).max(4096),
@@ -140,3 +150,5 @@ export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type CreateFaqInput = z.infer<typeof createFaqSchema>;
 export type AiConfigInput = z.infer<typeof aiConfigSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
+export type ChangePlanInput = z.infer<typeof changePlanSchema>;

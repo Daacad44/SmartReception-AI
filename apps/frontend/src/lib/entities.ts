@@ -72,7 +72,7 @@ export interface Appointment {
   date: string;
   time: string;
   duration: number;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
+  status: 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show';
   notes?: string;
 }
 
@@ -140,6 +140,57 @@ export interface BillingData {
   nextBillingDate: string;
   usage: Record<string, { used: number; limit: number }>;
   invoices: Array<{ id: string; date: string; amount: number; status: string }>;
+}
+
+export interface CustomerNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  createdBy?: string;
+}
+
+export interface CustomerTag {
+  id: string;
+  name: string;
+  color?: string;
+  customerCount?: number;
+}
+
+export interface TimelineEvent {
+  id: string;
+  type: 'note' | 'appointment' | 'conversation' | 'activity';
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface CustomerInsights {
+  leadScore: number;
+  status: string;
+  totalConversations: number;
+  totalAppointments: number;
+  completedAppointments: number;
+  cancelledAppointments: number;
+  totalMessages: number;
+  lastActivity: string;
+  lastConversationStatus: string | null;
+  tags: Array<{ id: string; name: string; color?: string }>;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  price?: number;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  createdAt: string;
+  user?: { firstName: string; lastName: string; email: string };
 }
 
 export interface CustomerGrowthPoint {

@@ -1,5 +1,8 @@
 import { billingRepository } from './billing.repository';
 import { SubscriptionPlan } from '@prisma/client';
+import { ChangePlanInput } from '@smartreception/shared';
+import { prisma } from '../../infrastructure/database/prisma';
+import { ForbiddenError } from '../../core/errors';
 
 const STATUS_MAP: Record<string, string> = {
   ACTIVE: 'active',
@@ -47,6 +50,63 @@ export class BillingService {
         status: INVOICE_STATUS_MAP[inv.status] || inv.status.toLowerCase(),
       })),
     };
+  }
+
+  async changePlan(businessId: string, input: ChangePlanInput, userId: string) {
+    const plan = input.plan as SubscriptionPlan;
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    const subscription = await prisma.subscription.upsert({
+      where: { businessId },
+      create: {
+        businessId,
+        plan,
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: periodEnd,
+      },
+      update: {
+        plan,
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: periodEnd,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        businessId,
+        userId,
+        action: 'UPDATE',
+        entity: 'Subscription',
+        entityId: subscription.id,
+        newData: { plan },
+      },
+    });
+
+    return this.getBillingOverview(businessId);
+  }
+
+  async assertWithinLimit(
+    businessId: string,
+    resource: 'conversations' | 'customers' | 'teamMembers'
+  ) {
+    const [subscription, usageCounts] = await Promise.all([
+      billingRepository.getSubscription(businessId),
+      billingRepository.getUsageCounts(businessId),
+    ]);
+
+    const plan = subscription?.plan ?? SubscriptionPlan.FREE;
+    const limits = billingRepository.getPlanLimits(plan);
+    const used = usageCounts[resource];
+    const limit = limits[resource];
+
+    if (used >= limit) {
+      throw new ForbiddenError(
+        `${resource} limit reached for your ${plan} plan (${used}/${limit}). Please upgrade.`
+      );
+    }
   }
 }
 

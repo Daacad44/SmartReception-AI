@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { Search, Plus, MoreHorizontal, Mail, Phone } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Mail, Phone, Tag, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -27,8 +36,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCustomers } from '@/hooks/useApi';
-import { useCreateCustomer, useUpdateCustomer, useDeleteCustomer } from '@/hooks/useMutations';
+import {
+  useCustomers,
+  useCustomerTags,
+  useCustomerNotes,
+  useCustomerTimeline,
+  useCustomerInsights,
+} from '@/hooks/useApi';
+import {
+  useCreateCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
+  useAddCustomerNote,
+  useAssignCustomerTags,
+  useCreateCustomerTag,
+} from '@/hooks/useMutations';
 import { getInitials, formatRelativeTime } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -44,20 +66,31 @@ const statusVariant: Record<string, 'success' | 'warning' | 'accent' | 'secondar
 export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [tagFilter, setTagFilter] = useState<string>('All');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' });
+  const [newNote, setNewNote] = useState('');
+  const [newTagName, setNewTagName] = useState('');
 
   const { data: customers, isLoading, isError } = useCustomers(search);
+  const { data: tags } = useCustomerTags();
+  const { data: notes } = useCustomerNotes(detailCustomer?.id ?? null);
+  const { data: timeline } = useCustomerTimeline(detailCustomer?.id ?? null);
+  const { data: insights } = useCustomerInsights(detailCustomer?.id ?? null);
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
+  const addNote = useAddCustomerNote();
+  const assignTags = useAssignCustomerTags();
+  const createTag = useCreateCustomerTag();
 
   const filtered = customers?.filter((c) => {
-    if (statusFilter === 'All') return true;
-    if (statusFilter === 'VIP') return c.status === 'vip';
-    if (statusFilter === 'Active') return c.status === 'active';
-    if (statusFilter === 'Inactive') return c.status === 'inactive';
+    if (statusFilter === 'VIP' && c.status !== 'vip') return false;
+    if (statusFilter === 'Active' && c.status !== 'active') return false;
+    if (statusFilter === 'Inactive' && c.status !== 'inactive') return false;
+    if (tagFilter !== 'All' && !c.tags.includes(tagFilter)) return false;
     return true;
   });
 
@@ -80,7 +113,6 @@ export function CustomersPage() {
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.phone.trim()) return;
-
     if (editingCustomer) {
       await updateCustomer.mutateAsync({
         id: editingCustomer.id,
@@ -102,6 +134,15 @@ export function CustomersPage() {
     setDialogOpen(false);
   };
 
+  const toggleTag = (tagId: string) => {
+    if (!detailCustomer) return;
+    const current = insights?.tags.map((t) => t.id) ?? [];
+    const next = current.includes(tagId)
+      ? current.filter((id) => id !== tagId)
+      : [...current, tagId];
+    assignTags.mutate({ customerId: detailCustomer.id, tagIds: next });
+  };
+
   if (isError) {
     return <ErrorState message="Unable to load customers." />;
   }
@@ -111,7 +152,7 @@ export function CustomersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">Manage your customer database and tags</p>
+          <p className="text-muted-foreground">Manage your customer database, notes, and tags</p>
         </div>
         <Button className="bg-accent hover:bg-accent/90" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -119,7 +160,7 @@ export function CustomersPage() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -141,6 +182,27 @@ export function CustomersPage() {
             </Button>
           ))}
         </div>
+        {tags && tags.length > 0 && (
+          <div className="flex gap-2">
+            <Button
+              variant={tagFilter === 'All' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTagFilter('All')}
+            >
+              All Tags
+            </Button>
+            {tags.map((t) => (
+              <Button
+                key={t.id}
+                variant={tagFilter === t.name ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTagFilter(t.name)}
+              >
+                {t.name}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -166,7 +228,11 @@ export function CustomersPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow
+                  key={customer.id}
+                  className="cursor-pointer"
+                  onClick={() => setDetailCustomer(customer)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
@@ -214,7 +280,7 @@ export function CustomersPage() {
                       {customer.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -238,6 +304,136 @@ export function CustomersPage() {
           </Table>
         </div>
       )}
+
+      <Sheet open={!!detailCustomer} onOpenChange={(open) => !open && setDetailCustomer(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          {detailCustomer && (
+            <>
+              <SheetHeader>
+                <SheetTitle>{detailCustomer.name}</SheetTitle>
+                <SheetDescription>{detailCustomer.phone}</SheetDescription>
+              </SheetHeader>
+
+              {insights && (
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg border p-2">
+                    <p className="text-lg font-bold">{insights.leadScore}</p>
+                    <p className="text-[10px] text-muted-foreground">Lead Score</p>
+                  </div>
+                  <div className="rounded-lg border p-2">
+                    <p className="text-lg font-bold">{insights.totalAppointments}</p>
+                    <p className="text-[10px] text-muted-foreground">Appointments</p>
+                  </div>
+                  <div className="rounded-lg border p-2">
+                    <p className="text-lg font-bold">{insights.totalMessages}</p>
+                    <p className="text-[10px] text-muted-foreground">Messages</p>
+                  </div>
+                </div>
+              )}
+
+              <Tabs defaultValue="notes" className="mt-6">
+                <TabsList className="w-full">
+                  <TabsTrigger value="notes" className="flex-1">Notes</TabsTrigger>
+                  <TabsTrigger value="tags" className="flex-1">Tags</TabsTrigger>
+                  <TabsTrigger value="timeline" className="flex-1">Timeline</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="notes" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Textarea
+                      placeholder="Add a note..."
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      rows={2}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!newNote.trim() || addNote.isPending}
+                      onClick={() => {
+                        addNote.mutate(
+                          { customerId: detailCustomer.id, content: newNote.trim() },
+                          { onSuccess: () => setNewNote('') }
+                        );
+                      }}
+                    >
+                      Add Note
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {notes?.map((n) => (
+                      <div key={n.id} className="rounded-lg border p-3 text-sm">
+                        <p>{n.content}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {formatRelativeTime(n.createdAt)}
+                        </p>
+                      </div>
+                    ))}
+                    {!notes?.length && (
+                      <p className="text-sm text-muted-foreground">No notes yet</p>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="tags" className="space-y-4 mt-4">
+                  <div className="flex flex-wrap gap-2">
+                    {tags?.map((t) => {
+                      const active = insights?.tags.some((it) => it.id === t.id);
+                      return (
+                        <Badge
+                          key={t.id}
+                          variant={active ? 'default' : 'outline'}
+                          className="cursor-pointer"
+                          onClick={() => toggleTag(t.id)}
+                        >
+                          <Tag className="h-3 w-3 mr-1" />
+                          {t.name}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="New tag name"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!newTagName.trim()}
+                      onClick={() => {
+                        createTag.mutate(
+                          { name: newTagName.trim() },
+                          { onSuccess: () => setNewTagName('') }
+                        );
+                      }}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="timeline" className="space-y-3 mt-4">
+                  {timeline?.map((event) => (
+                    <div key={event.id} className="flex gap-3 border-l-2 border-accent/30 pl-3">
+                      <Activity className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">{event.title}</p>
+                        <p className="text-xs text-muted-foreground">{event.description}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {formatRelativeTime(event.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {!timeline?.length && (
+                    <p className="text-sm text-muted-foreground">No activity yet</p>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
@@ -270,9 +466,7 @@ export function CustomersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button
               className="bg-accent hover:bg-accent/90"
               onClick={handleSubmit}

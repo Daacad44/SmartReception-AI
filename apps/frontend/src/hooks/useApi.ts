@@ -13,6 +13,12 @@ import type {
   AnalyticsData,
   BillingData,
   CustomerGrowthPoint,
+  CustomerNote,
+  CustomerTag,
+  TimelineEvent,
+  CustomerInsights,
+  Service,
+  AuditLogEntry,
 } from '@/lib/entities';
 import type {
   DashboardStats,
@@ -125,7 +131,7 @@ export function transformAppointment(raw: any): Appointment {
     SCHEDULED: 'pending',
     CANCELLED: 'cancelled',
     COMPLETED: 'completed',
-    NO_SHOW: 'cancelled',
+    NO_SHOW: 'no_show',
   };
 
   return {
@@ -310,13 +316,28 @@ export function useTeamPerformance() {
 }
 
 export function useConversations(params?: { status?: string; search?: string }) {
+  const apiStatus =
+    params?.status && params.status !== 'all' && params.status !== 'ai_handling'
+      ? params.status.toUpperCase()
+      : undefined;
+
   return useAuthQuery<Conversation[]>({
     queryKey: ['conversations', params],
     queryFn: async () => {
-      const response = await api.get('/conversations', { params: { limit: 100, ...params } });
+      const response = await api.get('/conversations', {
+        params: {
+          limit: 100,
+          search: params?.search || undefined,
+          status: apiStatus,
+        },
+      });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
-      return items.map(transformConversation);
+      let conversations = items.map(transformConversation);
+      if (params?.status === 'ai_handling') {
+        conversations = conversations.filter((c) => c.status === 'ai_handling');
+      }
+      return conversations;
     },
   });
 }
@@ -346,14 +367,130 @@ export function useCustomers(search?: string) {
   });
 }
 
-export function useAppointments() {
+export function useAppointments(params?: { status?: string; customerId?: string }) {
   return useAuthQuery<Appointment[]>({
-    queryKey: ['appointments'],
+    queryKey: ['appointments', params],
     queryFn: async () => {
-      const response = await api.get('/appointments', { params: { limit: 100 } });
+      const response = await api.get('/appointments', {
+        params: { limit: 200, ...params },
+      });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
       return items.map(transformAppointment);
+    },
+  });
+}
+
+export function useAppointmentCalendar(startDate: string, endDate: string) {
+  return useAuthQuery<Appointment[]>({
+    queryKey: ['appointments', 'calendar', startDate, endDate],
+    queryFn: async () => {
+      const response = await api.get('/appointments/calendar', {
+        params: { startDate, endDate },
+      });
+      const data = extractData(response);
+      const items = Array.isArray(data) ? data : [];
+      return items.map(transformAppointment);
+    },
+    enabled: !!startDate && !!endDate,
+  });
+}
+
+export function useServices() {
+  return useAuthQuery<Service[]>({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const response = await api.get('/services', { params: { limit: 100 } });
+      const data = extractData(response);
+      const items = Array.isArray(data) ? data : [];
+      return items.map((raw: { id: string; name: string; duration: number; price?: number }) => ({
+        id: raw.id,
+        name: raw.name,
+        duration: raw.duration,
+        price: raw.price,
+      }));
+    },
+  });
+}
+
+export function useCustomer(customerId: string | null) {
+  return useAuthQuery<Customer & { notes?: string }>({
+    queryKey: ['customers', customerId],
+    queryFn: async () => {
+      const response = await api.get(`/customers/${customerId}`);
+      const raw = extractData(response);
+      return transformCustomer(raw);
+    },
+    enabled: !!customerId,
+  });
+}
+
+export function useCustomerNotes(customerId: string | null) {
+  return useAuthQuery<CustomerNote[]>({
+    queryKey: ['customers', customerId, 'notes'],
+    queryFn: async () => {
+      const response = await api.get(`/customers/${customerId}/notes`);
+      const data = extractData(response);
+      return (Array.isArray(data) ? data : []).map(
+        (n: { id: string; content: string; createdAt: string; createdBy?: string }) => ({
+          id: n.id,
+          content: n.content,
+          createdAt: n.createdAt,
+          createdBy: n.createdBy,
+        })
+      );
+    },
+    enabled: !!customerId,
+  });
+}
+
+export function useCustomerTimeline(customerId: string | null) {
+  return useAuthQuery<TimelineEvent[]>({
+    queryKey: ['customers', customerId, 'timeline'],
+    queryFn: async () => {
+      const response = await api.get(`/customers/${customerId}/timeline`);
+      return extractData(response);
+    },
+    enabled: !!customerId,
+  });
+}
+
+export function useCustomerInsights(customerId: string | null) {
+  return useAuthQuery<CustomerInsights>({
+    queryKey: ['customers', customerId, 'insights'],
+    queryFn: async () => {
+      const response = await api.get(`/customers/${customerId}/insights`);
+      return extractData(response);
+    },
+    enabled: !!customerId,
+  });
+}
+
+export function useCustomerTags() {
+  return useAuthQuery<CustomerTag[]>({
+    queryKey: ['customers', 'tags'],
+    queryFn: async () => {
+      const response = await api.get('/customers/tags');
+      const data = extractData(response);
+      return (Array.isArray(data) ? data : []).map(
+        (t: { id: string; name: string; color?: string; _count?: { customers: number } }) => ({
+          id: t.id,
+          name: t.name,
+          color: t.color,
+          customerCount: t._count?.customers,
+        })
+      );
+    },
+  });
+}
+
+export function useAuditLogs() {
+  return useAuthQuery<AuditLogEntry[]>({
+    queryKey: ['audit', 'logs'],
+    queryFn: async () => {
+      const response = await api.get('/audit/logs', { params: { limit: 50 } });
+      const data = extractData(response);
+      return Array.isArray(data) ? data : [];
     },
   });
 }

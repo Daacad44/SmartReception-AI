@@ -47,6 +47,19 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       );
     }
 
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'appointments',
+        filter: `businessId=eq.${businessId}`,
+      },
+      () => {
+        queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      }
+    );
+
     channel.subscribe();
 
     return () => {
