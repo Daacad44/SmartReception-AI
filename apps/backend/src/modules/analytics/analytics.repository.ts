@@ -73,6 +73,19 @@ export class AnalyticsRepository {
         (SELECT COUNT(*)::bigint FROM messages m JOIN conversations c ON m."conversationId" = c.id WHERE c."businessId" = ${businessId} AND m."createdAt" >= ${sixtyDaysAgo} AND m."createdAt" < ${thirtyDaysAgo}) AS "prevTotalMessages"
     `;
 
+    if (!row) {
+      return {
+        totalConversations: 0,
+        activeCustomers: 0,
+        appointmentsToday: 0,
+        aiResolutionRate: 0,
+        conversationGrowth: 0,
+        customerGrowth: 0,
+        appointmentGrowth: 0,
+        aiGrowth: 0,
+      };
+    }
+
     const n = (v: bigint) => Number(v);
     const totalMessages = n(row.totalMessages);
     const aiMessages = n(row.aiMessages);

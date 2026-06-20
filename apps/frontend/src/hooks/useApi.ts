@@ -45,7 +45,8 @@ function mapConversationStatus(
   return 'open';
 }
 
-function mapMessageStatus(status: string): Message['status'] {
+function mapMessageStatus(status: string | null | undefined): Message['status'] {
+  if (!status) return 'sent';
   const normalized = status.toLowerCase();
   if (normalized === 'delivered' || normalized === 'read' || normalized === 'sent') {
     return normalized as Message['status'];
