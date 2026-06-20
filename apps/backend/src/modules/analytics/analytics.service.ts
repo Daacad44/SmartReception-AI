@@ -21,6 +21,10 @@ export class AnalyticsService {
     return analyticsRepository.getFullAnalytics(businessId);
   }
 
+  async getWhatsAppAnalytics(businessId: string) {
+    return analyticsRepository.getWhatsAppAnalytics(businessId);
+  }
+
   async getTrends(businessId: string, days?: number) {
     return analyticsRepository.getConversationTrends(businessId, days || 30);
   }

@@ -32,5 +32,8 @@ router.get('/trends', authorize(PERMISSIONS['analytics:read']), (req, res, next)
 router.get('/team-performance', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.teamPerformance(req, res, next)
 );
+router.get('/whatsapp', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.whatsapp(req, res, next)
+);
 
 export default router;

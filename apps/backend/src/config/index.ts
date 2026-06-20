@@ -30,9 +30,19 @@ export const config = {
   },
 
   whatsapp: {
-    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'smartreception-verify',
+    verifyToken:
+      process.env.VERIFY_TOKEN ||
+      process.env.WHATSAPP_VERIFY_TOKEN ||
+      '',
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-    appSecret: process.env.WHATSAPP_APP_SECRET || '',
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+    businessAccountId:
+      process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+    appId: process.env.META_APP_ID || '',
+    appSecret:
+      process.env.WHATSAPP_APP_SECRET ||
+      process.env.META_APP_SECRET ||
+      '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,
   },

@@ -354,6 +354,140 @@ export class AnalyticsRepository {
     };
   }
 
+  async getWhatsAppAnalytics(businessId: string) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const whatsappWhere = {
+      conversation: { businessId, whatsappAccountId: { not: null } },
+    };
+
+    const [
+      messagesReceived,
+      messagesSent,
+      aiOutbound,
+      humanOutbound,
+      activeConversations,
+      recentCustomers,
+      prevCustomers,
+      takeoverCount,
+      totalWhatsAppConversations,
+    ] = await Promise.all([
+      prisma.message.count({
+        where: { ...whatsappWhere, direction: 'INBOUND', createdAt: { gte: thirtyDaysAgo } },
+      }),
+      prisma.message.count({
+        where: { ...whatsappWhere, direction: 'OUTBOUND', createdAt: { gte: thirtyDaysAgo } },
+      }),
+      prisma.message.count({
+        where: {
+          ...whatsappWhere,
+          direction: 'OUTBOUND',
+          isAiGenerated: true,
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.message.count({
+        where: {
+          ...whatsappWhere,
+          direction: 'OUTBOUND',
+          isAiGenerated: false,
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          whatsappAccountId: { not: null },
+          status: { in: ['OPEN', 'PENDING'] },
+        },
+      }),
+      prisma.customer.count({
+        where: {
+          businessId,
+          conversations: { some: { whatsappAccountId: { not: null } } },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.customer.count({
+        where: {
+          businessId,
+          conversations: { some: { whatsappAccountId: { not: null } } },
+          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          whatsappAccountId: { not: null },
+          isAiEnabled: false,
+          assignedToId: { not: null },
+          updatedAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: { businessId, whatsappAccountId: { not: null } },
+      }),
+    ]);
+
+    const conversationMessages = await prisma.message.findMany({
+      where: {
+        conversation: { businessId, whatsappAccountId: { not: null } },
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      select: { conversationId: true, direction: true, createdAt: true },
+      orderBy: [{ conversationId: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const responseTimes: number[] = [];
+    const byConversation = new Map<string, Array<{ direction: string; createdAt: Date }>>();
+    for (const msg of conversationMessages) {
+      const list = byConversation.get(msg.conversationId) || [];
+      list.push({ direction: msg.direction, createdAt: msg.createdAt });
+      byConversation.set(msg.conversationId, list);
+    }
+    for (const convMsgs of byConversation.values()) {
+      for (let i = 0; i < convMsgs.length - 1; i++) {
+        if (convMsgs[i].direction === 'INBOUND' && convMsgs[i + 1].direction === 'OUTBOUND') {
+          const diffMs = convMsgs[i + 1].createdAt.getTime() - convMsgs[i].createdAt.getTime();
+          if (diffMs > 0 && diffMs < 24 * 60 * 60 * 1000) {
+            responseTimes.push(diffMs);
+          }
+        }
+      }
+    }
+
+    const avgMs =
+      responseTimes.length > 0
+        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+        : 0;
+    const avgMinutes = Math.round((avgMs / 60000) * 10) / 10;
+    const avgResponseTime =
+      avgMinutes >= 1 ? `${avgMinutes} min` : `${Math.round(avgMs / 1000)} sec`;
+
+    const outboundTotal = messagesSent || 1;
+    const aiResolutionRate = Math.round((aiOutbound / outboundTotal) * 1000) / 10;
+    const humanTakeoverRate =
+      totalWhatsAppConversations > 0
+        ? Math.round((takeoverCount / totalWhatsAppConversations) * 1000) / 10
+        : 0;
+
+    return {
+      messagesReceived,
+      messagesSent,
+      avgResponseTime,
+      aiResolutionRate,
+      humanTakeoverRate,
+      activeConversations,
+      customerGrowth: Math.round(calcGrowth(recentCustomers, prevCustomers) * 10) / 10,
+      humanOutbound,
+      aiOutbound,
+      periodDays: 30,
+    };
+  }
+
   async getConversationTrends(businessId: string, days = 30) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);

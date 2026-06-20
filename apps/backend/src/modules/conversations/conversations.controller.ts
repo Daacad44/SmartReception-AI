@@ -95,6 +95,18 @@ export class ConversationsController {
       next(error);
     }
   }
+
+  async sendTyping(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await conversationsService.sendTypingIndicator(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const conversationsController = new ConversationsController();

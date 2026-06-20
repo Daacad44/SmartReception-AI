@@ -107,7 +107,9 @@ export const knowledgeSearchSchema = z.object({
 
 export const sendMessageSchema = z.object({
   content: z.string().min(1).max(4096),
-  type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO']).default('TEXT'),
+  type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO', 'TEMPLATE', 'INTERACTIVE']).default('TEXT'),
+  mediaUrl: z.string().url().optional(),
+  mediaFilename: z.string().max(255).optional(),
 });
 
 export const inviteTeamMemberSchema = z.object({

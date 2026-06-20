@@ -45,6 +45,8 @@ export interface Message {
   id: string;
   conversationId: string;
   content: string;
+  type?: string;
+  mediaUrl?: string;
   sender: 'customer' | 'agent' | 'ai';
   senderName: string;
   timestamp: string;

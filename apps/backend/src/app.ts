@@ -39,7 +39,11 @@ export function createApp(): express.Application {
   app.use(
     cors({
       origin: (origin, callback) => {
-        const allowed = [config.frontendUrl];
+        const allowed = [
+          config.frontendUrl,
+          'https://somreception.botandev.com',
+          'https://api.somreception.botandev.com',
+        ];
         if (process.env.VERCEL_URL) {
           allowed.push(`https://${process.env.VERCEL_URL}`);
         }
@@ -73,6 +77,7 @@ export function createApp(): express.Application {
   });
 
   app.use('/api/v1/whatsapp/webhook', rawJson);
+  app.use('/api/v1/webhooks/whatsapp', rawJson);
   app.use('/api/v1/billing/webhook', rawJson);
 
   app.use(express.json({ limit: '10mb' }));

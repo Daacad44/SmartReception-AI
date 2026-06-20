@@ -4,17 +4,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useWhatsAppAccounts, useWhatsAppWebhookInfo } from '@/hooks/useApi';
-import { useConnectWhatsApp, useDisconnectWhatsApp } from '@/hooks/useMutations';
+import { useWhatsAppAccounts, useWhatsAppWebhookInfo, useWhatsAppStatus } from '@/hooks/useApi';
+import {
+  useConnectWhatsApp,
+  useConnectWhatsAppFromEnv,
+  useDisconnectWhatsApp,
+  useTestWhatsAppConnection,
+} from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2, Plug, Wifi, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatRelativeTime } from '@/lib/utils';
 
 export function WhatsAppSettings() {
-  const { data: accounts, isLoading } = useWhatsAppAccounts();
+  const { data: accounts, isLoading, refetch } = useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
+  const { data: status } = useWhatsAppStatus();
   const connectWhatsApp = useConnectWhatsApp();
+  const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
+  const testConnection = useTestWhatsAppConnection();
 
   const [form, setForm] = useState({
     phoneNumberId: '',
@@ -39,20 +48,81 @@ export function WhatsAppSettings() {
     return <LoadingState rows={4} />;
   }
 
+  const activeAccount = accounts?.find((a) => a.isActive);
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
+          <CardTitle>Connection Status</CardTitle>
+          <CardDescription>WhatsApp Cloud API integration status</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border p-4">
+            <p className="text-xs text-muted-foreground">Connection</p>
+            <Badge variant={status?.connected ? 'success' : 'secondary'} className="mt-1">
+              {status?.connected ? 'Connected' : 'Not Connected'}
+            </Badge>
+          </div>
+          <div className="rounded-lg border p-4">
+            <p className="text-xs text-muted-foreground">Webhook</p>
+            <Badge variant={activeAccount?.webhookVerified ? 'success' : 'warning'} className="mt-1">
+              {activeAccount?.webhookStatus ?? 'pending'}
+            </Badge>
+          </div>
+          <div className="rounded-lg border p-4">
+            <p className="text-xs text-muted-foreground">Phone Status</p>
+            <p className="mt-1 text-sm font-medium capitalize">
+              {activeAccount?.phoneNumberStatus ?? 'unknown'}
+            </p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <p className="text-xs text-muted-foreground">Last Sync</p>
+            <p className="mt-1 text-sm font-medium">
+              {activeAccount?.lastSyncAt
+                ? formatRelativeTime(activeAccount.lastSyncAt)
+                : 'Never'}
+            </p>
+          </div>
+        </CardContent>
+        <CardContent className="flex flex-wrap gap-2 pt-0">
+          {status?.envConfigured && (
+            <Button
+              variant="outline"
+              onClick={() => connectFromEnv.mutate()}
+              disabled={connectFromEnv.isPending}
+            >
+              <Plug className="mr-2 h-4 w-4" />
+              Connect from Environment
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => testConnection.mutate(activeAccount?.id)}
+            disabled={!activeAccount || testConnection.isPending}
+          >
+            <Wifi className="mr-2 h-4 w-4" />
+            Test Connection
+          </Button>
+          <Button variant="ghost" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Webhook Configuration</CardTitle>
           <CardDescription>
-            Use these values in your Meta WhatsApp App webhook settings
+            Configure these in Meta Developer Console → WhatsApp → Configuration
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {webhookInfo && (
             <>
               <div className="space-y-2">
-                <Label>Callback URL</Label>
+                <Label>Callback URL (production)</Label>
                 <div className="flex gap-2">
                   <Input readOnly value={webhookInfo.webhookUrl} />
                   <Button
@@ -68,15 +138,17 @@ export function WhatsAppSettings() {
               <div className="space-y-2">
                 <Label>Verify Token</Label>
                 <div className="flex gap-2">
-                  <Input readOnly value={webhookInfo.verifyToken} />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(webhookInfo.verifyToken)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+                  <Input readOnly value={webhookInfo.verifyToken ? '••••••••' : 'Not configured'} />
+                  {webhookInfo.verifyToken && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(webhookInfo.verifyToken)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
@@ -102,6 +174,9 @@ export function WhatsAppSettings() {
                   <p className="text-sm text-muted-foreground">
                     {account.phoneNumber} · ID: {account.phoneNumberId}
                   </p>
+                  {account.wabaId && (
+                    <p className="text-xs text-muted-foreground">WABA: {account.wabaId}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={account.isActive ? 'success' : 'secondary'}>
@@ -124,9 +199,9 @@ export function WhatsAppSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connect WhatsApp Business Account</CardTitle>
+          <CardTitle>Connect Manually</CardTitle>
           <CardDescription>
-            Enter credentials from Meta Business Suite / WhatsApp Cloud API
+            Or use &quot;Connect from Environment&quot; if credentials are set in server .env
           </CardDescription>
         </CardHeader>
         <CardContent>

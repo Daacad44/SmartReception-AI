@@ -67,6 +67,9 @@ export interface WhatsAppJobData {
   messageId: string;
   phoneNumber: string;
   content: string;
+  type?: string;
+  mediaUrl?: string;
+  mediaFilename?: string;
 }
 
 export interface AIJobData {
