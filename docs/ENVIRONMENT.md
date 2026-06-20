@@ -1,7 +1,9 @@
 # Environment Variables
 
 All secrets must be set in `.env` (local) or your hosting provider (Vercel, Railway, etc.).  
-**Never commit real values.** `.env`, `.env.local`, and `.env.production` are gitignored.
+**Never commit real values.** Copy `.env.example` to `.env` and fill in your keys locally.
+
+`.env`, `.env.local`, `.env.production`, and all other `.env.*` files are gitignored.
 
 ## Required for core operation
 
