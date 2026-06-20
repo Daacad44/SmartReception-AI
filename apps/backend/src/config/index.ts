@@ -1,13 +1,42 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
+const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
+
+function resolveApiUrl(): string {
+  if (process.env.API_URL) {
+    return process.env.API_URL.replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return PRODUCTION_API_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3001';
+}
+
+function resolveFrontendUrl(): string {
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL.replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return PRODUCTION_FRONTEND_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:5173';
+}
+
+const apiUrl = resolveApiUrl();
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3001', 10),
-  frontendUrl:
-    process.env.FRONTEND_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173'),
-  apiUrl: process.env.API_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3001'),
+  frontendUrl: resolveFrontendUrl(),
+  apiUrl,
 
   database: {
     url: process.env.DATABASE_URL!,
@@ -45,6 +74,7 @@ export const config = {
       '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,
+    webhookUrl: `${apiUrl}/webhook`,
   },
 
   r2: {

@@ -196,7 +196,7 @@ export class WhatsAppModuleService {
   }
 
   getWebhookUrl(): string {
-    return `${config.apiUrl}/webhook`;
+    return config.whatsapp.webhookUrl;
   }
 
   getLegacyWebhookUrl(): string {
