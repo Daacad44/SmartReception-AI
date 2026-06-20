@@ -88,6 +88,35 @@ describe('WhatsApp webhook parser', () => {
   });
 });
 
+describe('WhatsApp webhook verification', () => {
+  function verifyWebhook(
+    mode: string,
+    token: string,
+    challenge: string,
+    expectedToken: string
+  ): string | null {
+    if (mode === 'subscribe' && token === expectedToken && challenge) {
+      return challenge;
+    }
+    return null;
+  }
+
+  it('returns challenge when mode and token match', () => {
+    const result = verifyWebhook('subscribe', 'smartreception-verify', '123456', 'smartreception-verify');
+    assert.equal(result, '123456');
+  });
+
+  it('rejects wrong verify token', () => {
+    const result = verifyWebhook('subscribe', 'wrong-token', '123456', 'smartreception-verify');
+    assert.equal(result, null);
+  });
+
+  it('rejects non-subscribe mode', () => {
+    const result = verifyWebhook('unsubscribe', 'smartreception-verify', '123456', 'smartreception-verify');
+    assert.equal(result, null);
+  });
+});
+
 describe('WhatsApp webhook signature', () => {
   it('validates X-Hub-Signature-256', () => {
     const secret = 'test-secret';

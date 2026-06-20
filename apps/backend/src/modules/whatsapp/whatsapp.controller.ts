@@ -12,15 +12,31 @@ export class WhatsAppController {
       const token = req.query['hub.verify_token'] as string;
       const challenge = req.query['hub.challenge'] as string;
 
-      logger.info('WhatsApp webhook verification attempt', { mode, hasToken: Boolean(token) });
+      console.log('[WhatsApp Webhook] Mode:', mode);
+      console.log('[WhatsApp Webhook] Token:', token);
+      console.log('[WhatsApp Webhook] Challenge:', challenge);
+      console.log('[WhatsApp Webhook] Expected:', config.whatsapp.verifyToken);
+
+      logger.info('WhatsApp webhook verification attempt', {
+        mode,
+        tokenReceived: Boolean(token),
+        challengeReceived: Boolean(challenge),
+        path: req.path,
+        host: req.get('host'),
+      });
 
       const result = whatsappModuleService.verifyWebhook(mode, token, challenge);
       if (result) {
-        res.status(200).send(result);
+        console.log('[WhatsApp Webhook] Verification succeeded');
+        res.status(200).type('text/plain').send(result);
         return;
       }
 
-      logger.warn('WhatsApp webhook verification failed');
+      console.log('[WhatsApp Webhook] Verification failed — token mismatch or invalid mode');
+      logger.warn('WhatsApp webhook verification failed', {
+        mode,
+        tokenMatch: token === config.whatsapp.verifyToken,
+      });
       res.status(403).json({ success: false, error: 'Verification failed' });
     } catch (error) {
       next(error);

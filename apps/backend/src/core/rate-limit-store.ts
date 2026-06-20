@@ -22,6 +22,7 @@ export function createRateLimiter(options: {
   windowMs: number;
   max: number;
   message?: string;
+  skip?: (req: import('express').Request) => boolean;
 }) {
   const redis = getRedisClient();
   const base = {
@@ -30,6 +31,7 @@ export function createRateLimiter(options: {
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, error: options.message ?? 'Too many requests, please try again later' },
+    skip: options.skip,
   };
 
   if (redis) {
