@@ -52,11 +52,23 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
   });
 
   if (conversation.whatsappAccount) {
-    const whatsappMsgId = await whatsappService.sendMessage({
+    await whatsappService.sendTypingIndicator(
+      conversation.whatsappAccount.phoneNumberId,
+      conversation.customer.phone,
+      conversation.whatsappAccount.accessToken || undefined
+    );
+
+    const whatsappMsgId = await whatsappService.sendOutbound({
       phoneNumberId: conversation.whatsappAccount.phoneNumberId,
       to: conversation.customer.phone,
-      message: aiResponse.content,
       accessToken: conversation.whatsappAccount.accessToken || undefined,
+      type: 'TEXT',
+      content: aiResponse.content,
+    });
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { isTyping: false },
     });
 
     await prisma.message.update({
@@ -118,7 +130,8 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
 }
 
 async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
-  const { businessId, conversationId, messageId, phoneNumber, content } = job.data;
+  const { businessId, conversationId, messageId, phoneNumber, content, type, mediaUrl, mediaFilename } =
+    job.data;
 
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId, businessId },
@@ -133,11 +146,15 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     return;
   }
 
-  const whatsappMsgId = await whatsappService.sendMessage({
+  const msgType = (type ?? 'TEXT') as 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO';
+  const whatsappMsgId = await whatsappService.sendOutbound({
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
     to: phoneNumber,
-    message: content,
     accessToken: conversation.whatsappAccount.accessToken || undefined,
+    type: msgType,
+    content,
+    mediaUrl,
+    mediaFilename,
   });
 
   await prisma.message.update({

@@ -327,7 +327,52 @@ export function useConnectWhatsApp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
       toast.success('WhatsApp account connected');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useConnectWhatsAppFromEnv() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/whatsapp/connect-env');
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      toast.success('WhatsApp connected from environment variables');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useTestWhatsAppConnection() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (accountId?: string) => {
+      const response = await api.post('/whatsapp/test', { accountId });
+      return extractData<{
+        verifiedName?: string;
+        displayPhoneNumber?: string;
+        qualityRating?: string;
+      }>(response);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      toast.success(
+        `Connection OK${data?.verifiedName ? `: ${data.verifiedName}` : ''}`
+      );
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -344,6 +389,7 @@ export function useDisconnectWhatsApp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
       toast.success('WhatsApp account disconnected');
     },
     onError: (error) => {

@@ -490,6 +490,9 @@ model WhatsAppAccount {
   wabaId            String?
   accessToken       String?
   webhookVerified   Boolean  @default(false)
+  phoneNumberStatus String?  @default("unknown")
+  webhookStatus     String?  @default("pending")
+  lastSyncAt        DateTime?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -500,6 +503,18 @@ model WhatsAppAccount {
   @@index([businessId])
   @@index([phoneNumberId])
   @@map("whatsapp_accounts")
+}
+
+model WhatsAppWebhookEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  eventType  String
+  businessId String?
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+  @@index([businessId])
+  @@map("whatsapp_webhook_events")
 }
 
 // ─── AI CONFIGURATION ────────────────────────────────────────────────────────

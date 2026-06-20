@@ -265,7 +265,38 @@ export function ConversationsPage() {
                           </span>
                         </div>
                       )}
-                      <p className="text-sm">{msg.content}</p>
+                      {msg.mediaUrl && (
+                        <div className="mb-2">
+                          {(msg.type === 'IMAGE' || msg.mediaUrl.match(/\.(jpe?g|png|gif|webp)(\?|$)/i)) && (
+                            <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={msg.mediaUrl}
+                                alt={msg.content || 'Image'}
+                                className="max-h-48 rounded-md object-cover"
+                              />
+                            </a>
+                          )}
+                          {(msg.type === 'VIDEO' || msg.mediaUrl.match(/\.(mp4|webm)(\?|$)/i)) && (
+                            <video src={msg.mediaUrl} controls className="max-h-48 rounded-md" />
+                          )}
+                          {(msg.type === 'AUDIO' || msg.mediaUrl.match(/\.(mp3|ogg|wav|m4a)(\?|$)/i)) && (
+                            <audio src={msg.mediaUrl} controls className="w-full" />
+                          )}
+                          {(msg.type === 'DOCUMENT' ||
+                            (!msg.type?.match(/IMAGE|VIDEO|AUDIO/) &&
+                              !msg.mediaUrl.match(/\.(jpe?g|png|gif|webp|mp4|webm|mp3|ogg|wav|m4a)(\?|$)/i))) && (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-accent underline"
+                            >
+                              {msg.content || 'Download document'}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {msg.content && <p className="text-sm">{msg.content}</p>}
                       <div className="mt-1 flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

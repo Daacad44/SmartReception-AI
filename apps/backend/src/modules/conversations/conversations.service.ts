@@ -3,6 +3,7 @@ import { NotFoundError } from '../../core/errors';
 import { PaginationInput, SendMessageInput } from '@smartreception/shared';
 import { getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
+import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 
 export class ConversationsService {
   async list(
@@ -48,6 +49,7 @@ export class ConversationsService {
       direction: 'OUTBOUND',
       content: input.content,
       type: input.type,
+      mediaUrl: input.mediaUrl,
       sentByUserId: userId,
       isAiGenerated: false,
       status: 'PENDING',
@@ -62,6 +64,9 @@ export class ConversationsService {
           messageId: message.id,
           phoneNumber: conversation.customer.phone,
           content: input.content,
+          type: input.type,
+          mediaUrl: input.mediaUrl,
+          mediaFilename: input.mediaFilename,
         });
       } else {
         await prisma.message.update({
@@ -117,6 +122,29 @@ export class ConversationsService {
     }
 
     return conversationsRepository.transferToAi(businessId, conversationId);
+  }
+
+  async sendTypingIndicator(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.findConversationWithWhatsApp(
+      businessId,
+      conversationId
+    );
+    if (!conversation?.whatsappAccount) {
+      return { sent: false };
+    }
+
+    await whatsappService.sendTypingIndicator(
+      conversation.whatsappAccount.phoneNumberId,
+      conversation.customer.phone,
+      conversation.whatsappAccount.accessToken || undefined
+    );
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { isTyping: true },
+    });
+
+    return { sent: true };
   }
 }
 

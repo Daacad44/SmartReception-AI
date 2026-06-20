@@ -71,6 +71,7 @@ export class ConversationsRepository {
     direction: 'INBOUND' | 'OUTBOUND';
     content: string;
     type?: string;
+    mediaUrl?: string;
     sentByUserId?: string;
     isAiGenerated?: boolean;
     whatsappMsgId?: string;
@@ -83,6 +84,7 @@ export class ConversationsRepository {
           direction: data.direction,
           content: data.content,
           type: (data.type as 'TEXT') || 'TEXT',
+          mediaUrl: data.mediaUrl,
           sentByUserId: data.sentByUserId,
           isAiGenerated: data.isAiGenerated ?? false,
           whatsappMsgId: data.whatsappMsgId,

@@ -98,6 +98,8 @@ export function transformMessage(raw: any, conversationId: string): Message {
     id: raw.id,
     conversationId,
     content: raw.content,
+    type: raw.type,
+    mediaUrl: raw.mediaUrl ?? undefined,
     sender,
     senderName,
     timestamp: raw.createdAt,
@@ -653,10 +655,30 @@ export function useWhatsAppAccounts() {
           phoneNumberId: string;
           phoneNumber: string;
           displayName?: string | null;
+          wabaId?: string | null;
           webhookVerified: boolean;
+          phoneNumberStatus?: string | null;
+          webhookStatus?: string | null;
+          lastSyncAt?: string | null;
           isActive: boolean;
         }>
       >(response);
+    },
+  });
+}
+
+export function useWhatsAppStatus() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-status'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/status');
+      return extractData<{
+        connected: boolean;
+        envConfigured: boolean;
+        webhookUrl: string;
+        verifyTokenConfigured: boolean;
+        appSecretConfigured: boolean;
+      }>(response);
     },
   });
 }
@@ -666,7 +688,9 @@ export function useWhatsAppWebhookInfo() {
     queryKey: ['whatsapp-webhook-info'],
     queryFn: async () => {
       const response = await api.get('/whatsapp/webhook-info');
-      return extractData<{ webhookUrl: string; verifyToken: string }>(response);
+      return extractData<{ webhookUrl: string; legacyWebhookUrl?: string; verifyToken: string }>(
+        response
+      );
     },
   });
 }

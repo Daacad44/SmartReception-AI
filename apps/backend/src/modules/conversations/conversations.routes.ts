@@ -26,6 +26,9 @@ router.post('/:id/takeover', authorize(PERMISSIONS['conversations:write']), (req
 router.post('/:id/transfer-ai', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.transferToAi(req, res, next)
 );
+router.post('/:id/typing', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.sendTyping(req, res, next)
+);
 router.patch('/:id/read', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.markAsRead(req, res, next)
 );

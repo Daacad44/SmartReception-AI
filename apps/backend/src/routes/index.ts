@@ -14,6 +14,7 @@ import whatsappRoutes from '../modules/whatsapp/whatsapp.routes';
 import aiRoutes from '../modules/ai/ai.routes';
 import servicesRoutes from '../modules/services/services.routes';
 import auditRoutes from '../modules/audit/audit.routes';
+import webhooksRoutes from '../modules/webhooks/webhooks.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/whatsapp', whatsappRoutes);
 router.use('/ai', aiRoutes);
 router.use('/services', servicesRoutes);
 router.use('/audit', auditRoutes);
+router.use('/webhooks', webhooksRoutes);
 
 export default router;

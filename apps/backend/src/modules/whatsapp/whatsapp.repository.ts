@@ -8,6 +8,32 @@ export class WhatsAppRepository {
     });
   }
 
+  async findAccountByBusiness(businessId: string) {
+    return prisma.whatsAppAccount.findFirst({
+      where: { businessId, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async isEventProcessed(eventId: string): Promise<boolean> {
+    const existing = await prisma.whatsAppWebhookEvent.findUnique({
+      where: { eventId },
+      select: { id: true },
+    });
+    return Boolean(existing);
+  }
+
+  async recordWebhookEvent(eventId: string, eventType: string, businessId?: string) {
+    try {
+      await prisma.whatsAppWebhookEvent.create({
+        data: { eventId, eventType, businessId },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async findOrCreateCustomer(businessId: string, phone: string, name?: string) {
     const normalizedPhone = phone.replace(/\D/g, '');
     const existing = await prisma.customer.findUnique({
@@ -62,6 +88,8 @@ export class WhatsAppRepository {
     content: string;
     whatsappMsgId: string;
     type?: string;
+    mediaUrl?: string;
+    metadata?: Record<string, unknown>;
   }) {
     return prisma.$transaction(async (tx) => {
       const message = await tx.message.create({
@@ -70,8 +98,10 @@ export class WhatsAppRepository {
           direction: 'INBOUND',
           content: data.content,
           type: (data.type as 'TEXT') || 'TEXT',
+          mediaUrl: data.mediaUrl,
           whatsappMsgId: data.whatsappMsgId,
           status: 'DELIVERED',
+          metadata: data.metadata as object | undefined,
         },
       });
 
@@ -87,10 +117,37 @@ export class WhatsAppRepository {
     });
   }
 
+  async updateMessageStatus(whatsappMsgId: string, status: string) {
+    const statusMap: Record<string, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = {
+      sent: 'SENT',
+      delivered: 'DELIVERED',
+      read: 'READ',
+      failed: 'FAILED',
+    };
+    const mapped = statusMap[status.toLowerCase()];
+    if (!mapped) return null;
+
+    return prisma.message.updateMany({
+      where: { whatsappMsgId },
+      data: { status: mapped },
+    });
+  }
+
   async markWebhookVerified(phoneNumberId: string) {
     return prisma.whatsAppAccount.update({
       where: { phoneNumberId },
-      data: { webhookVerified: true },
+      data: { webhookVerified: true, webhookStatus: 'verified', lastSyncAt: new Date() },
+    });
+  }
+
+  async updateAccountSync(phoneNumberId: string, data: {
+    phoneNumberStatus?: string;
+    displayName?: string;
+    webhookStatus?: string;
+  }) {
+    return prisma.whatsAppAccount.update({
+      where: { phoneNumberId },
+      data: { ...data, lastSyncAt: new Date() },
     });
   }
 }
