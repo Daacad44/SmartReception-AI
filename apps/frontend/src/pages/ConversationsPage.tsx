@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useConversations, useMessages } from '@/hooks/useApi';
 import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
-import { useRealtime } from '@/hooks/useRealtime';
+import { useConversationRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
@@ -69,7 +69,7 @@ export function ConversationsPage() {
   const transferToAi = useTransferToAi();
   const markRead = useMarkConversationRead();
 
-  useRealtime({ conversationId: selectedId });
+  useConversationRealtime(selectedId);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
