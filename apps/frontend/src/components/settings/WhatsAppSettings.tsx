@@ -124,33 +124,59 @@ export function WhatsAppSettings() {
               <div className="space-y-2">
                 <Label>Callback URL (production)</Label>
                 <div className="flex gap-2">
-                  <Input readOnly value={webhookInfo.webhookUrl} />
+                  <Input
+                    readOnly
+                    value={webhookInfo.webhookUrl}
+                    className="font-mono text-xs sm:text-sm"
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
+                    className="shrink-0"
                     onClick={() => copyToClipboard(webhookInfo.webhookUrl)}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Use this exact URL in Meta Developer Console → WhatsApp → Configuration
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Verify Token</Label>
                 <div className="flex gap-2">
-                  <Input readOnly value={webhookInfo.verifyToken ? '••••••••' : 'Not configured'} />
+                  <Input
+                    readOnly
+                    value={webhookInfo.verifyToken || 'Not configured'}
+                    className="font-mono text-xs sm:text-sm"
+                  />
                   {webhookInfo.verifyToken && (
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
+                      className="shrink-0"
                       onClick={() => copyToClipboard(webhookInfo.verifyToken)}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter this same value as the Verify Token in Meta webhook settings
+                </p>
               </div>
+              {webhookInfo.legacyWebhookUrl && (
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Legacy callback URL</Label>
+                  <Input
+                    readOnly
+                    value={webhookInfo.legacyWebhookUrl}
+                    className="font-mono text-xs text-muted-foreground"
+                  />
+                </div>
+              )}
             </>
           )}
         </CardContent>
