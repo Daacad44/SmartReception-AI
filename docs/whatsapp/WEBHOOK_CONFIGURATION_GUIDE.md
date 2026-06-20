@@ -4,10 +4,10 @@
 
 | Method | URL | Purpose |
 |--------|-----|---------|
-| `GET` | `https://api.somreception.botandev.com/api/v1/webhooks/whatsapp` | Meta subscription verification |
-| `POST` | `https://api.somreception.botandev.com/api/v1/webhooks/whatsapp` | Incoming messages and status events |
+| `GET` | `https://api.somreception.botandev.com/webhook` | Meta subscription verification |
+| `POST` | `https://api.somreception.botandev.com/webhook` | Incoming messages and status events |
 
-Legacy path (backward compatible): `/api/v1/whatsapp/webhook`
+Legacy paths (backward compatible): `/api/v1/webhooks/whatsapp`, `/api/v1/whatsapp/webhook`
 
 ## Meta Developer Console Setup
 
@@ -15,9 +15,9 @@ Legacy path (backward compatible): `/api/v1/whatsapp/webhook`
 2. Under **Webhook**, click **Edit**.
 3. Set **Callback URL** to:
    ```
-   https://api.somreception.botandev.com/api/v1/webhooks/whatsapp
+   https://api.somreception.botandev.com/webhook
    ```
-4. Set **Verify token** to the same value as your server `VERIFY_TOKEN` (or `WHATSAPP_VERIFY_TOKEN`) environment variable.
+4. Set **Verify token** to `smartreception-verify` (or your `VERIFY_TOKEN` env value).
 5. Click **Verify and save**.
 6. Subscribe to webhook fields:
    - `messages`
@@ -29,7 +29,7 @@ Legacy path (backward compatible): `/api/v1/whatsapp/webhook`
 Meta sends:
 
 ```
-GET /api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=RANDOM_STRING
+GET /webhook?hub.mode=subscribe&hub.verify_token=smartreception-verify&hub.challenge=RANDOM_STRING
 ```
 
 SmartReception validates:
@@ -56,9 +56,8 @@ SmartReception:
 ## Required Server Environment
 
 ```env
-VERIFY_TOKEN=your-chosen-verify-token
+VERIFY_TOKEN=smartreception-verify
 META_APP_SECRET=your-meta-app-secret
-WHATSAPP_APP_SECRET=your-meta-app-secret
 API_URL=https://api.somreception.botandev.com
 ```
 

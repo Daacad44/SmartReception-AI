@@ -33,7 +33,7 @@ export const config = {
     verifyToken:
       process.env.VERIFY_TOKEN ||
       process.env.WHATSAPP_VERIFY_TOKEN ||
-      '',
+      'smartreception-verify',
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     businessAccountId:

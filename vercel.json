@@ -13,6 +13,7 @@
   },
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/webhook", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
