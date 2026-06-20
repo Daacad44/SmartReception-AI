@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
+const PRODUCTION_API_URL = 'https://somreception.botandev.com';
 const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
 
 function resolveApiUrl(): string {
@@ -15,6 +15,13 @@ function resolveApiUrl(): string {
     return `https://${process.env.VERCEL_URL}`;
   }
   return 'http://localhost:3001';
+}
+
+function resolveWebhookUrl(): string {
+  if (process.env.WHATSAPP_WEBHOOK_URL) {
+    return process.env.WHATSAPP_WEBHOOK_URL.replace(/\/$/, '');
+  }
+  return `${resolveApiUrl()}/webhook`;
 }
 
 function resolveFrontendUrl(): string {
@@ -31,6 +38,7 @@ function resolveFrontendUrl(): string {
 }
 
 const apiUrl = resolveApiUrl();
+const webhookUrl = resolveWebhookUrl();
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
@@ -74,7 +82,7 @@ export const config = {
       '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,
-    webhookUrl: `${apiUrl}/webhook`,
+    webhookUrl,
   },
 
   r2: {
@@ -127,4 +135,14 @@ export function validateProductionConfig(): void {
   if (INSECURE_JWT_SECRETS.has(config.jwt.secret) || INSECURE_JWT_SECRETS.has(config.jwt.refreshSecret)) {
     throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be set to strong values in production');
   }
+}
+
+/** Log WhatsApp webhook config at startup (never logs secrets). */
+export function logWhatsAppConfig(): void {
+  const verifyToken = config.whatsapp.verifyToken;
+  console.log('[WhatsApp] Webhook URL:', config.whatsapp.webhookUrl);
+  console.log('[WhatsApp] Verify token configured:', Boolean(verifyToken));
+  console.log('[WhatsApp] Expected verify token:', verifyToken ? `${verifyToken.slice(0, 4)}...` : '(not set)');
+  console.log('[WhatsApp] App secret configured:', Boolean(config.whatsapp.appSecret));
+  console.log('[WhatsApp] Access token configured:', Boolean(config.whatsapp.accessToken));
 }

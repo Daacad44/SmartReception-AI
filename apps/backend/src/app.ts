@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { config } from './config';
+import { config, logWhatsAppConfig } from './config';
 import { errorHandler, notFoundHandler } from './core/error-handler';
 import routes from './routes';
 import { logger } from './core/logger';
@@ -11,6 +11,14 @@ import { prisma } from './infrastructure/database/prisma';
 import { isSupabaseStorageConfigured } from './infrastructure/storage';
 import { createRateLimiter } from './core/rate-limit-store';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
+
+const WEBHOOK_RAW_PATHS = [
+  '/webhook',
+  '/api/webhook',
+  '/api/v1/whatsapp/webhook',
+  '/api/v1/webhooks/whatsapp',
+  '/api/v1/billing/webhook',
+];
 
 export function createApp(): express.Application {
   const app = express();
@@ -64,23 +72,34 @@ export function createApp(): express.Application {
   app.use(compression());
   app.use(cookieParser());
 
-  app.use(
-    createRateLimiter({
-      windowMs: 15 * 60 * 1000,
-      max: config.env === 'production' ? 200 : 1000,
-    })
-  );
-
   const rawJson = express.json({
     verify: (req, _res, buf) => {
       (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
     },
   });
 
-  app.use('/api/v1/whatsapp/webhook', rawJson);
-  app.use('/api/v1/webhooks/whatsapp', rawJson);
-  app.use('/webhook', rawJson);
-  app.use('/api/v1/billing/webhook', rawJson);
+  const verifyHandler = (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    whatsappController.verify(req, res, next);
+  const webhookHandler = (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    whatsappController.webhook(req, res, next);
+
+  // Meta WhatsApp webhook — mounted BEFORE rate limiter so verification always succeeds
+  app.get('/webhook', verifyHandler);
+  app.get('/api/webhook', verifyHandler);
+  app.post('/webhook', rawJson, webhookHandler);
+  app.post('/api/webhook', rawJson, webhookHandler);
+
+  app.use(
+    createRateLimiter({
+      windowMs: 15 * 60 * 1000,
+      max: config.env === 'production' ? 200 : 1000,
+      skip: (req) => WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
+    })
+  );
+
+  for (const path of WEBHOOK_RAW_PATHS) {
+    app.use(path, rawJson);
+  }
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -99,6 +118,8 @@ export function createApp(): express.Application {
         database: 'connected',
         auth: jwtConfigured ? 'configured' : 'missing_jwt_secret',
         storage: storageConfigured ? 'configured' : 'missing_supabase_service_role_key',
+        webhookUrl: config.whatsapp.webhookUrl,
+        verifyTokenConfigured: Boolean(config.whatsapp.verifyToken),
         timestamp,
       });
     } catch {
@@ -107,21 +128,20 @@ export function createApp(): express.Application {
         database: 'disconnected',
         auth: jwtConfigured ? 'configured' : 'missing_jwt_secret',
         storage: storageConfigured ? 'configured' : 'missing_supabase_service_role_key',
+        webhookUrl: config.whatsapp.webhookUrl,
+        verifyTokenConfigured: Boolean(config.whatsapp.verifyToken),
         timestamp,
       });
     }
   });
-
-  // Meta WhatsApp webhook (production callback: https://api.somreception.botandev.com/webhook)
-  app.get('/webhook', (req, res, next) => whatsappController.verify(req, res, next));
-  app.post('/webhook', (req, res, next) => whatsappController.webhook(req, res, next));
 
   app.use('/api/v1', routes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  logger.info('Express app configured');
+  logWhatsAppConfig();
+  logger.info('Express app configured', { webhookUrl: config.whatsapp.webhookUrl });
 
   return app;
 }

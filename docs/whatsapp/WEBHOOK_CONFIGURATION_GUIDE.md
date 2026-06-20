@@ -4,10 +4,14 @@
 
 | Method | URL | Purpose |
 |--------|-----|---------|
-| `GET` | `https://api.somreception.botandev.com/webhook` | Meta subscription verification |
-| `POST` | `https://api.somreception.botandev.com/webhook` | Incoming messages and status events |
+| `GET` | `https://somreception.botandev.com/webhook` | Meta subscription verification |
+| `POST` | `https://somreception.botandev.com/webhook` | Incoming messages and status events |
+
+Alternate path (same handler): `https://somreception.botandev.com/api/webhook`
 
 Legacy paths (backward compatible): `/api/v1/webhooks/whatsapp`, `/api/v1/whatsapp/webhook`
+
+> **Important:** `api.somreception.botandev.com` does not resolve in DNS unless you add a CNAME record pointing to Vercel. Use `somreception.botandev.com/webhook` in Meta until the API subdomain is configured.
 
 ## Meta Developer Console Setup
 
@@ -15,13 +19,15 @@ Legacy paths (backward compatible): `/api/v1/webhooks/whatsapp`, `/api/v1/whatsa
 2. Under **Webhook**, click **Edit**.
 3. Set **Callback URL** to:
    ```
-   https://api.somreception.botandev.com/webhook
+   https://somreception.botandev.com/webhook
    ```
-4. Set **Verify token** to `smartreception-verify` (or your `VERIFY_TOKEN` env value).
+4. Set **Verify token** to:
+   ```
+   smartreception-verify
+   ```
 5. Click **Verify and save**.
 6. Subscribe to webhook fields:
    - `messages`
-   - `message_template_status_update` (optional, for template analytics)
 7. Under **WhatsApp Business Account**, ensure your phone number is connected.
 
 ## Verification Flow (GET)
@@ -35,53 +41,42 @@ GET /webhook?hub.mode=subscribe&hub.verify_token=smartreception-verify&hub.chall
 SmartReception validates:
 
 - `hub.mode` === `subscribe`
-- `hub.verify_token` === `VERIFY_TOKEN` from environment
+- `hub.verify_token` === `WHATSAPP_VERIFY_TOKEN` from environment (default: `smartreception-verify`)
 
 On success: returns `hub.challenge` as plain text with HTTP 200.  
 On failure: returns HTTP 403.
 
-## Incoming Events (POST)
+## Manual Test
 
-Meta sends JSON payloads for:
+```bash
+curl "https://somreception.botandev.com/webhook?hub.mode=subscribe&hub.verify_token=smartreception-verify&hub.challenge=123456"
+```
 
-- New messages (text, media, interactive, contacts, location)
-- Status updates (sent, delivered, read, failed)
-
-SmartReception:
-
-1. Verifies `X-Hub-Signature-256` using `META_APP_SECRET` or `WHATSAPP_APP_SECRET`
-2. Returns `EVENT_RECEIVED` immediately (HTTP 200)
-3. Processes payload asynchronously
+Expected response: `123456`
 
 ## Required Server Environment
 
 ```env
+WHATSAPP_VERIFY_TOKEN=smartreception-verify
 VERIFY_TOKEN=smartreception-verify
+API_URL=https://somreception.botandev.com
+WHATSAPP_WEBHOOK_URL=https://somreception.botandev.com/webhook
 META_APP_SECRET=your-meta-app-secret
-API_URL=https://api.somreception.botandev.com
 ```
 
-`API_URL` is used to display the webhook URL in the Settings UI.
+## Optional: API Subdomain
 
-## SmartReception Settings UI
+To use `https://api.somreception.botandev.com/webhook`:
 
-Navigate to **Settings → WhatsApp** to:
-
-- Copy the production webhook URL
-- Copy the verify token (when configured on server)
-- View webhook status (`pending`, `receiving`, `verified`)
-- Test API connectivity
+1. In Vercel → Project → Settings → Domains, add `api.somreception.botandev.com`
+2. In your DNS provider, add CNAME: `api.somreception.botandev.com` → `cname.vercel-dns.com`
+3. Set `API_URL=https://api.somreception.botandev.com` and `WHATSAPP_WEBHOOK_URL=https://api.somreception.botandev.com/webhook`
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|-------|
-| Verification fails (403) | `VERIFY_TOKEN` on server matches Meta console exactly |
-| Webhook receives nothing | Phone number subscribed to app; fields `messages` enabled |
-| 403 on POST | `META_APP_SECRET` matches app secret in Meta dashboard |
+| Verification fails immediately | DNS — can Meta resolve your callback host? Test with `curl` |
+| 403 on verification | `WHATSAPP_VERIFY_TOKEN` on server must exactly match Meta console |
+| Callback URL couldn't be validated | Host unreachable — `api.somreception.botandev.com` has no DNS unless configured |
 | Messages not in UI | WhatsApp account connected in Settings for your business |
-| Duplicate messages | Should not occur — `whatsapp_webhook_events` deduplicates by `eventId` |
-
-## Firewall / Infrastructure
-
-Ensure `api.somreception.botandev.com` is publicly reachable by Meta's webhook IPs. No IP allowlist is configured in the application; signature verification provides authentication.
