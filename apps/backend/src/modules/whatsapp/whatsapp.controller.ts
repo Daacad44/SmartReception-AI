@@ -12,10 +12,10 @@ export class WhatsAppController {
       const token = req.query['hub.verify_token'] as string;
       const challenge = req.query['hub.challenge'] as string;
 
-      console.log('[WhatsApp Webhook] Mode:', mode);
-      console.log('[WhatsApp Webhook] Token:', token);
-      console.log('[WhatsApp Webhook] Challenge:', challenge);
-      console.log('[WhatsApp Webhook] Expected:', config.whatsapp.verifyToken);
+      console.log('Mode:', mode);
+      console.log('Token:', token);
+      console.log('Challenge:', challenge);
+      console.log('Expected:', process.env.WHATSAPP_VERIFY_TOKEN ?? config.whatsapp.verifyToken);
 
       logger.info('WhatsApp webhook verification attempt', {
         mode,
@@ -35,7 +35,9 @@ export class WhatsAppController {
       console.log('[WhatsApp Webhook] Verification failed — token mismatch or invalid mode');
       logger.warn('WhatsApp webhook verification failed', {
         mode,
-        tokenMatch: token === config.whatsapp.verifyToken,
+        tokenMatch: (token ?? '').trim() === config.whatsapp.verifyToken,
+        expectedLength: config.whatsapp.verifyToken.length,
+        receivedLength: (token ?? '').trim().length,
       });
       res.status(403).json({ success: false, error: 'Verification failed' });
     } catch (error) {
@@ -62,6 +64,20 @@ export class WhatsAppController {
     } catch (error) {
       next(error);
     }
+  }
+
+  async getWebhookStatus(req: Request, res: Response) {
+    res.json({
+      success: true,
+      data: {
+        webhookUrl: config.whatsapp.webhookUrl,
+        verifyTokenConfigured: Boolean(config.whatsapp.verifyToken),
+        verifyTokenLength: config.whatsapp.verifyToken.length,
+        verifyTokenMatchesDefault:
+          config.whatsapp.verifyToken === 'smartreception-verify',
+        host: req.get('host'),
+      },
+    });
   }
 
   async listAccounts(req: Request, res: Response, next: NextFunction) {

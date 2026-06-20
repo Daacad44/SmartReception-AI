@@ -1,8 +1,21 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const PRODUCTION_API_URL = 'https://somreception.botandev.com';
+const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
 const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
+const DEFAULT_VERIFY_TOKEN = 'smartreception-verify';
+
+function normalizeEnv(value: string | undefined): string {
+  return (value ?? '').trim();
+}
+
+function resolveVerifyToken(): string {
+  const token =
+    normalizeEnv(process.env.WHATSAPP_VERIFY_TOKEN) ||
+    normalizeEnv(process.env.VERIFY_TOKEN) ||
+    DEFAULT_VERIFY_TOKEN;
+  return token;
+}
 
 function resolveApiUrl(): string {
   if (process.env.API_URL) {
@@ -67,10 +80,7 @@ export const config = {
   },
 
   whatsapp: {
-    verifyToken:
-      process.env.VERIFY_TOKEN ||
-      process.env.WHATSAPP_VERIFY_TOKEN ||
-      'smartreception-verify',
+    verifyToken: resolveVerifyToken(),
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     businessAccountId:
@@ -140,9 +150,16 @@ export function validateProductionConfig(): void {
 /** Log WhatsApp webhook config at startup (never logs secrets). */
 export function logWhatsAppConfig(): void {
   const verifyToken = config.whatsapp.verifyToken;
+  const tokenSource = normalizeEnv(process.env.WHATSAPP_VERIFY_TOKEN)
+    ? 'WHATSAPP_VERIFY_TOKEN'
+    : normalizeEnv(process.env.VERIFY_TOKEN)
+      ? 'VERIFY_TOKEN'
+      : 'default';
   console.log('[WhatsApp] Webhook URL:', config.whatsapp.webhookUrl);
+  console.log('[WhatsApp] Verify token source:', tokenSource);
   console.log('[WhatsApp] Verify token configured:', Boolean(verifyToken));
-  console.log('[WhatsApp] Expected verify token:', verifyToken ? `${verifyToken.slice(0, 4)}...` : '(not set)');
+  console.log('[WhatsApp] Verify token length:', verifyToken.length);
+  console.log('[WhatsApp] Expected verify token:', verifyToken);
   console.log('[WhatsApp] App secret configured:', Boolean(config.whatsapp.appSecret));
   console.log('[WhatsApp] Access token configured:', Boolean(config.whatsapp.accessToken));
 }

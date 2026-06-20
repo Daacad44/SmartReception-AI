@@ -4,14 +4,17 @@
 
 | Method | URL | Purpose |
 |--------|-----|---------|
-| `GET` | `https://somreception.botandev.com/webhook` | Meta subscription verification |
-| `POST` | `https://somreception.botandev.com/webhook` | Incoming messages and status events |
+| `GET` | `https://api.somreception.botandev.com/webhook` | Meta subscription verification (canonical) |
+| `POST` | `https://api.somreception.botandev.com/webhook` | Incoming messages and status events |
 
-Alternate path (same handler): `https://somreception.botandev.com/api/webhook`
+Alternate paths (same handler):
+
+- `https://api.somreception.botandev.com/api/webhook`
+- `https://somreception.botandev.com/webhook` (same Vercel project)
 
 Legacy paths (backward compatible): `/api/v1/webhooks/whatsapp`, `/api/v1/whatsapp/webhook`
 
-> **Important:** `api.somreception.botandev.com` does not resolve in DNS unless you add a CNAME record pointing to Vercel. Use `somreception.botandev.com/webhook` in Meta until the API subdomain is configured.
+Diagnostic: `GET /webhook/status` returns verify token configuration (no secrets).
 
 ## Meta Developer Console Setup
 
@@ -19,7 +22,7 @@ Legacy paths (backward compatible): `/api/v1/webhooks/whatsapp`, `/api/v1/whatsa
 2. Under **Webhook**, click **Edit**.
 3. Set **Callback URL** to:
    ```
-   https://somreception.botandev.com/webhook
+   https://api.somreception.botandev.com/webhook
    ```
 4. Set **Verify token** to:
    ```
@@ -49,7 +52,7 @@ On failure: returns HTTP 403.
 ## Manual Test
 
 ```bash
-curl "https://somreception.botandev.com/webhook?hub.mode=subscribe&hub.verify_token=smartreception-verify&hub.challenge=123456"
+curl "https://api.somreception.botandev.com/webhook?hub.mode=subscribe&hub.verify_token=smartreception-verify&hub.challenge=123456"
 ```
 
 Expected response: `123456`
@@ -58,25 +61,20 @@ Expected response: `123456`
 
 ```env
 WHATSAPP_VERIFY_TOKEN=smartreception-verify
-VERIFY_TOKEN=smartreception-verify
-API_URL=https://somreception.botandev.com
-WHATSAPP_WEBHOOK_URL=https://somreception.botandev.com/webhook
+API_URL=https://api.somreception.botandev.com
+WHATSAPP_WEBHOOK_URL=https://api.somreception.botandev.com/webhook
 META_APP_SECRET=your-meta-app-secret
+WHATSAPP_ACCESS_TOKEN=your-whatsapp-access-token
 ```
 
-## Optional: API Subdomain
-
-To use `https://api.somreception.botandev.com/webhook`:
-
-1. In Vercel → Project → Settings → Domains, add `api.somreception.botandev.com`
-2. In your DNS provider, add CNAME: `api.somreception.botandev.com` → `cname.vercel-dns.com`
-3. Set `API_URL=https://api.somreception.botandev.com` and `WHATSAPP_WEBHOOK_URL=https://api.somreception.botandev.com/webhook`
+`WHATSAPP_VERIFY_TOKEN` takes priority over `VERIFY_TOKEN`. If both are set, ensure they match or remove `VERIFY_TOKEN`.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|-------|
-| Verification fails immediately | DNS — can Meta resolve your callback host? Test with `curl` |
-| 403 on verification | `WHATSAPP_VERIFY_TOKEN` on server must exactly match Meta console |
-| Callback URL couldn't be validated | Host unreachable — `api.somreception.botandev.com` has no DNS unless configured |
+| Verification fails immediately | DNS/SSL — test with `curl` from outside your network |
+| 403 on verification | `WHATSAPP_VERIFY_TOKEN` on Vercel must exactly match Meta console; redeploy after env changes |
+| Callback URL couldn't be validated | Host unreachable or wrong verify token; check `/health` and `/webhook/status` |
+| `VERIFY_TOKEN` override | Remove stale `VERIFY_TOKEN` on Vercel if it differs from `WHATSAPP_VERIFY_TOKEN` |
 | Messages not in UI | WhatsApp account connected in Settings for your business |

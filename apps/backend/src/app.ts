@@ -84,6 +84,7 @@ export function createApp(): express.Application {
     whatsappController.webhook(req, res, next);
 
   // Meta WhatsApp webhook — mounted BEFORE rate limiter so verification always succeeds
+  app.get('/webhook/status', (req, res) => whatsappController.getWebhookStatus(req, res));
   app.get('/webhook', verifyHandler);
   app.get('/api/webhook', verifyHandler);
   app.post('/webhook', rawJson, webhookHandler);

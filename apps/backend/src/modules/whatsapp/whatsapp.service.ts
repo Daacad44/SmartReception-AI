@@ -38,8 +38,17 @@ export class WhatsAppModuleService {
 
   verifyWebhook(mode: string, token: string, challenge: string): string | null {
     const verifyToken = config.whatsapp.verifyToken;
-    if (mode === 'subscribe' && token === verifyToken && challenge) {
-      return challenge;
+    const normalizedMode = (mode ?? '').trim();
+    const normalizedToken = (token ?? '').trim();
+    const normalizedChallenge =
+      challenge !== undefined && challenge !== null ? String(challenge).trim() : '';
+
+    if (
+      normalizedMode === 'subscribe' &&
+      normalizedToken === verifyToken &&
+      normalizedChallenge.length > 0
+    ) {
+      return normalizedChallenge;
     }
     return null;
   }
