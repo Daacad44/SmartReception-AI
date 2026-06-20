@@ -1,5 +1,5 @@
-import { lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazyWithRetry } from '@/lib/lazyWithRetry';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
@@ -7,44 +7,43 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { HydrationGate } from '@/components/HydrationGate';
 import { RootRedirect } from '@/components/RootRedirect';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
-import { useAuthStore } from '@/stores/auth.store';
-import { ThemeProvider } from '@/components/ThemeProvider';
-import { Navigate } from 'react-router-dom';
-
-const DashboardPage = lazy(() =>
-  import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
-);
-const ConversationsPage = lazy(() =>
-  import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
-);
-const CustomersPage = lazy(() =>
-  import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
-);
-const AppointmentsPage = lazy(() =>
-  import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
-);
-const KnowledgeBasePage = lazy(() =>
-  import('@/pages/KnowledgeBasePage').then((m) => ({ default: m.KnowledgeBasePage }))
-);
-const AnalyticsPage = lazy(() =>
-  import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
-);
-const TeamPage = lazy(() => import('@/pages/TeamPage').then((m) => ({ default: m.TeamPage })));
-const SettingsPage = lazy(() =>
-  import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
-);
-const BillingPage = lazy(() =>
-  import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
-);
 import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
 import { PermissionRoute } from '@/components/PermissionRoute';
 import { PERMISSIONS } from '@/lib/permissions';
+import { useAuthStore } from '@/stores/auth.store';
+import { ThemeProvider } from '@/components/ThemeProvider';
+
+const ConversationsPage = lazyWithRetry(() =>
+  import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
+);
+const CustomersPage = lazyWithRetry(() =>
+  import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
+);
+const AppointmentsPage = lazyWithRetry(() =>
+  import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
+);
+const KnowledgeBasePage = lazyWithRetry(() =>
+  import('@/pages/KnowledgeBasePage').then((m) => ({ default: m.KnowledgeBasePage }))
+);
+const AnalyticsPage = lazyWithRetry(() =>
+  import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
+);
+const TeamPage = lazyWithRetry(() =>
+  import('@/pages/TeamPage').then((m) => ({ default: m.TeamPage }))
+);
+const SettingsPage = lazyWithRetry(() =>
+  import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
+);
+const BillingPage = lazyWithRetry(() =>
+  import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -25,6 +25,7 @@ secrets.json
 *.log
 .DS_Store
 coverage
+playwright-report
 .turbo
 .vite
 *.tsbuildinfo

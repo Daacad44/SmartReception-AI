@@ -48,8 +48,10 @@ function KpiCard({
   format?: 'number' | 'percent' | 'currency';
 }) {
   const isPositive = growth >= 0;
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const safeGrowth = Number.isFinite(Number(growth)) ? Number(growth) : 0;
   const formatted =
-    format === 'percent' ? `${value}%` : format === 'currency' ? formatCurrency(value) : formatNumber(value);
+    format === 'percent' ? `${safeValue}%` : format === 'currency' ? formatCurrency(safeValue) : formatNumber(safeValue);
 
   return (
     <Card>
@@ -60,7 +62,7 @@ function KpiCard({
           </div>
           <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-success' : 'text-danger'}`}>
             {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {formatPercent(growth)}
+            {formatPercent(safeGrowth)}
           </div>
         </div>
         <div className="mt-4">
@@ -184,7 +186,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
                   <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
+                  <Tooltip formatter={(v) => [formatCurrency(v ?? 0), 'Revenue']} />
                   <Area type="monotone" dataKey="revenue" stroke="#651147" fill="url(#revenueGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
