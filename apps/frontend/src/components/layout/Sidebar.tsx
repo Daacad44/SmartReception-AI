@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useConversations, useBilling, useAppointments } from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ROUTE_PERMISSIONS } from '@/lib/permissions';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -29,10 +31,15 @@ const navItems = [
   { to: '/billing', icon: CreditCard, label: 'Billing' },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const { data: conversations } = useConversations();
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
+  const { hasPermission } = usePermissions();
   const unreadCount = conversations?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
   const upcomingAppointments =
     appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
@@ -48,8 +55,13 @@ export function Sidebar() {
     appointments: upcomingAppointments,
   };
 
+  const visibleItems = navItems.filter((item) => {
+    const permission = ROUTE_PERMISSIONS[item.to];
+    return permission ? hasPermission(permission) : true;
+  });
+
   return (
-    <aside className="flex h-screen w-64 flex-col bg-navy text-white">
+    <aside className="flex h-full w-64 flex-col bg-navy text-white">
       <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
           <Bot className="h-5 w-5 text-white" />
@@ -61,10 +73,11 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 scrollbar-thin">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -85,26 +98,29 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <div className="rounded-lg bg-white/5 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-accent" />
-            <span className="text-xs font-semibold">{billing?.plan ?? 'Starter'} Plan</span>
+      {hasPermission('billing:read') && (
+        <div className="border-t border-white/10 p-4">
+          <div className="rounded-lg bg-white/5 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold">{billing?.plan ?? 'Starter'} Plan</span>
+            </div>
+            <p className="mb-3 text-[11px] text-white/50">
+              {conversationUsage
+                ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
+                : 'Loading usage...'}
+            </p>
+            <Progress value={usagePercent} className="mb-3 h-1.5 bg-white/10" />
+            <Link
+              to="/billing"
+              onClick={onNavigate}
+              className="block text-center text-xs font-medium text-accent hover:text-accent/80"
+            >
+              Upgrade Plan
+            </Link>
           </div>
-          <p className="mb-3 text-[11px] text-white/50">
-            {conversationUsage
-              ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
-              : 'Loading usage...'}
-          </p>
-          <Progress value={usagePercent} className="mb-3 h-1.5 bg-white/10" />
-          <Link
-            to="/billing"
-            className="block text-center text-xs font-medium text-accent hover:text-accent/80"
-          >
-            Upgrade Plan
-          </Link>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

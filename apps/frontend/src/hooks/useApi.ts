@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, isInitialLoading } from '@/hooks/useAuthQuery';
 import api, { extractData } from '@/lib/api';
 import type {
@@ -215,6 +216,7 @@ export function transformNotification(raw: any): Notification {
     type: typeMap[raw.type] ?? 'info',
     read: raw.isRead ?? raw.read ?? false,
     createdAt: raw.createdAt,
+    data: raw.data ?? null,
   };
 }
 
@@ -574,6 +576,18 @@ export function useNotifications() {
   });
 }
 
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/notifications/${id}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 export function useAnalytics() {
   return useAuthQuery<AnalyticsData>({
     queryKey: ['analytics'],
@@ -625,5 +639,53 @@ export function useAiConfig() {
         languages: string[];
       }>(response);
     },
+  });
+}
+
+export function useWhatsAppAccounts() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-accounts'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/accounts');
+      return extractData<
+        Array<{
+          id: string;
+          phoneNumberId: string;
+          phoneNumber: string;
+          displayName?: string | null;
+          webhookVerified: boolean;
+          isActive: boolean;
+        }>
+      >(response);
+    },
+  });
+}
+
+export function useWhatsAppWebhookInfo() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-webhook-info'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/webhook-info');
+      return extractData<{ webhookUrl: string; verifyToken: string }>(response);
+    },
+  });
+}
+
+export function useKnowledgeSearch(query: string) {
+  return useAuthQuery({
+    queryKey: ['knowledge-search', query],
+    queryFn: async () => {
+      const response = await api.get('/knowledge/search', { params: { q: query, limit: 10 } });
+      return extractData<
+        Array<{
+          documentId: string;
+          title: string;
+          type: string;
+          snippet: string;
+          score: number;
+        }>
+      >(response);
+    },
+    enabled: query.trim().length >= 2,
   });
 }

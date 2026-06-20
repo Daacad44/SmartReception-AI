@@ -90,5 +90,6 @@ export interface UserProfile {
     name: string;
     industry: string;
     plan: string;
+    role?: string;
   }>;
 }

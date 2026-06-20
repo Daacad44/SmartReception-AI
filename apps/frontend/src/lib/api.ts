@@ -10,6 +10,7 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 15000,
+  withCredentials: true,
 });
 
 export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
@@ -86,8 +87,8 @@ async function refreshAccessToken(): Promise<string> {
   refreshPromise = axios
     .post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
       `${API_BASE_URL}/auth/refresh`,
-      { refreshToken },
-      { timeout: 10000 }
+      refreshToken ? { refreshToken } : {},
+      { timeout: 10000, withCredentials: true }
     )
     .then((response) => {
       const tokens = extractData(response);

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Send,
-  Paperclip,
   MoreVertical,
   Bot,
   User,
@@ -11,6 +10,8 @@ import {
   Tag,
   CheckCheck,
   Calendar,
+  ArrowLeft,
+  Info,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ export function ConversationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'list' | 'chat' | 'details'>('list');
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -71,6 +73,7 @@ export function ConversationsPage() {
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
+    setMobilePane('chat');
     markRead.mutate(id);
   }, [markRead]);
 
@@ -103,9 +106,14 @@ export function ConversationsPage() {
   }, [filtered, selectedId, handleSelect]);
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] -m-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-7rem)] -m-4 md:-m-6 overflow-hidden">
       {/* Left pane - conversation list */}
-      <div className="flex w-80 flex-col border-r bg-card">
+      <div
+        className={cn(
+          'flex w-full md:w-80 flex-col border-r bg-card',
+          mobilePane !== 'list' && 'hidden md:flex'
+        )}
+      >
         <div className="border-b p-4 space-y-3">
           <h2 className="text-lg font-semibold">Conversations</h2>
           <div className="relative">
@@ -155,11 +163,25 @@ export function ConversationsPage() {
       </div>
 
       {/* Center pane - messages */}
-      <div className="flex flex-1 flex-col bg-muted/40 dark:bg-muted/20">
+      <div
+        className={cn(
+          'flex flex-1 flex-col bg-muted/40 dark:bg-muted/20',
+          mobilePane !== 'chat' && 'hidden md:flex'
+        )}
+      >
         {selected ? (
           <>
             <div className="flex items-center justify-between border-b bg-card px-4 py-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden shrink-0"
+                  onClick={() => setMobilePane('list')}
+                  aria-label="Back to conversations"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="bg-accent/10 text-accent text-sm">
                     {getInitials(selected.customerName)}
@@ -187,9 +209,24 @@ export function ConversationsPage() {
                     <DropdownMenuItem onClick={() => selectedId && takeover.mutate(selectedId)}>
                       Take over from AI
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="md:hidden"
+                      onClick={() => setMobilePane('details')}
+                    >
+                      View contact details
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">Block contact</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => setMobilePane('details')}
+                  aria-label="Contact details"
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
@@ -251,9 +288,6 @@ export function ConversationsPage() {
 
             <div className="border-t bg-card p-3">
               <div className="flex items-end gap-2">
-                <Button variant="ghost" size="icon" className="shrink-0">
-                  <Paperclip className="h-4 w-4" />
-                </Button>
                 <Textarea
                   placeholder="Type a message..."
                   className="min-h-[40px] max-h-24 resize-none"
@@ -285,9 +319,23 @@ export function ConversationsPage() {
       </div>
 
       {/* Right pane - contact details */}
-      <div className="flex w-72 flex-col border-l bg-card">
+      <div
+        className={cn(
+          'flex w-full md:w-72 flex-col border-l bg-card',
+          mobilePane !== 'details' && 'hidden md:flex'
+        )}
+      >
         {selected ? (
           <ScrollArea className="flex-1 p-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4 md:hidden"
+              onClick={() => setMobilePane('chat')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to chat
+            </Button>
             <div className="text-center">
               <Avatar className="mx-auto h-16 w-16">
                 <AvatarFallback className="bg-accent/10 text-accent text-lg">

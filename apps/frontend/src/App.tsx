@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { LazyRoute } from '@/components/LazyRoute';
 import { HydrationGate } from '@/components/HydrationGate';
 import { RootRedirect } from '@/components/RootRedirect';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -44,6 +43,8 @@ const BillingPage = lazy(() =>
   import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
 );
 import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
+import { PermissionRoute } from '@/components/PermissionRoute';
+import { PERMISSIONS } from '@/lib/permissions';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,73 +123,73 @@ export default function App() {
                   <Route
                     path="/dashboard"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
                         <DashboardPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/conversations"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['conversations:read']}>
                         <ConversationsPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/customers"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['customers:read']}>
                         <CustomersPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/appointments"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['appointments:read']}>
                         <AppointmentsPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/knowledge"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
                         <KnowledgeBasePage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/analytics"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
                         <AnalyticsPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/team"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['team:read']}>
                         <TeamPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/settings"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['settings:read']}>
                         <SettingsPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                   <Route
                     path="/billing"
                     element={
-                      <LazyRoute>
+                      <PermissionRoute permission={PERMISSIONS['billing:read']}>
                         <BillingPage />
-                      </LazyRoute>
+                      </PermissionRoute>
                     }
                   />
                 </Route>

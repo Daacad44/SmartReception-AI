@@ -60,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
             name: b.name,
             industry: b.industry,
             plan: b.plan,
+            role: b.role,
           })),
           currentBusinessId: user.businesses[0]?.id ?? null,
           isAuthenticated: true,

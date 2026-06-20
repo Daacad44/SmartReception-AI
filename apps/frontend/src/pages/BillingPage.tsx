@@ -1,4 +1,4 @@
-import { CreditCard, Download, Check, Zap } from 'lucide-react';
+import { CreditCard, Download, Check, Zap, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBilling } from '@/hooks/useApi';
-import { useChangePlan } from '@/hooks/useMutations';
+import { useChangePlan, useStripeCheckout, useStripePortal } from '@/hooks/useMutations';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
@@ -37,6 +38,10 @@ const PLAN_PRICES: Record<string, number> = {
 export function BillingPage() {
   const { data: billing, isLoading, isError } = useBilling();
   const changePlan = useChangePlan();
+  const stripeCheckout = useStripeCheckout();
+  const stripePortal = useStripePortal();
+  const { hasPermission } = usePermissions();
+  const canManageBilling = hasPermission('billing:write');
 
   if (isError) {
     return <ErrorState message="Unable to load billing information." />;
@@ -47,6 +52,7 @@ export function BillingPage() {
   }
 
   const currentPlan = billing?.plan ?? 'PROFESSIONAL';
+  const stripeEnabled = billing?.stripeEnabled ?? false;
   const plans = Object.entries(PLAN_PRICES)
     .filter(([key]) => key !== 'FREE')
     .map(([key, price]) => ({
@@ -61,6 +67,14 @@ export function BillingPage() {
     conversations: 'Conversations',
     customers: 'Customers',
     teamMembers: 'Team Members',
+  };
+
+  const handleUpgrade = (planKey: string) => {
+    if (stripeEnabled) {
+      stripeCheckout.mutate(planKey);
+    } else {
+      changePlan.mutate(planKey);
+    }
   };
 
   return (
@@ -122,12 +136,37 @@ export function BillingPage() {
             <CardTitle className="text-base">Payment Method</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <CreditCard className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">
-                No payment method on file. Stripe integration coming soon.
-              </p>
-            </div>
+            {billing?.hasPaymentMethod ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-8 w-8 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Payment method on file</p>
+                    <p className="text-xs text-muted-foreground">Managed via Stripe</p>
+                  </div>
+                </div>
+                {stripeEnabled && canManageBilling && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => stripePortal.mutate()}
+                    disabled={stripePortal.isPending}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Manage Billing
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <CreditCard className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  {stripeEnabled
+                    ? 'Subscribe to a plan to add a payment method.'
+                    : 'Stripe is not configured. Plan changes apply without payment.'}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -154,19 +193,23 @@ export function BillingPage() {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  className={`mt-6 w-full ${plan.current ? '' : 'bg-accent hover:bg-accent/90'}`}
-                  variant={plan.current ? 'outline' : 'default'}
-                  disabled={plan.current || changePlan.isPending}
-                  onClick={() => changePlan.mutate(plan.key)}
-                >
-                  {plan.current ? 'Current Plan' : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Upgrade
-                    </>
-                  )}
-                </Button>
+                {canManageBilling && (
+                  <Button
+                    className={`mt-6 w-full ${plan.current ? '' : 'bg-accent hover:bg-accent/90'}`}
+                    variant={plan.current ? 'outline' : 'default'}
+                    disabled={
+                      plan.current || changePlan.isPending || stripeCheckout.isPending
+                    }
+                    onClick={() => handleUpgrade(plan.key)}
+                  >
+                    {plan.current ? 'Current Plan' : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        {stripeEnabled ? 'Subscribe' : 'Upgrade'}
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -206,9 +249,22 @@ export function BillingPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon">
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      {inv.stripeInvoiceId ? (
+                        <Button variant="ghost" size="icon" asChild>
+                          <a
+                            href={`https://dashboard.stripe.com/invoices/${inv.stripeInvoiceId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="View invoice"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" disabled>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

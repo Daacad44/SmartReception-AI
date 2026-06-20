@@ -17,6 +17,7 @@ function mapNotification(notification: {
   type: NotificationType;
   isRead: boolean;
   createdAt: Date;
+  data?: unknown;
 }) {
   return {
     id: notification.id,
@@ -25,6 +26,7 @@ function mapNotification(notification: {
     type: TYPE_MAP[notification.type] || 'info',
     read: notification.isRead,
     createdAt: notification.createdAt.toISOString(),
+    data: notification.data ?? null,
   };
 }
 

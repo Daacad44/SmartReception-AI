@@ -281,6 +281,77 @@ export function useChangePlan() {
   });
 }
 
+export function useStripeCheckout() {
+  return useMutation({
+    mutationFn: async (plan: string) => {
+      const response = await api.post('/billing/checkout', { plan });
+      return extractData<{ url: string }>(response);
+    },
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useStripePortal() {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/billing/portal');
+      return extractData<{ url: string }>(response);
+    },
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useConnectWhatsApp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      phoneNumberId: string;
+      phoneNumber: string;
+      displayName?: string;
+      wabaId?: string;
+      accessToken: string;
+    }) => {
+      const response = await api.post('/whatsapp/accounts', data);
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      toast.success('WhatsApp account connected');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useDisconnectWhatsApp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (accountId: string) => {
+      await api.delete(`/whatsapp/accounts/${accountId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      toast.success('WhatsApp account disconnected');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
 export function useAcceptInvite() {
   return useMutation({
     mutationFn: async (token: string) => {
@@ -429,6 +500,7 @@ export function useUpdateBusinessSettings() {
 
   return useMutation({
     mutationFn: async (data: {
+      name?: string;
       timezone?: string;
       phone?: string;
       email?: string;

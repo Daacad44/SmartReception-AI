@@ -54,7 +54,14 @@ export class BusinessService {
 
   async updateSettings(
     businessId: string,
-    input: { timezone?: string; phone?: string; email?: string; website?: string; address?: string },
+    input: {
+      name?: string;
+      timezone?: string;
+      phone?: string;
+      email?: string;
+      website?: string;
+      address?: string;
+    },
     userId: string
   ) {
     const existing = await businessRepository.findById(businessId);
@@ -63,6 +70,7 @@ export class BusinessService {
     }
 
     const business = await businessRepository.update(businessId, {
+      name: input.name,
       timezone: input.timezone,
       phone: input.phone,
       email: input.email,

@@ -43,36 +43,6 @@ export function otpEmail(data: OtpEmailData): { subject: string; html: string } 
   };
 }
 
-interface VerificationEmailData {
-  firstName: string;
-  businessName: string;
-  verifyUrl: string;
-}
-
-export function verificationEmail(data: VerificationEmailData): { subject: string; html: string } {
-  const body = `
-    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Verify your email</h1>
-    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Hi ${data.firstName}, welcome to <strong>${BRAND.productName}</strong>! Please verify your email to activate your account for <strong>${data.businessName}</strong>.
-    </p>
-    ${renderButton(data.verifyUrl, 'Verify Email Address')}
-    <p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
-      Or copy this link into your browser:<br />
-      <a href="${data.verifyUrl}" style="color:${BRAND.secondaryColor};word-break:break-all;">${data.verifyUrl}</a>
-    </p>
-    ${renderSecurityNotice('This verification link expires in 24 hours and can only be used once. You must verify your email before signing in.')}
-  `;
-
-  return {
-    subject: `Verify your ${BRAND.productName} account`,
-    html: renderEmailLayout({
-      preheader: `Verify your email to activate ${data.businessName}`,
-      title: 'Verify your email',
-      body,
-    }),
-  };
-}
-
 interface WelcomeEmailData {
   firstName: string;
   businessName: string;
@@ -236,31 +206,6 @@ export function accountActivatedEmail(data: AccountActivatedEmailData): { subjec
     html: renderEmailLayout({
       preheader: 'Your account has been activated',
       title: 'Account activated',
-      body,
-    }),
-  };
-}
-
-interface ResendVerificationEmailData {
-  firstName: string;
-  verifyUrl: string;
-}
-
-export function resendVerificationEmail(data: ResendVerificationEmailData): { subject: string; html: string } {
-  const body = `
-    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Verify your email</h1>
-    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Hi ${data.firstName}, here is a new verification link for your ${BRAND.productName} account.
-    </p>
-    ${renderButton(data.verifyUrl, 'Verify Email Address')}
-    ${renderSecurityNotice('This link expires in 24 hours. You must verify your email before signing in.')}
-  `;
-
-  return {
-    subject: `Verify your ${BRAND.productName} email`,
-    html: renderEmailLayout({
-      preheader: 'New email verification link',
-      title: 'Email verification',
       body,
     }),
   };

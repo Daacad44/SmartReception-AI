@@ -6,6 +6,7 @@ import { emailService } from '../../infrastructure/email/email.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { billingService } from '../billing/billing.service';
 import { UserRole } from '@prisma/client';
+import { notifyTeam } from '../../infrastructure/notifications/notification-helper';
 
 export class TeamService {
   async listMembers(businessId: string) {
@@ -81,6 +82,16 @@ export class TeamService {
         newData: { email: input.email, role: input.role },
       },
     });
+
+    const existingUser = await teamRepository.findUserByEmail(input.email);
+    if (existingUser) {
+      await notifyTeam(
+        businessId,
+        existingUser.id,
+        'Team invitation',
+        `You have been invited to join ${business?.name || 'the team'} as ${input.role}`
+      );
+    }
 
     return invitation;
   }

@@ -299,12 +299,12 @@ export function AppointmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Appointments</h1>
           <p className="text-muted-foreground">Manage and schedule customer appointments</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border p-0.5">
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'ghost'}

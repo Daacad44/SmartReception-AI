@@ -1,5 +1,8 @@
 # SmartReception AI — Deployment Guide
 
+> **Environment variables:** See [ENVIRONMENT.md](./ENVIRONMENT.md) for the full list.  
+> **Admin operations:** See [ADMIN_GUIDE.md](./ADMIN_GUIDE.md).
+
 ## Prerequisites
 
 - Node.js 20+

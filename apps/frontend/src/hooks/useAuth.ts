@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import api, { extractData, getErrorMessage, getErrorCode } from '@/lib/api';
 import type { LoginCredentials, RegisterData, UserProfile } from '@/lib/types';
@@ -63,6 +63,7 @@ function mapLoginToProfile(data: LoginResponse): UserProfile {
       name: b.name,
       industry: b.industry ?? 'OTHER',
       plan: b.plan ?? 'STARTER',
+      role: b.role,
     })),
   };
 }
@@ -81,12 +82,14 @@ function mapProfileToUserProfile(data: ProfileResponse): UserProfile {
       name: b.name,
       industry: b.industry ?? 'OTHER',
       plan: b.plan ?? 'STARTER',
+      role: b.role,
     })),
   };
 }
 
 export function useAuth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user, isAuthenticated, login, logout: storeLogout } = useAuthStore();
 
@@ -99,7 +102,8 @@ export function useAuth() {
       const profile = mapLoginToProfile(data);
       login(data.accessToken, data.refreshToken, profile);
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      const redirect = searchParams.get('redirect');
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/dashboard');
     },
     onError: (error, variables) => {
       const message = getErrorMessage(error);

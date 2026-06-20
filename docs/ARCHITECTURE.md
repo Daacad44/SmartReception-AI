@@ -113,16 +113,35 @@ apps/frontend/src/
 
 ## Security Layers
 
-1. **Helmet** — HTTP security headers
+1. **Helmet** — CSP, HSTS, and HTTP security headers
 2. **CORS** — Origin-restricted
-3. **Rate Limiting** — Global + auth-specific limits
-4. **JWT** — Short-lived access tokens (15m)
+3. **Rate Limiting** — Redis-backed when `REDIS_URL` is set; in-memory fallback
+4. **JWT** — Short-lived access tokens (15m), HttpOnly cookies
 5. **Refresh Tokens** — Rotating, revocable (7d)
-6. **RBAC** — Role-based permissions per business
-7. **Input Validation** — Zod schemas on all endpoints
-8. **Password Hashing** — bcrypt (12 rounds)
-9. **Audit Logs** — All sensitive actions logged
-10. **SQL Injection** — Prisma parameterized queries
+6. **Login Lockout** — 5 failed attempts, 15-minute lockout
+7. **RBAC** — Role-based permissions per business (API + frontend route guards)
+8. **Input Validation** — Zod schemas on all endpoints
+9. **Webhook Signatures** — Stripe and WhatsApp HMAC verification
+10. **Production Config** — Boot fails if default JWT secrets are used
+
+## Billing (Stripe)
+
+- Checkout and Customer Portal via `infrastructure/stripe/stripe.service.ts`
+- Webhook handlers update `subscriptions` and `invoices`
+- `billingService.assertActiveSubscription()` enforces paid status on write operations
+- Usage limits enforced per plan tier
+
+## Notifications & Realtime
+
+- `notification-helper.ts` creates in-app notifications for messages, appointments, team, billing, and knowledge events
+- Frontend `useRealtime` + `GlobalRealtime` invalidate React Query caches on Supabase postgres changes
+- Tables in realtime publication: `conversations`, `messages`, `appointments`, `customers`, `notifications`
+
+## AI Knowledge Search
+
+- Documents chunked and embedded via OpenAI (`embedding.service.ts`)
+- Semantic search ranks by cosine similarity; keyword fallback when embeddings unavailable
+- pgvector migration available for native vector queries
 
 ## RBAC Roles
 

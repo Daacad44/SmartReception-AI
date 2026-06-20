@@ -7,6 +7,7 @@ import {
 } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
 import { getReminderQueue } from '../../infrastructure/queue/queues';
+import { notifyAppointment } from '../../infrastructure/notifications/notification-helper';
 
 export class AppointmentsService {
   async list(
@@ -89,6 +90,13 @@ export class AppointmentsService {
       },
     });
 
+    await notifyAppointment(
+      businessId,
+      'New appointment',
+      `${input.title} scheduled for ${startTime.toLocaleDateString()}`,
+      appointment.id
+    );
+
     return appointment;
   }
 
@@ -139,6 +147,14 @@ export class AppointmentsService {
       },
     });
 
+    await notifyAppointment(
+      businessId,
+      'Appointment updated',
+      `${appointment.title} was updated`,
+      appointment.id,
+      userId
+    );
+
     return appointment;
   }
 
@@ -159,6 +175,14 @@ export class AppointmentsService {
         entityId: id,
       },
     });
+
+    await notifyAppointment(
+      businessId,
+      'Appointment cancelled',
+      `${existing.title} was cancelled`,
+      id,
+      userId
+    );
   }
 
   async getCalendar(businessId: string, startDate: string, endDate: string) {

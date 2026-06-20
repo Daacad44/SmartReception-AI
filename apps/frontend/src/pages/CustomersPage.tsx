@@ -149,12 +149,12 @@ export function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Customers</h1>
           <p className="text-muted-foreground">Manage your customer database, notes, and tags</p>
         </div>
-        <Button className="bg-accent hover:bg-accent/90" onClick={openCreate}>
+        <Button className="bg-accent hover:bg-accent/90 w-full sm:w-auto" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
           Add Customer
         </Button>

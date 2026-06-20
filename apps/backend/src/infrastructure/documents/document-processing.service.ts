@@ -3,7 +3,9 @@ import { prisma } from '../database/prisma';
 import { storageService } from '../storage';
 import { getDocumentQueue } from '../queue/queues';
 import { extractDocumentText } from '../../modules/knowledge/document-processor';
+import { generateEmbeddings } from '../ai/embedding.service';
 import { logger } from '../../core/logger';
+import { notifyKnowledge } from '../notifications/notification-helper';
 
 const CHUNK_SIZE = 1500;
 
@@ -78,17 +80,33 @@ export async function processDocumentById(documentId: string, businessId: string
     });
 
     const chunks = chunkText(trimmed.slice(0, 50000));
+    const embeddings = await generateEmbeddings(chunks);
+    const indexedChunks = chunks.map((text, index) => ({
+      text,
+      embedding: embeddings[index] ?? null,
+    }));
 
     await prisma.knowledgeDocument.update({
       where: { id: documentId },
       data: {
         status: 'INDEXED',
-        embedding: JSON.stringify({ chunks, chunkCount: chunks.length }),
+        embedding: JSON.stringify({
+          chunks: indexedChunks,
+          chunkCount: chunks.length,
+          vectorSearchEnabled: embeddings.some((e) => e !== null),
+        }),
         processingError: null,
       },
     });
 
     logger.info(`Document ${documentId} indexed with ${chunks.length} chunks`);
+
+    await notifyKnowledge(
+      businessId,
+      'Document indexed',
+      `Knowledge document is ready for AI search (${chunks.length} chunks)`,
+      documentId
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Document processing failed';
     logger.error(`Document processing failed for ${documentId}:`, error);

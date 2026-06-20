@@ -3,20 +3,39 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler, notFoundHandler } from './core/error-handler';
 import routes from './routes';
 import { logger } from './core/logger';
 import { prisma } from './infrastructure/database/prisma';
 import { isSupabaseStorageConfigured } from './infrastructure/storage';
+import { createRateLimiter } from './core/rate-limit-store';
 
 export function createApp(): express.Application {
   const app = express();
 
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy:
+        config.env === 'production'
+          ? {
+              directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", 'data:', 'https:'],
+                connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'],
+                fontSrc: ["'self'", 'data:'],
+                frameSrc: ["'none'"],
+                objectSrc: ["'none'"],
+              },
+            }
+          : false,
+      hsts: config.env === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+    })
+  );
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -41,23 +60,20 @@ export function createApp(): express.Application {
   app.use(cookieParser());
 
   app.use(
-    rateLimit({
+    createRateLimiter({
       windowMs: 15 * 60 * 1000,
       max: config.env === 'production' ? 200 : 1000,
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: { success: false, error: 'Too many requests, please try again later' },
     })
   );
 
-  app.use(
-    '/api/v1/whatsapp/webhook',
-    express.json({
-      verify: (req, _res, buf) => {
-        (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
-      },
-    })
-  );
+  const rawJson = express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+    },
+  });
+
+  app.use('/api/v1/whatsapp/webhook', rawJson);
+  app.use('/api/v1/billing/webhook', rawJson);
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));

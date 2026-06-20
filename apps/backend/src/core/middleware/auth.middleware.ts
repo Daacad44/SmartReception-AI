@@ -4,6 +4,7 @@ import { config } from '../../config';
 import { UnauthorizedError, AppError } from '../errors';
 import { JwtPayload } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+import { getAccessTokenFromCookies } from '../auth-cookies';
 
 declare global {
   namespace Express {
@@ -13,18 +14,26 @@ declare global {
   }
 }
 
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+  const cookieToken = getAccessTokenFromCookies(req.cookies as Record<string, string | undefined>);
+  return cookieToken ?? null;
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = extractToken(req);
+    if (!token) {
       throw new UnauthorizedError('No token provided');
     }
 
-    const token = authHeader.split(' ')[1];
     let decoded: JwtPayload;
     try {
       decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
@@ -72,8 +81,8 @@ export function optionalAuth(
   _res: Response,
   next: NextFunction
 ): void {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = extractToken(req);
+  if (!token) {
     next();
     return;
   }

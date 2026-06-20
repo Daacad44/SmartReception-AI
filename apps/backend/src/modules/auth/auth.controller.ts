@@ -9,6 +9,7 @@ import {
   verifyOtpSchema,
   resendOtpSchema,
 } from '@smartreception/shared';
+import { setAuthCookies, clearAuthCookies, getRefreshTokenFromCookies } from '../../core/auth-cookies';
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
@@ -26,6 +27,7 @@ export class AuthController {
       const input = loginSchema.parse(req.body);
       const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
       const result = await authService.login(input, ipAddress);
+      setAuthCookies(res, result.accessToken, result.refreshToken);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -54,8 +56,15 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction) {
     try {
-      const { refreshToken } = refreshTokenSchema.parse(req.body);
+      const bodyToken = req.body?.refreshToken as string | undefined;
+      const cookieToken = getRefreshTokenFromCookies(req.cookies as Record<string, string | undefined>);
+      const refreshToken = bodyToken || cookieToken;
+      if (!refreshToken) {
+        res.status(401).json({ success: false, error: 'No refresh token provided' });
+        return;
+      }
       const tokens = await authService.refresh(refreshToken);
+      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
       res.json({ success: true, data: tokens });
     } catch (error) {
       next(error);
@@ -64,8 +73,11 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const { refreshToken } = req.body;
+      const bodyToken = req.body?.refreshToken as string | undefined;
+      const cookieToken = getRefreshTokenFromCookies(req.cookies as Record<string, string | undefined>);
+      const refreshToken = bodyToken || cookieToken;
       await authService.logout(refreshToken, req.user?.userId);
+      clearAuthCookies(res);
       res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
       next(error);
@@ -105,6 +117,7 @@ export class AuthController {
     try {
       const { businessId } = req.body;
       const tokens = await authService.switchBusiness(req.user!.userId, businessId);
+      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
       res.json({ success: true, data: tokens });
     } catch (error) {
       next(error);

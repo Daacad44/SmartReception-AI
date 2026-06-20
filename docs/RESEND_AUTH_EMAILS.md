@@ -2,7 +2,7 @@
 
 ## Overview
 
-SmartReception AI uses [Resend](https://resend.com) for all authentication emails, sent from **SmartReception AI <noreply@botandev.com>**.
+SmartReception AI uses [Resend](https://resend.com) for authentication emails, sent from **SmartReception AI <noreply@botandev.com>**.
 
 ## Environment Variables
 
@@ -20,11 +20,11 @@ SMTP remains available as a fallback if `RESEND_API_KEY` is not set.
 
 | Email | Trigger |
 |-------|---------|
-| Email Verification | User registration |
-| Resend Verification | `POST /auth/resend-verification` |
-| Welcome | After email verified |
-| Account Activated | After email verified |
-| Password Reset | `POST /auth/forgot-password` (15 min expiry) |
+| OTP Verification | User registration |
+| OTP Resend | `POST /auth/resend-otp` |
+| Welcome | After OTP verification |
+| Account Activated | After OTP verification |
+| Password Reset OTP | `POST /auth/forgot-password` (10 min expiry) |
 | Password Changed | After successful password reset |
 | Login Alert | After successful login |
 | Team Invitation | `POST /team/invite` |
@@ -33,29 +33,30 @@ SMTP remains available as a fallback if `RESEND_API_KEY` is not set.
 
 ### Registration
 1. User registers → account created (unverified)
-2. Verification email sent via Resend
+2. 6-digit OTP sent via Resend
 3. **No JWT tokens returned** — user must verify first
-4. User redirected to `/check-email`
+4. User redirected to `/verify-otp`
 
-### Email Verification
-1. User clicks link: `/verify-email?token={TOKEN}`
-2. Token validated (SHA-256 hashed in DB, 24h expiry, single use)
+### Email Verification (OTP)
+1. User enters email + OTP on `/verify-otp`
+2. Code validated (SHA-256 hashed in DB, 10 min expiry, max 5 attempts)
 3. Welcome + Account Activated emails sent
 4. User can now sign in
 
 ### Login
 - Blocked with `403 EMAIL_NOT_VERIFIED` if email not verified
 - Login alert email sent on success
+- Failed attempts trigger account lockout (5 attempts, 15 min)
 
 ### Password Reset
-- Token expires in **15 minutes**, single use
-- Tokens stored as SHA-256 hashes
+- OTP expires in **10 minutes**, max 5 attempts
+- Codes stored as SHA-256 hashes
 - Password changed confirmation email sent after reset
 
 ## Security
 
-- Verification and reset tokens are hashed before database storage
-- Tokens are single-use and time-limited
+- OTP codes are hashed before database storage
+- Codes are time-limited with attempt limits
 - Auth events logged in `audit_logs`
 - Password reset revokes all refresh tokens
 
@@ -63,10 +64,9 @@ SMTP remains available as a fallback if `RESEND_API_KEY` is not set.
 
 | Route | Purpose |
 |-------|---------|
-| `/verify-email` | Email verification handler |
-| `/check-email` | Post-registration instructions + resend |
-| `/forgot-password` | Request password reset |
-| `/reset-password` | Set new password |
+| `/verify-otp` | Enter email verification code |
+| `/forgot-password` | Request password reset OTP |
+| `/reset-password` | Set new password with OTP |
 
 ## Vercel Setup
 

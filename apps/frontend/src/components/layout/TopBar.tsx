@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings, Moon, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings, Moon, Sun, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,22 +16,70 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { useBusiness } from '@/hooks/useBusiness';
-import { useNotifications } from '@/hooks/useApi';
+import { useNotifications, useMarkNotificationRead } from '@/hooks/useApi';
+import type { Notification } from '@/lib/entities';
 import { useTheme } from '@/components/ThemeProvider';
 import { getInitials, formatRelativeTime } from '@/lib/utils';
 
-export function TopBar() {
+const QUICK_LINKS = [
+  { label: 'Conversations', path: '/conversations' },
+  { label: 'Customers', path: '/customers' },
+  { label: 'Appointments', path: '/appointments' },
+  { label: 'Knowledge Base', path: '/knowledge' },
+];
+
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export function TopBar({ onMenuClick }: TopBarProps) {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { businesses, currentBusiness, switchBusiness } = useBusiness();
   const { data: notifications } = useNotifications();
+  const markRead = useMarkNotificationRead();
   const { resolvedTheme, setTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const unreadNotifications = notifications?.filter((n) => !n.read).length ?? 0;
   const displayName = user ? `${user.firstName} ${user.lastName}` : 'User';
 
+  const handleNotificationClick = (notif: Notification) => {
+    if (!notif.read) {
+      markRead.mutate(notif.id);
+    }
+
+    const data = notif.data as Record<string, string> | null | undefined;
+    if (data?.conversationId) {
+      navigate(`/conversations?conversation=${data.conversationId}`);
+      return;
+    }
+    if (data?.appointmentId) {
+      navigate('/appointments');
+      return;
+    }
+    if (data?.documentId) {
+      navigate('/knowledge');
+      return;
+    }
+    if (notif.title.toLowerCase().includes('subscription') || notif.title.toLowerCase().includes('invoice')) {
+      navigate('/billing');
+    }
+  };
+
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6 gap-3">
+      {onMenuClick && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden shrink-0"
+          onClick={onMenuClick}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      )}
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -43,12 +92,18 @@ export function TopBar() {
           <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border bg-card p-4 shadow-lg">
             <p className="text-xs text-muted-foreground">Quick search</p>
             <div className="mt-2 space-y-1">
-              {['Conversations', 'Customers', 'Appointments', 'Knowledge Base'].map((item) => (
+              {QUICK_LINKS.map((item) => (
                 <button
-                  key={item}
+                  key={item.path}
+                  type="button"
                   className="flex w-full items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    navigate(item.path);
+                    setSearchOpen(false);
+                  }}
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -82,7 +137,11 @@ export function TopBar() {
             <DropdownMenuSeparator />
             <ScrollArea className="h-64">
               {notifications?.map((notif) => (
-                <DropdownMenuItem key={notif.id} className="flex flex-col items-start gap-1 p-3">
+                <DropdownMenuItem
+                  key={notif.id}
+                  className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                  onClick={() => handleNotificationClick(notif)}
+                >
                   <div className="flex w-full items-center justify-between">
                     <span className="text-sm font-medium">{notif.title}</span>
                     {!notif.read && <Badge variant="accent" className="text-[10px]">New</Badge>}

@@ -5,10 +5,11 @@ import { useAuthStore } from '@/stores/auth.store';
 
 interface UseRealtimeOptions {
   conversationId?: string | null;
+  userId?: string | null;
 }
 
 export function useRealtime(options: UseRealtimeOptions = {}) {
-  const { conversationId } = options;
+  const { conversationId, userId } = options;
   const businessId = useAuthStore((s) => s.currentBusinessId);
   const queryClient = useQueryClient();
 
@@ -29,6 +30,42 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
         () => {
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `businessId=eq.${businessId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customers',
+          filter: `businessId=eq.${businessId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['customers'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `businessId=eq.${businessId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
       );
 
     if (conversationId) {
@@ -43,27 +80,30 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
         () => {
           queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
         }
       );
     }
 
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'appointments',
-        filter: `businessId=eq.${businessId}`,
-      },
-      () => {
-        queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      }
-    );
+    if (userId) {
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `userId=eq.${userId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      );
+    }
 
     channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [businessId, conversationId, queryClient]);
+  }, [businessId, conversationId, userId, queryClient]);
 }

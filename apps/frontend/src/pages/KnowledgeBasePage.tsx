@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useKnowledgeDocs, useKnowledgeBases, useFaqs, isInitialLoading } from '@/hooks/useApi';
+import { useKnowledgeDocs, useKnowledgeBases, useFaqs, useKnowledgeSearch, isInitialLoading } from '@/hooks/useApi';
 import { useUploadDocument, useDeleteDocument, useCreateFaq } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -112,10 +112,14 @@ export function KnowledgeBasePage() {
   const docsLoading = isInitialLoading(isPending, isFetching, documents);
   const uploadDocument = useUploadDocument();
   const deleteDocument = useDeleteDocument();
+  const { data: searchResults, isFetching: searchFetching } = useKnowledgeSearch(search);
 
   const filtered = documents?.filter(
     (d) => !search || d.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  const semanticResults =
+    search.trim().length >= 2 ? searchResults : undefined;
 
   const handleFileSelect = (file: File | null) => {
     if (!file) {
@@ -277,6 +281,30 @@ export function KnowledgeBasePage() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      {semanticResults && semanticResults.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-3 text-sm font-semibold">AI Search Results</p>
+            <div className="space-y-3">
+              {semanticResults.map((result) => (
+                <div key={`${result.documentId}-${result.snippet.slice(0, 20)}`} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{result.title}</p>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {Math.round(result.score * 100)}% match
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{result.snippet}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {search.trim().length >= 2 && searchFetching && (
+        <p className="text-sm text-muted-foreground">Searching knowledge base...</p>
+      )}
 
       {docsLoading ? (
         <LoadingState rows={4} />

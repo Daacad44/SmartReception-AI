@@ -88,6 +88,23 @@ export const changePlanSchema = z.object({
   plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
 });
 
+export const checkoutSchema = z.object({
+  plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
+});
+
+export const connectWhatsAppSchema = z.object({
+  phoneNumberId: z.string().min(1).max(100),
+  phoneNumber: z.string().min(1).max(20),
+  displayName: z.string().max(200).optional(),
+  wabaId: z.string().max(100).optional(),
+  accessToken: z.string().min(1).max(500),
+});
+
+export const knowledgeSearchSchema = z.object({
+  q: z.string().min(1).max(500),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
+
 export const sendMessageSchema = z.object({
   content: z.string().min(1).max(4096),
   type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO']).default('TEXT'),
@@ -152,3 +169,6 @@ export type AiConfigInput = z.infer<typeof aiConfigSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
 export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;
+export type KnowledgeSearchInput = z.infer<typeof knowledgeSearchSchema>;

@@ -5,6 +5,7 @@ import { storageService } from '../../infrastructure/storage';
 import { scheduleDocumentProcessing } from '../../infrastructure/documents/document-processing.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
+import { notifyKnowledge } from '../../infrastructure/notifications/notification-helper';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
@@ -193,6 +194,13 @@ export class KnowledgeService {
 
     await knowledgeRepository.deleteDocument(id);
 
+    await notifyKnowledge(
+      businessId,
+      'FAQ removed',
+      `"${document.title}" was removed from the knowledge base.`,
+      id
+    );
+
     await prisma.auditLog.create({
       data: {
         businessId,
@@ -220,6 +228,13 @@ export class KnowledgeService {
 
     await knowledgeRepository.deleteDocument(id);
 
+    await notifyKnowledge(
+      businessId,
+      'Document removed',
+      `"${document.title}" was removed from the knowledge base.`,
+      id
+    );
+
     await prisma.auditLog.create({
       data: {
         businessId,
@@ -229,6 +244,96 @@ export class KnowledgeService {
         entityId: id,
       },
     });
+  }
+
+  async searchDocuments(businessId: string, query: string, limit = 10) {
+    const { generateEmbedding, cosineSimilarity } = await import(
+      '../../infrastructure/ai/embedding.service'
+    );
+
+    const queryEmbedding = await generateEmbedding(query);
+    const documents = await prisma.knowledgeDocument.findMany({
+      where: {
+        status: 'INDEXED',
+        knowledgeBase: { businessId },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        embedding: true,
+        content: true,
+      },
+      take: 100,
+    });
+
+    type ScoredResult = {
+      documentId: string;
+      title: string;
+      type: string;
+      snippet: string;
+      score: number;
+    };
+
+    const results: ScoredResult[] = [];
+
+    for (const doc of documents) {
+      if (!doc.embedding) {
+        if (doc.title.toLowerCase().includes(query.toLowerCase())) {
+          results.push({
+            documentId: doc.id,
+            title: doc.title,
+            type: doc.type,
+            snippet: (doc.content ?? '').slice(0, 200),
+            score: 0.5,
+          });
+        }
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(doc.embedding) as {
+          chunks?: Array<{ text: string; embedding?: number[] | null } | string>;
+        };
+
+        const chunks = parsed.chunks ?? [];
+        for (const chunk of chunks) {
+          const text = typeof chunk === 'string' ? chunk : chunk.text;
+          const embedding = typeof chunk === 'string' ? null : chunk.embedding;
+
+          let score = 0;
+          if (queryEmbedding && embedding?.length) {
+            score = cosineSimilarity(queryEmbedding, embedding);
+          } else if (text.toLowerCase().includes(query.toLowerCase())) {
+            score = 0.4;
+          }
+
+          if (score > 0.3) {
+            results.push({
+              documentId: doc.id,
+              title: doc.title,
+              type: doc.type,
+              snippet: text.slice(0, 300),
+              score,
+            });
+          }
+        }
+      } catch {
+        if (doc.title.toLowerCase().includes(query.toLowerCase())) {
+          results.push({
+            documentId: doc.id,
+            title: doc.title,
+            type: doc.type,
+            snippet: (doc.content ?? '').slice(0, 200),
+            score: 0.5,
+          });
+        }
+      }
+    }
+
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 }
 

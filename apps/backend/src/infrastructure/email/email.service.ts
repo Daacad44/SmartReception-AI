@@ -79,30 +79,6 @@ export class EmailService {
     await this.send(email, subject, html);
   }
 
-  async sendVerificationEmail(
-    email: string,
-    token: string,
-    data: { firstName: string; businessName: string }
-  ): Promise<void> {
-    const verifyUrl = `${config.frontendUrl}/verify-email?token=${token}`;
-    const { subject, html } = templates.verificationEmail({
-      firstName: data.firstName,
-      businessName: data.businessName,
-      verifyUrl,
-    });
-    await this.send(email, subject, html);
-  }
-
-  async sendResendVerificationEmail(
-    email: string,
-    token: string,
-    firstName: string
-  ): Promise<void> {
-    const verifyUrl = `${config.frontendUrl}/verify-email?token=${token}`;
-    const { subject, html } = templates.resendVerificationEmail({ firstName, verifyUrl });
-    await this.send(email, subject, html);
-  }
-
   async sendWelcomeEmail(
     email: string,
     data: { firstName: string; businessName: string }

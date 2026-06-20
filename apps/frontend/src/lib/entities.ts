@@ -120,6 +120,7 @@ export interface Notification {
   type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
   createdAt: string;
+  data?: Record<string, unknown> | null;
 }
 
 export interface AnalyticsData {
@@ -138,8 +139,16 @@ export interface BillingData {
   price: number;
   billingCycle: string;
   nextBillingDate: string;
+  hasPaymentMethod?: boolean;
+  stripeEnabled?: boolean;
   usage: Record<string, { used: number; limit: number }>;
-  invoices: Array<{ id: string; date: string; amount: number; status: string }>;
+  invoices: Array<{
+    id: string;
+    date: string;
+    amount: number;
+    status: string;
+    stripeInvoiceId?: string | null;
+  }>;
 }
 
 export interface CustomerNote {

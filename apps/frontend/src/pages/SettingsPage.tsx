@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Bot, Bell, Shield } from 'lucide-react';
+import { Building2, Bot, Bell, Shield, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,8 @@ import { useBusinessSettings, useAiConfig } from '@/hooks/useApi';
 import { useUpdateBusinessSettings, useUpdateAiConfig } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
+import { WhatsAppSettings } from '@/components/settings/WhatsAppSettings';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const businessSchema = z.object({
   name: z.string().min(1),
@@ -47,6 +49,7 @@ export function SettingsPage() {
   const { data: aiConfig, isLoading: aiLoading } = useAiConfig();
   const updateSettings = useUpdateBusinessSettings();
   const updateAiConfig = useUpdateAiConfig();
+  const { hasPermission } = usePermissions();
 
   const businessForm = useForm<BusinessForm>({
     resolver: zodResolver(businessSchema),
@@ -98,6 +101,7 @@ export function SettingsPage() {
 
   const onSaveBusiness = businessForm.handleSubmit(async (data) => {
     await updateSettings.mutateAsync({
+      name: data.name,
       timezone: data.timezone,
       phone: data.phone,
       email: data.email || undefined,
@@ -137,6 +141,12 @@ export function SettingsPage() {
             <Bot className="h-4 w-4" />
             AI Assistant
           </TabsTrigger>
+          {hasPermission('settings:write') && (
+            <TabsTrigger value="whatsapp" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </TabsTrigger>
+          )}
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
             Notifications
@@ -160,7 +170,7 @@ export function SettingsPage() {
                 <form onSubmit={onSaveBusiness} className="space-y-4 max-w-lg">
                   <div className="space-y-2">
                     <Label>Business Name</Label>
-                    <Input {...businessForm.register('name')} disabled />
+                    <Input {...businessForm.register('name')} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -284,6 +294,12 @@ export function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {hasPermission('settings:write') && (
+          <TabsContent value="whatsapp" className="mt-6">
+            <WhatsAppSettings />
+          </TabsContent>
+        )}
 
         <TabsContent value="notifications" className="mt-6">
           <Card>

@@ -32,6 +32,7 @@ export const config = {
   whatsapp: {
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'smartreception-verify',
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+    appSecret: process.env.WHATSAPP_APP_SECRET || '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,
   },
@@ -64,4 +65,26 @@ export const config = {
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
   },
+
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  },
 } as const;
+
+const INSECURE_JWT_SECRETS = new Set([
+  'dev-secret-change-me',
+  'dev-refresh-secret-change-me',
+]);
+
+export function validateProductionConfig(): void {
+  if (config.env !== 'production') return;
+
+  if (!config.database.url) {
+    throw new Error('DATABASE_URL is required in production');
+  }
+
+  if (INSECURE_JWT_SECRETS.has(config.jwt.secret) || INSECURE_JWT_SECRETS.has(config.jwt.refreshSecret)) {
+    throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be set to strong values in production');
+  }
+}

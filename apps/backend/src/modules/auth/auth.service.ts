@@ -12,6 +12,11 @@ import {
 } from '../../core/errors';
 import { RegisterInput, LoginInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+import {
+  assertLoginAllowed,
+  recordFailedLogin,
+  clearLoginAttempts,
+} from '../../infrastructure/auth/login-lockout.service';
 
 const VERIFY_EXPIRY_HOURS = 24;
 
@@ -75,15 +80,21 @@ export class AuthService {
   }
 
   async login(input: LoginInput, ipAddress?: string) {
+    assertLoginAllowed(input.email, ipAddress);
+
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
+      recordFailedLogin(input.email, ipAddress);
       throw new UnauthorizedError('Invalid credentials');
     }
 
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
+      recordFailedLogin(input.email, ipAddress);
       throw new UnauthorizedError('Invalid credentials');
     }
+
+    clearLoginAttempts(input.email, ipAddress);
 
     if (!user.isEmailVerified) {
       throw new EmailNotVerifiedError();
@@ -229,7 +240,7 @@ export class AuthService {
     );
   }
 
-  async logout(refreshToken: string, userId?: string) {
+  async logout(refreshToken?: string, userId?: string) {
     if (refreshToken) {
       await tokenService.revokeRefreshToken(refreshToken);
     }
