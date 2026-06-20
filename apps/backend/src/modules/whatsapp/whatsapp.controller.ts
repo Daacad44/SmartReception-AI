@@ -3,6 +3,7 @@ import { whatsappModuleService } from './whatsapp.service';
 import { logger } from '../../core/logger';
 import { connectWhatsAppSchema } from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
+import { config } from '../../config';
 
 export class WhatsAppController {
   async verify(req: Request, res: Response, next: NextFunction) {
@@ -72,7 +73,7 @@ export class WhatsAppController {
         data: {
           webhookUrl: whatsappModuleService.getWebhookUrl(),
           legacyWebhookUrl: whatsappModuleService.getLegacyWebhookUrl(),
-          verifyToken: process.env.VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || '',
+          verifyToken: config.whatsapp.verifyToken,
         },
       });
     } catch (error) {

@@ -196,11 +196,11 @@ export class WhatsAppModuleService {
   }
 
   getWebhookUrl(): string {
-    return `${config.apiUrl}/api/v1/webhooks/whatsapp`;
+    return `${config.apiUrl}/webhook`;
   }
 
   getLegacyWebhookUrl(): string {
-    return `${config.apiUrl}/api/v1/whatsapp/webhook`;
+    return `${config.apiUrl}/api/v1/webhooks/whatsapp`;
   }
 
   async listAccounts(businessId: string) {

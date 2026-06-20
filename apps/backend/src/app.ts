@@ -10,6 +10,7 @@ import { logger } from './core/logger';
 import { prisma } from './infrastructure/database/prisma';
 import { isSupabaseStorageConfigured } from './infrastructure/storage';
 import { createRateLimiter } from './core/rate-limit-store';
+import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 
 export function createApp(): express.Application {
   const app = express();
@@ -78,6 +79,7 @@ export function createApp(): express.Application {
 
   app.use('/api/v1/whatsapp/webhook', rawJson);
   app.use('/api/v1/webhooks/whatsapp', rawJson);
+  app.use('/webhook', rawJson);
   app.use('/api/v1/billing/webhook', rawJson);
 
   app.use(express.json({ limit: '10mb' }));
@@ -109,6 +111,10 @@ export function createApp(): express.Application {
       });
     }
   });
+
+  // Meta WhatsApp webhook (production callback: https://api.somreception.botandev.com/webhook)
+  app.get('/webhook', (req, res, next) => whatsappController.verify(req, res, next));
+  app.post('/webhook', (req, res, next) => whatsappController.webhook(req, res, next));
 
   app.use('/api/v1', routes);
 
