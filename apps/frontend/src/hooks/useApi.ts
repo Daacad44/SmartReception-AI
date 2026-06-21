@@ -668,6 +668,26 @@ export function useWhatsAppAccounts() {
   });
 }
 
+export function useWhatsAppHealth() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-health'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/health');
+      return extractData<{
+        connection: 'connected' | 'disconnected';
+        webhook: 'verified' | 'pending' | 'not_configured';
+        phoneStatus: 'active' | 'unknown' | 'inactive';
+        phoneNumber: string | null;
+        phoneNumberId: string | null;
+        wabaId: string | null;
+        lastSync: string | null;
+        envConfigured: boolean;
+      }>(response);
+    },
+    refetchInterval: 30_000,
+  });
+}
+
 export function useWhatsAppStatus() {
   return useAuthQuery({
     queryKey: ['whatsapp-status'],

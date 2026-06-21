@@ -4,7 +4,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useWhatsAppAccounts, useWhatsAppWebhookInfo, useWhatsAppStatus } from '@/hooks/useApi';
+import {
+  useWhatsAppAccounts,
+  useWhatsAppWebhookInfo,
+  useWhatsAppHealth,
+} from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
   useConnectWhatsAppFromEnv,
@@ -16,10 +20,29 @@ import { Copy, Trash2, Plug, Wifi, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/utils';
 
+function statusBadgeVariant(
+  status: string
+): 'success' | 'warning' | 'secondary' | 'destructive' {
+  const normalized = status.toLowerCase();
+  if (['connected', 'verified', 'active'].includes(normalized)) return 'success';
+  if (['pending', 'receiving'].includes(normalized)) return 'warning';
+  if (['disconnected', 'inactive', 'not_configured'].includes(normalized)) return 'destructive';
+  return 'secondary';
+}
+
+function formatStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ');
+}
+
 export function WhatsAppSettings() {
-  const { data: accounts, isLoading, refetch } = useWhatsAppAccounts();
+  const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } =
+    useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
-  const { data: status } = useWhatsAppStatus();
+  const {
+    data: health,
+    isLoading: healthLoading,
+    refetch: refetchHealth,
+  } = useWhatsAppHealth();
   const connectWhatsApp = useConnectWhatsApp();
   const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
@@ -44,7 +67,12 @@ export function WhatsAppSettings() {
     setForm({ phoneNumberId: '', phoneNumber: '', displayName: '', wabaId: '', accessToken: '' });
   };
 
-  if (isLoading) {
+  const handleRefresh = () => {
+    refetchAccounts();
+    refetchHealth();
+  };
+
+  if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
   }
 
@@ -55,38 +83,59 @@ export function WhatsAppSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Connection Status</CardTitle>
-          <CardDescription>WhatsApp Cloud API integration status</CardDescription>
+          <CardDescription>Live WhatsApp Cloud API health from Meta and webhooks</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">Connection</p>
-            <Badge variant={status?.connected ? 'success' : 'secondary'} className="mt-1">
-              {status?.connected ? 'Connected' : 'Not Connected'}
+            <Badge
+              variant={statusBadgeVariant(health?.connection ?? 'disconnected')}
+              className="mt-1 capitalize"
+            >
+              {formatStatusLabel(health?.connection ?? 'disconnected')}
             </Badge>
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">Webhook</p>
-            <Badge variant={activeAccount?.webhookVerified ? 'success' : 'warning'} className="mt-1">
-              {activeAccount?.webhookStatus ?? 'pending'}
+            <Badge
+              variant={statusBadgeVariant(health?.webhook ?? 'pending')}
+              className="mt-1 capitalize"
+            >
+              {formatStatusLabel(health?.webhook ?? 'pending')}
             </Badge>
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">Phone Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">
-              {activeAccount?.phoneNumberStatus ?? 'unknown'}
-            </p>
+            <Badge
+              variant={statusBadgeVariant(health?.phoneStatus ?? 'unknown')}
+              className="mt-1 capitalize"
+            >
+              {formatStatusLabel(health?.phoneStatus ?? 'unknown')}
+            </Badge>
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">Last Sync</p>
             <p className="mt-1 text-sm font-medium">
-              {activeAccount?.lastSyncAt
-                ? formatRelativeTime(activeAccount.lastSyncAt)
-                : 'Never'}
+              {health?.lastSync ? formatRelativeTime(health.lastSync) : 'Never'}
             </p>
           </div>
         </CardContent>
+        <CardContent className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Connected Phone Number</p>
+            <p className="font-mono text-sm">{health?.phoneNumber ?? '—'}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Phone Number ID</p>
+            <p className="font-mono text-sm break-all">{health?.phoneNumberId ?? '—'}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">WABA ID</p>
+            <p className="font-mono text-sm break-all">{health?.wabaId ?? '—'}</p>
+          </div>
+        </CardContent>
         <CardContent className="flex flex-wrap gap-2 pt-0">
-          {status?.envConfigured && (
+          {health?.envConfigured && (
             <Button
               variant="outline"
               onClick={() => connectFromEnv.mutate()}
@@ -104,7 +153,7 @@ export function WhatsAppSettings() {
             <Wifi className="mr-2 h-4 w-4" />
             Test Connection
           </Button>
-          <Button variant="ghost" onClick={() => refetch()}>
+          <Button variant="ghost" onClick={handleRefresh}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>

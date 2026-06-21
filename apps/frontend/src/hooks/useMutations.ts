@@ -328,6 +328,7 @@ export function useConnectWhatsApp() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
       toast.success('WhatsApp account connected');
     },
     onError: (error) => {
@@ -347,6 +348,7 @@ export function useConnectWhatsAppFromEnv() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
       toast.success('WhatsApp connected from environment variables');
     },
     onError: (error) => {
@@ -370,6 +372,7 @@ export function useTestWhatsAppConnection() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
       toast.success(
         `Connection OK${data?.verifiedName ? `: ${data.verifiedName}` : ''}`
       );
@@ -390,6 +393,7 @@ export function useDisconnectWhatsApp() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
       toast.success('WhatsApp account disconnected');
     },
     onError: (error) => {
