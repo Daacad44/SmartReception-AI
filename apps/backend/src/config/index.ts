@@ -4,6 +4,7 @@ dotenv.config();
 const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
 const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
 const DEFAULT_VERIFY_TOKEN = 'smartreception-verify';
+export const WHATSAPP_WEBHOOK_PATH = '/api/v1/webhooks/whatsapp';
 
 function normalizeEnv(value: string | undefined): string {
   return (value ?? '').trim();
@@ -31,10 +32,30 @@ function resolveApiUrl(): string {
 }
 
 function resolveWebhookUrl(): string {
-  if (process.env.WHATSAPP_WEBHOOK_URL) {
-    return process.env.WHATSAPP_WEBHOOK_URL.replace(/\/$/, '');
+  const canonical = `${resolveApiUrl()}${WHATSAPP_WEBHOOK_PATH}`;
+
+  if (!process.env.WHATSAPP_WEBHOOK_URL) {
+    return canonical;
   }
-  return `${resolveApiUrl()}/webhook`;
+
+  const configured = process.env.WHATSAPP_WEBHOOK_URL.replace(/\/$/, '');
+  const apiBase = resolveApiUrl();
+  const legacyUrls = new Set([
+    `${apiBase}/webhook`,
+    `${apiBase}/api/webhook`,
+    'https://somreception.botandev.com/webhook',
+    'https://api.somreception.botandev.com/webhook',
+  ]);
+
+  if (legacyUrls.has(configured)) {
+    console.warn(
+      '[WhatsApp] WHATSAPP_WEBHOOK_URL uses legacy path — serving canonical URL:',
+      canonical
+    );
+    return canonical;
+  }
+
+  return configured;
 }
 
 function resolveFrontendUrl(): string {

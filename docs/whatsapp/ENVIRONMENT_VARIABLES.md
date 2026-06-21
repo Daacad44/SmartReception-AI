@@ -17,6 +17,7 @@ Copy `.env.example` to `.env` and fill in real values.
 | `META_APP_SECRET` | Meta app secret (for webhook signature) | From app dashboard |
 | `WHATSAPP_APP_SECRET` | Alias for `META_APP_SECRET` | Same as above |
 | `WHATSAPP_API_VERSION` | Graph API version | `v21.0` (default) |
+| `WHATSAPP_WEBHOOK_URL` | Canonical Meta callback URL | `https://api.somreception.botandev.com/api/v1/webhooks/whatsapp` |
 
 ## Application URLs (Production)
 

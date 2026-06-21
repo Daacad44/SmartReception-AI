@@ -54,10 +54,11 @@ Webhook: `https://<domain>/api/v1/billing/webhook`
 | Variable | Where | Description |
 |----------|-------|-------------|
 | `WHATSAPP_VERIFY_TOKEN` | Backend | Meta webhook verify token |
+| `WHATSAPP_WEBHOOK_URL` | Backend | Canonical callback URL |
 | `WHATSAPP_APP_SECRET` | Backend | Webhook signature verification |
 | `WHATSAPP_ACCESS_TOKEN` | Backend | Optional global fallback |
 
-Webhook: `https://<domain>/api/v1/whatsapp/webhook`
+Webhook: `https://<domain>/api/v1/webhooks/whatsapp`
 
 ## Optional
 

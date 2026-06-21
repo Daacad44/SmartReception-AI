@@ -163,7 +163,7 @@ FRONTEND_URL=https://app.smartreception.ai
 
 Set webhook URL in Meta dashboard:
 ```
-https://api.yourdomain.com/api/v1/whatsapp/webhook
+https://api.yourdomain.com/api/v1/webhooks/whatsapp
 ```
 
 Verify token: value of `WHATSAPP_VERIFY_TOKEN`
