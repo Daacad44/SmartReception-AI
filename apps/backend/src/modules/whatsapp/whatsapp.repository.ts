@@ -135,10 +135,68 @@ export class WhatsAppRepository {
   }
 
   async markWebhookVerified(phoneNumberId: string) {
-    console.log('[WhatsApp] Webhook verified');
+    console.log('[WhatsApp] Webhook status set to VERIFIED');
     return prisma.whatsAppAccount.update({
       where: { phoneNumberId },
-      data: { webhookVerified: true, webhookStatus: 'verified', lastSyncAt: new Date() },
+      data: {
+        webhookVerified: true,
+        webhookStatus: 'verified',
+        lastSyncAt: new Date(),
+      },
+    });
+  }
+
+  async recordWebhookReceipt(phoneNumberId: string) {
+    return prisma.whatsAppAccount.update({
+      where: { phoneNumberId },
+      data: {
+        lastWebhookReceivedAt: new Date(),
+        lastSyncAt: new Date(),
+      },
+    });
+  }
+
+  async getLastWebhookReceived(businessId: string): Promise<Date | null> {
+    const account = await this.findAccountByBusiness(businessId);
+    if (account?.lastWebhookReceivedAt) {
+      return account.lastWebhookReceivedAt;
+    }
+
+    const event = await prisma.whatsAppWebhookEvent.findFirst({
+      where: { businessId },
+      orderBy: { receivedAt: 'desc' },
+      select: { receivedAt: true },
+    });
+    return event?.receivedAt ?? null;
+  }
+
+  async resolveAccountForWebhook(phoneNumberId?: string) {
+    if (phoneNumberId) {
+      const byId = await this.findAccountByPhoneNumberId(phoneNumberId);
+      if (byId) return byId;
+    }
+
+    const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (envPhoneNumberId) {
+      const byEnv = await this.findAccountByPhoneNumberId(envPhoneNumberId);
+      if (byEnv) return byEnv;
+    }
+
+    return prisma.whatsAppAccount.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markAllActiveWebhooksVerified() {
+    console.log('[WhatsApp] Webhook status set to VERIFIED');
+    return prisma.whatsAppAccount.updateMany({
+      where: { isActive: true },
+      data: {
+        webhookVerified: true,
+        webhookStatus: 'verified',
+        lastSyncAt: new Date(),
+      },
     });
   }
 
@@ -159,6 +217,7 @@ export class WhatsAppRepository {
       wabaId?: string;
       webhookStatus?: string;
       webhookVerified?: boolean;
+      lastWebhookReceivedAt?: Date;
     }
   ) {
     return prisma.whatsAppAccount.update({
