@@ -72,9 +72,13 @@ export class WhatsAppModuleService {
       webhookStatus: 'receiving',
     });
 
+    const aiConfig = await prisma.aIConfiguration.findUnique({
+      where: { businessId: account.businessId },
+      select: { enableAutoReply: true },
+    });
+
     for (const status of parsed.statuses) {
-      if (await whatsappRepository.isEventProcessed(status.id)) continue;
-      const recorded = await whatsappRepository.recordWebhookEvent(
+      const recorded = await whatsappRepository.tryRecordWebhookEvent(
         status.id,
         `status:${status.status}`,
         account.businessId
@@ -86,8 +90,7 @@ export class WhatsAppModuleService {
     }
 
     for (const msg of parsed.messages) {
-      if (await whatsappRepository.isEventProcessed(msg.id)) continue;
-      const recorded = await whatsappRepository.recordWebhookEvent(
+      const recorded = await whatsappRepository.tryRecordWebhookEvent(
         msg.id,
         `message:${msg.type}`,
         account.businessId
@@ -142,16 +145,12 @@ export class WhatsAppModuleService {
 
       const message = await whatsappRepository.createInboundMessage({
         conversationId: conversation.id,
+        customerId: customer.id,
         content: extracted.content,
         whatsappMsgId: msg.id,
         type: extracted.type,
         mediaUrl,
         metadata,
-      });
-
-      await prisma.customer.update({
-        where: { id: customer.id },
-        data: { lastContactAt: new Date() },
       });
 
       const accessToken = account.accessToken || config.whatsapp.accessToken || undefined;
@@ -168,10 +167,6 @@ export class WhatsAppModuleService {
       });
 
       await notifyNewMessage(account.businessId, customer.name, conversation.id);
-
-      const aiConfig = await prisma.aIConfiguration.findUnique({
-        where: { businessId: account.businessId },
-      });
 
       const aiText =
         extracted.type === 'TEXT' || extracted.type === 'INTERACTIVE'
