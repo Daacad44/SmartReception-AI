@@ -16,8 +16,12 @@ Get your database password from [Supabase Dashboard](https://supabase.com/dashbo
 
 **Pooled (for Vercel serverless — `DATABASE_URL`):**
 ```
-postgresql://postgres.hlngecipthlecwqozwhe:[PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+postgresql://postgres.hlngecipthlecwqozwhe:[PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=3&pool_timeout=20
 ```
+
+> **Prisma P2024 fix:** Do not use `connection_limit=1` on Vercel unless you serialize all DB access.
+> Warm serverless instances handle concurrent requests (health + webhook + API). Use `connection_limit=3`
+> with Supabase transaction pooler (port 6543). `DIRECT_URL` is for migrations only (port 5432).
 
 **Direct (for migrations — `DIRECT_URL`):**
 ```
@@ -46,6 +50,8 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 |----------|-------------|
 | `DATABASE_URL` | Supabase pooled connection string (port 6543) |
 | `DIRECT_URL` | Supabase direct connection string (port 5432) |
+| `DATABASE_CONNECTION_LIMIT` | Optional; default `3` on Vercel (avoid P2024 pool timeouts) |
+| `DATABASE_POOL_TIMEOUT` | Optional; default `20` seconds |
 | `JWT_SECRET` | Random 64-char hex string |
 | `JWT_REFRESH_SECRET` | Random 64-char hex string |
 | `NODE_ENV` | `production` |

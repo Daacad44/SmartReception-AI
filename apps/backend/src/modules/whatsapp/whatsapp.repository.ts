@@ -4,7 +4,6 @@ export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
     return prisma.whatsAppAccount.findUnique({
       where: { phoneNumberId },
-      include: { business: true },
     });
   }
 
@@ -15,15 +14,11 @@ export class WhatsAppRepository {
     });
   }
 
-  async isEventProcessed(eventId: string): Promise<boolean> {
-    const existing = await prisma.whatsAppWebhookEvent.findUnique({
-      where: { eventId },
-      select: { id: true },
-    });
-    return Boolean(existing);
-  }
-
-  async recordWebhookEvent(eventId: string, eventType: string, businessId?: string) {
+  async tryRecordWebhookEvent(
+    eventId: string,
+    eventType: string,
+    businessId?: string
+  ): Promise<boolean> {
     try {
       await prisma.whatsAppWebhookEvent.create({
         data: { eventId, eventType, businessId },
@@ -85,6 +80,7 @@ export class WhatsAppRepository {
 
   async createInboundMessage(data: {
     conversationId: string;
+    customerId: string;
     content: string;
     whatsappMsgId: string;
     type?: string;
@@ -111,6 +107,11 @@ export class WhatsAppRepository {
           lastMessageAt: new Date(),
           unreadCount: { increment: 1 },
         },
+      });
+
+      await tx.customer.update({
+        where: { id: data.customerId },
+        data: { lastContactAt: new Date() },
       });
 
       return message;

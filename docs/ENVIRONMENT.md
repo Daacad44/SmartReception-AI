@@ -9,8 +9,10 @@ All secrets must be set in `.env` (local) or your hosting provider (Vercel, Rail
 
 | Variable | Where | Description |
 |----------|-------|-------------|
-| `DATABASE_URL` | Backend | Supabase pooler connection (port 6543) |
+| `DATABASE_URL` | Backend | Supabase pooler connection (port 6543, `pgbouncer=true`) |
 | `DIRECT_URL` | Backend | Direct Postgres for migrations (port 5432) |
+| `DATABASE_CONNECTION_LIMIT` | Backend | Prisma pool size per serverless instance (default `3` on Vercel) |
+| `DATABASE_POOL_TIMEOUT` | Backend | Seconds to wait for a pool connection (default `20`) |
 | `JWT_SECRET` | Backend | Access token signing secret |
 | `JWT_REFRESH_SECRET` | Backend | Refresh token signing secret |
 | `RESEND_API_KEY` | Backend | OTP and team invite emails |
