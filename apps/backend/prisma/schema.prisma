@@ -492,6 +492,7 @@ model WhatsAppAccount {
   webhookVerified   Boolean  @default(false)
   phoneNumberStatus String?  @default("unknown")
   webhookStatus     String?  @default("pending")
+  lastWebhookReceivedAt DateTime?
   lastSyncAt        DateTime?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())

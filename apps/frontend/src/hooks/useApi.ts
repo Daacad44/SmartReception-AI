@@ -668,6 +668,22 @@ export function useWhatsAppAccounts() {
   });
 }
 
+export function useWhatsAppWebhookHealth() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-webhook-health'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/webhook-health');
+      return extractData<{
+        verified: boolean;
+        receivingEvents: boolean;
+        lastWebhookReceived: string | null;
+        status: 'verified' | 'pending' | 'not_configured';
+      }>(response);
+    },
+    refetchInterval: 30_000,
+  });
+}
+
 export function useWhatsAppHealth() {
   return useAuthQuery({
     queryKey: ['whatsapp-health'],

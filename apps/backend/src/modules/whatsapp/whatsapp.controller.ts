@@ -28,6 +28,7 @@ export class WhatsAppController {
       const result = whatsappModuleService.verifyWebhook(mode, token, challenge);
       if (result) {
         console.log('[WhatsApp Webhook] Verification succeeded');
+        await whatsappModuleService.recordWebhookVerificationSuccess();
         res.status(200).type('text/plain').send(result);
         return;
       }
@@ -88,6 +89,15 @@ export class WhatsAppController {
     try {
       const accounts = await whatsappModuleService.listAccounts(req.user!.businessId!);
       res.json({ success: true, data: accounts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getWebhookHealth(req: Request, res: Response, next: NextFunction) {
+    try {
+      const health = await whatsappModuleService.getWebhookHealth(req.user!.businessId!);
+      res.json({ success: true, data: health });
     } catch (error) {
       next(error);
     }

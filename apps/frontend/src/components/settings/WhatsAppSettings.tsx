@@ -8,6 +8,7 @@ import {
   useWhatsAppAccounts,
   useWhatsAppWebhookInfo,
   useWhatsAppHealth,
+  useWhatsAppWebhookHealth,
 } from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
@@ -38,6 +39,10 @@ export function WhatsAppSettings() {
   const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } =
     useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
+  const {
+    data: webhookHealth,
+    refetch: refetchWebhookHealth,
+  } = useWhatsAppWebhookHealth();
   const {
     data: health,
     isLoading: healthLoading,
@@ -70,7 +75,14 @@ export function WhatsAppSettings() {
   const handleRefresh = () => {
     refetchAccounts();
     refetchHealth();
+    refetchWebhookHealth();
   };
+
+  const webhookIsVerified =
+    webhookHealth?.verified === true || webhookHealth?.receivingEvents === true;
+  const webhookDisplayStatus = webhookIsVerified
+    ? 'verified'
+    : webhookHealth?.status ?? health?.webhook ?? 'not_configured';
 
   if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
@@ -98,10 +110,10 @@ export function WhatsAppSettings() {
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">Webhook</p>
             <Badge
-              variant={statusBadgeVariant(health?.webhook ?? 'pending')}
+              variant={statusBadgeVariant(webhookDisplayStatus)}
               className="mt-1 capitalize"
             >
-              {formatStatusLabel(health?.webhook ?? 'pending')}
+              {formatStatusLabel(webhookDisplayStatus)}
             </Badge>
           </div>
           <div className="rounded-lg border p-4">

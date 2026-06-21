@@ -25,7 +25,36 @@ export interface WhatsAppHealth {
   envConfigured: boolean;
 }
 
+export interface WhatsAppWebhookHealth {
+  verified: boolean;
+  receivingEvents: boolean;
+  lastWebhookReceived: string | null;
+  status: 'verified' | 'pending' | 'not_configured';
+}
+
 export class WhatsAppModuleService {
+  private isWebhookInfrastructureReady(): boolean {
+    return Boolean(config.whatsapp.verifyToken && config.whatsapp.webhookUrl);
+  }
+
+  private resolveWebhookStatus(input: {
+    webhookVerified: boolean;
+    receivingEvents: boolean;
+    infrastructureReady: boolean;
+  }): WhatsAppWebhookHealth['status'] {
+    if (!input.infrastructureReady) {
+      return 'not_configured';
+    }
+    if (input.webhookVerified || input.receivingEvents) {
+      return 'verified';
+    }
+    return 'pending';
+  }
+
+  async recordWebhookVerificationSuccess(): Promise<void> {
+    console.log('[WhatsApp] Webhook verification successful');
+    await whatsappRepository.markAllActiveWebhooksVerified();
+  }
   verifyWebhookSignature(rawBody: Buffer, signature: string | undefined): boolean {
     const appSecret =
       config.whatsapp.appSecret ||
@@ -65,66 +94,62 @@ export class WhatsAppModuleService {
   }
 
   async recordWebhookReceived(body: Record<string, unknown>): Promise<void> {
-    console.log('[WhatsApp] Meta webhook received');
+    console.log('[WhatsApp] Incoming webhook received');
 
-    if (!config.whatsapp.verifyToken || !config.whatsapp.webhookUrl) {
+    if (!this.isWebhookInfrastructureReady()) {
       return;
     }
 
     const parsed = parseWebhookBody(body);
     const phoneNumberId = parsed.phoneNumberId ?? config.whatsapp.phoneNumberId;
-    if (!phoneNumberId) {
-      logger.debug('Webhook received without phone_number_id');
-      return;
-    }
+    const account = await whatsappRepository.resolveAccountForWebhook(phoneNumberId);
 
-    const account = await whatsappRepository.findAccountByPhoneNumberId(phoneNumberId);
     if (!account) {
-      logger.warn(`No WhatsApp account found for phone_number_id: ${phoneNumberId}`);
+      logger.warn('Webhook received but no active WhatsApp account could be resolved');
       return;
     }
 
-    await whatsappRepository.markWebhookVerified(phoneNumberId);
+    await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+    await whatsappRepository.markWebhookVerified(account.phoneNumberId);
 
     const syncData: {
       webhookStatus: string;
+      webhookVerified: boolean;
       phoneNumberStatus?: string;
-      displayName?: string;
-    } = { webhookStatus: 'verified' };
+      phoneNumber?: string;
+      lastWebhookReceivedAt: Date;
+    } = {
+      webhookStatus: 'verified',
+      webhookVerified: true,
+      lastWebhookReceivedAt: new Date(),
+    };
 
     if (parsed.displayPhoneNumber) {
       syncData.phoneNumberStatus = 'active';
+      syncData.phoneNumber = parsed.displayPhoneNumber;
       console.log('[WhatsApp] Phone active');
-      await whatsappRepository.syncAccountHealth(phoneNumberId, {
-        ...syncData,
-        phoneNumber: parsed.displayPhoneNumber,
-      });
-      return;
     }
 
-    await whatsappRepository.syncAccountHealth(phoneNumberId, syncData);
+    await whatsappRepository.syncAccountHealth(account.phoneNumberId, syncData);
   }
 
   async processWebhook(body: Record<string, unknown>) {
     const parsed = parseWebhookBody(body);
-    const phoneNumberId = parsed.phoneNumberId;
+    const phoneNumberId = parsed.phoneNumberId ?? config.whatsapp.phoneNumberId;
+    const account = await whatsappRepository.resolveAccountForWebhook(phoneNumberId);
 
-    if (!phoneNumberId) {
-      logger.debug('Webhook received without phone_number_id');
-      return;
-    }
-
-    const account = await whatsappRepository.findAccountByPhoneNumberId(phoneNumberId);
     if (!account) {
-      logger.warn(`No WhatsApp account found for phone_number_id: ${phoneNumberId}`);
+      logger.warn(`No WhatsApp account found for phone_number_id: ${phoneNumberId ?? 'unknown'}`);
       return;
     }
+
+    await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
 
     if (!account.webhookVerified) {
-      await whatsappRepository.markWebhookVerified(phoneNumberId);
+      await whatsappRepository.markWebhookVerified(account.phoneNumberId);
     }
 
-    await whatsappRepository.updateAccountSync(phoneNumberId, {
+    await whatsappRepository.updateAccountSync(account.phoneNumberId, {
       webhookStatus: 'verified',
     });
 
@@ -248,13 +273,44 @@ export class WhatsAppModuleService {
       }
     }
 
-    await whatsappRepository.markWebhookVerified(phoneNumberId);
+    await whatsappRepository.markWebhookVerified(account.phoneNumberId);
+  }
+
+  async getWebhookHealth(businessId: string): Promise<WhatsAppWebhookHealth> {
+    const account = await whatsappRepository.findAccountByBusiness(businessId);
+    const infrastructureReady = this.isWebhookInfrastructureReady();
+    const lastWebhookReceivedAt = await whatsappRepository.getLastWebhookReceived(businessId);
+    const hasStoredEvents = await whatsappRepository.hasWebhookActivity(businessId);
+    const receivingEvents = Boolean(lastWebhookReceivedAt || hasStoredEvents);
+    const webhookVerified = Boolean(account?.webhookVerified || receivingEvents);
+
+    let status = this.resolveWebhookStatus({
+      webhookVerified,
+      receivingEvents,
+      infrastructureReady,
+    });
+
+    if (account?.isActive && status === 'verified') {
+      await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
+        webhookStatus: 'verified',
+        webhookVerified: true,
+        lastWebhookReceivedAt: lastWebhookReceivedAt ?? undefined,
+      });
+    }
+
+    return {
+      verified: status === 'verified',
+      receivingEvents,
+      lastWebhookReceived: lastWebhookReceivedAt?.toISOString() ?? null,
+      status,
+    };
   }
 
   async getHealth(businessId: string): Promise<WhatsAppHealth> {
     const account = await whatsappRepository.findAccountByBusiness(businessId);
     const verifyTokenConfigured = Boolean(config.whatsapp.verifyToken);
     const webhookEndpointConfigured = Boolean(config.whatsapp.webhookUrl);
+    const infrastructureReady = verifyTokenConfigured && webhookEndpointConfigured;
     const envConfigured = Boolean(
       config.whatsapp.accessToken && config.whatsapp.phoneNumberId
     );
@@ -262,7 +318,7 @@ export class WhatsAppModuleService {
     if (!account?.isActive) {
       return {
         connection: 'disconnected',
-        webhook: verifyTokenConfigured && webhookEndpointConfigured ? 'pending' : 'not_configured',
+        webhook: infrastructureReady ? 'pending' : 'not_configured',
         phoneStatus: 'unknown',
         phoneNumber: null,
         phoneNumberId: null,
@@ -297,20 +353,8 @@ export class WhatsAppModuleService {
       }
     }
 
-    const hasWebhookActivity =
-      account.webhookVerified || (await whatsappRepository.hasWebhookActivity(businessId));
-
-    let webhook: WhatsAppHealth['webhook'];
-    if (hasWebhookActivity && verifyTokenConfigured && webhookEndpointConfigured) {
-      if (!account.webhookVerified) {
-        await whatsappRepository.markWebhookVerified(account.phoneNumberId);
-      }
-      webhook = 'verified';
-    } else if (verifyTokenConfigured && webhookEndpointConfigured) {
-      webhook = 'pending';
-    } else {
-      webhook = 'not_configured';
-    }
+    const webhookHealth = await this.getWebhookHealth(businessId);
+    const webhook = webhookHealth.status;
 
     const synced = await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
       webhookStatus: webhook,
@@ -318,6 +362,9 @@ export class WhatsAppModuleService {
       phoneNumberStatus: phoneStatus,
       phoneNumber,
       wabaId: wabaId ?? undefined,
+      lastWebhookReceivedAt: webhookHealth.lastWebhookReceived
+        ? new Date(webhookHealth.lastWebhookReceived)
+        : undefined,
     });
 
     console.log('[WhatsApp] Health check successful');
