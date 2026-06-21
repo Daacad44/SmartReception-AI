@@ -135,13 +135,43 @@ export class WhatsAppRepository {
   }
 
   async markWebhookVerified(phoneNumberId: string) {
+    console.log('[WhatsApp] Webhook verified');
     return prisma.whatsAppAccount.update({
       where: { phoneNumberId },
       data: { webhookVerified: true, webhookStatus: 'verified', lastSyncAt: new Date() },
     });
   }
 
+  async hasWebhookActivity(businessId: string): Promise<boolean> {
+    const event = await prisma.whatsAppWebhookEvent.findFirst({
+      where: { businessId },
+      select: { id: true },
+    });
+    return Boolean(event);
+  }
+
+  async syncAccountHealth(
+    phoneNumberId: string,
+    data: {
+      phoneNumber?: string;
+      phoneNumberStatus?: string;
+      displayName?: string;
+      wabaId?: string;
+      webhookStatus?: string;
+      webhookVerified?: boolean;
+    }
+  ) {
+    return prisma.whatsAppAccount.update({
+      where: { phoneNumberId },
+      data: {
+        ...data,
+        lastSyncAt: new Date(),
+      },
+    });
+  }
+
   async updateAccountSync(phoneNumberId: string, data: {
+    phoneNumber?: string;
     phoneNumberStatus?: string;
     displayName?: string;
     webhookStatus?: string;

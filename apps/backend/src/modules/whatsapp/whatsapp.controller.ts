@@ -58,6 +58,10 @@ export class WhatsAppController {
 
       res.status(200).send('EVENT_RECEIVED');
 
+      whatsappModuleService.recordWebhookReceived(req.body).catch((error) => {
+        logger.error('WhatsApp webhook receipt recording error:', error);
+      });
+
       whatsappModuleService.processWebhook(req.body).catch((error) => {
         logger.error('WhatsApp webhook processing error:', error);
       });
@@ -84,6 +88,15 @@ export class WhatsAppController {
     try {
       const accounts = await whatsappModuleService.listAccounts(req.user!.businessId!);
       res.json({ success: true, data: accounts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHealth(req: Request, res: Response, next: NextFunction) {
+    try {
+      const health = await whatsappModuleService.getHealth(req.user!.businessId!);
+      res.json({ success: true, data: health });
     } catch (error) {
       next(error);
     }
