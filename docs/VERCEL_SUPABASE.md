@@ -59,6 +59,7 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 | `OPENAI_API_KEY` | OpenAI API key (optional, for AI features) |
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp webhook verify token |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp Cloud API token (optional) |
+| `WHATSAPP_WEBHOOK_URL` | `https://api.somreception.botandev.com/api/v1/webhooks/whatsapp` |
 | `REDIS_URL` | Upstash Redis URL (optional, for background jobs) |
 | `VITE_API_URL` | `/api/v1` |
 | `VITE_SUPABASE_URL` | `https://hlngecipthlecwqozwhe.supabase.co` |
@@ -110,4 +111,4 @@ Browser → Vercel (React SPA + Express API serverless)
 1. Set all environment variables in Vercel
 2. Verify health: `curl https://your-app.vercel.app/health`
 3. Test login: `POST https://your-app.vercel.app/api/v1/auth/login`
-4. Configure WhatsApp webhook URL: `https://your-app.vercel.app/api/v1/whatsapp/webhook`
+4. Configure WhatsApp webhook URL: `https://your-app.vercel.app/api/v1/webhooks/whatsapp`

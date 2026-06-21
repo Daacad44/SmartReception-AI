@@ -48,7 +48,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     C->>WA: Send message
-    WA->>W: POST /whatsapp/webhook
+    WA->>W: POST /api/v1/webhooks/whatsapp
     W->>W: Identify business by phoneNumberId
     W->>DB: Find/create customer & conversation
     W->>DB: Save inbound message
