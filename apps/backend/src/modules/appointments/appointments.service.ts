@@ -13,7 +13,14 @@ import {
   normalizeEmail,
 } from '../../infrastructure/appointments/email-validation';
 import { scheduleAppointmentReminders } from '../../infrastructure/appointments/appointment-scheduler.service';
-import { sendAppointmentConfirmation } from '../../infrastructure/appointments/appointment-notification.service';
+import {
+  sendAppointmentConfirmation,
+  sendAppointmentApproved,
+  sendAppointmentRejected,
+  sendAppointmentRescheduled,
+  sendAppointmentCancelled,
+} from '../../infrastructure/appointments/appointment-notification.service';
+import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
 
 export class AppointmentsService {
   async list(
@@ -62,6 +69,20 @@ export class AppointmentsService {
       include: { user: { select: { id: true, firstName: true, lastName: true } } },
     });
 
+    const appointmentHistory = await prisma.appointment.findMany({
+      where: { businessId, customerId: appointment.customerId, id: { not: id } },
+      orderBy: { startTime: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        startTime: true,
+        endTime: true,
+        serviceRequested: true,
+      },
+    });
+
     return {
       ...appointment,
       communicationHistory: {
@@ -75,6 +96,11 @@ export class AppointmentsService {
             conversationId: c.id,
           }))
         ),
+        appointmentHistory,
+        email: appointment.customer.email
+          ? auditEntries.filter((e) => e.newData && JSON.stringify(e.newData).includes('email'))
+          : [],
+        internalNotes: appointment.internalNotes,
         activity: auditEntries,
       },
     };
@@ -126,6 +152,10 @@ export class AppointmentsService {
       leadSource: input.leadSource || customer.source || 'WHATSAPP',
       assignedToId: input.assignedToId,
       meetingLink: input.meetingLink || undefined,
+      createdById: userId,
+      priority: input.priority,
+      serviceCategory: input.serviceCategory,
+      budget: input.budget,
     });
 
     await scheduleAppointmentReminders({
@@ -246,7 +276,13 @@ export class AppointmentsService {
     id: string,
     action: string,
     userId: string,
-    data?: { assignedToId?: string; startTime?: string; endTime?: string; internalNote?: string }
+    data?: {
+      assignedToId?: string;
+      startTime?: string;
+      endTime?: string;
+      internalNote?: string;
+      rejectionReason?: string;
+    }
   ) {
     const existing = await appointmentsRepository.findById(businessId, id);
     if (!existing) throw new NotFoundError('Appointment not found');
@@ -257,6 +293,10 @@ export class AppointmentsService {
     switch (action) {
       case 'approve':
         status = 'CONFIRMED';
+        break;
+      case 'reject':
+        status = 'CANCELLED';
+        updateData.rejectionReason = data?.rejectionReason || 'Rejected by staff';
         break;
       case 'cancel':
         status = 'CANCELLED';
@@ -295,6 +335,46 @@ export class AppointmentsService {
       });
     }
 
+    if (action === 'approve') {
+      void sendAppointmentApproved(id, businessId).catch(() => undefined);
+      await notifyAppointment(businessId, 'Appointment approved', `${appointment.title} was approved`, id, userId);
+      await prisma.notification.create({
+        data: {
+          businessId,
+          userId,
+          type: 'APPOINTMENT_APPROVED',
+          title: 'Appointment approved',
+          message: `${appointment.customer.name}'s appointment was approved`,
+          data: { appointmentId: id },
+        },
+      });
+    } else if (action === 'reject') {
+      void sendAppointmentRejected(id, businessId, data?.rejectionReason).catch(() => undefined);
+      await notifyAppointment(businessId, 'Appointment rejected', `${appointment.title} was rejected`, id, userId);
+    } else if (action === 'reschedule') {
+      void sendAppointmentRescheduled(id, businessId).catch(() => undefined);
+      await scheduleAppointmentReminders({
+        appointmentId: id,
+        businessId,
+        customerPhone: appointment.customer.phone,
+        startTime: appointment.startTime,
+      });
+      await notifyAppointment(businessId, 'Appointment rescheduled', `${appointment.title} was rescheduled`, id, userId);
+    } else if (action === 'cancel') {
+      void sendAppointmentCancelled(id, businessId).catch(() => undefined);
+      await prisma.notification.create({
+        data: {
+          businessId,
+          userId,
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment cancelled',
+          message: `${appointment.customer.name}'s appointment was cancelled`,
+          data: { appointmentId: id },
+        },
+      });
+      await notifyAppointment(businessId, 'Appointment cancelled', `${appointment.title} was cancelled`, id, userId);
+    }
+
     await prisma.auditLog.create({
       data: {
         businessId,
@@ -305,6 +385,8 @@ export class AppointmentsService {
         newData: { action, ...data },
       },
     });
+
+    void broadcastBusinessEvent(businessId, { type: 'appointment', appointmentId: id, action });
 
     return appointment;
   }

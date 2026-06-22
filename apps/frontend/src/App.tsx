@@ -53,6 +53,15 @@ const AuditLogsPage = lazyWithRetry(() =>
 const SuperAdminPage = lazyWithRetry(() =>
   import('@/pages/SuperAdminPage').then((m) => ({ default: m.SuperAdminPage }))
 );
+const BusinessManagementPage = lazyWithRetry(() =>
+  import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
+);
+const UserManagementPage = lazyWithRetry(() =>
+  import('@/pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
+);
+const CampaignsPage = lazyWithRetry(() =>
+  import('@/pages/CampaignsPage').then((m) => ({ default: m.CampaignsPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -161,6 +170,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/campaigns"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['campaigns:read']}>
+                        <CampaignsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
                     path="/knowledge"
                     element={
                       <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
@@ -221,6 +238,22 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <SuperAdminPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/businesses"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <BusinessManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/users"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <UserManagementPage />
                       </PermissionRoute>
                     }
                   />

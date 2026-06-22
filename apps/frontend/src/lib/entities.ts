@@ -74,8 +74,13 @@ export interface Appointment {
   date: string;
   time: string;
   duration: number;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show';
+  status: 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show' | 'missed';
   notes?: string;
+  assignedStaff?: string;
+  assignedToId?: string;
+  customerType?: string;
+  priority?: string;
+  serviceRequested?: string;
 }
 
 export interface KnowledgeDocument {

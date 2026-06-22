@@ -169,6 +169,18 @@ export class CustomersController {
       next(error);
     }
   }
+
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const profile = await customersService.getProfile(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: profile });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const customersController = new CustomersController();

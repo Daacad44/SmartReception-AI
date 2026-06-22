@@ -3,14 +3,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Clock,
-  User,
-  Pencil,
   List,
   CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,17 +44,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
 import type { Appointment } from '@/lib/entities';
 import { AppointmentDetailSheet } from '@/components/appointments/AppointmentDetailSheet';
-import api from '@/lib/api';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-
-const statusColors: Record<string, string> = {
-  confirmed: 'bg-success/10 text-success border-success/20',
-  pending: 'bg-primary/10 text-primary border-primary/20',
-  cancelled: 'bg-danger/10 text-danger border-danger/20',
-  completed: 'bg-muted text-muted-foreground border-border',
-  no_show: 'bg-warning/10 text-warning border-warning/20',
-};
+import { AppointmentCard } from '@/components/appointments/AppointmentCard';
 
 const STATUS_API: Record<Appointment['status'], string> = {
   pending: 'SCHEDULED',
@@ -66,6 +52,7 @@ const STATUS_API: Record<Appointment['status'], string> = {
   cancelled: 'CANCELLED',
   completed: 'COMPLETED',
   no_show: 'NO_SHOW',
+  missed: 'MISSED',
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -95,17 +82,6 @@ export function AppointmentsPage() {
   const [duration, setDuration] = useState('30');
   const [notes, setNotes] = useState('');
   const [detailId, setDetailId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
-
-  const appointmentAction = useMutation({
-    mutationFn: async ({ id, action }: { id: string; action: string }) => {
-      await api.post(`/appointments/${id}/actions`, { action });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      toast.success('Appointment updated');
-    },
-  });
 
   const { data: appointments, isLoading, isError } = useAppointments();
   const { data: customers } = useCustomers();
@@ -265,55 +241,32 @@ export function AppointmentsPage() {
     </div>
   );
 
-  const AppointmentCard = ({ apt, compact }: { apt: Appointment; compact?: boolean }) => (
-    <div className={cn('rounded-lg border p-3', compact && 'flex items-center gap-3')}>
-      <div className={cn(compact && 'flex-1')}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="flex items-center gap-1 text-sm font-medium">
-            <Clock className="h-3 w-3" />
-            {apt.time}
-          </span>
-          <Badge className={`text-[10px] ${statusColors[apt.status] ?? ''}`}>
-            {apt.status.replace('_', ' ')}
-          </Badge>
-        </div>
-        <p className="text-sm font-medium">{apt.service}</p>
-        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <User className="h-3 w-3" />
-          {apt.customerName}
-        </div>
-        {!compact && <p className="text-xs text-muted-foreground mt-1">{apt.duration} min</p>}
-      </div>
-      {apt.status !== 'cancelled' && (
-        <div className={cn('flex gap-1', compact ? '' : 'mt-2')}>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDetailId(apt.id)}>
-            View
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(apt)}>
-            <Pencil className="h-3 w-3 mr-1" />
-            Edit
-          </Button>
+  const AppointmentCardWrapper = ({ apt, compact }: { apt: Appointment; compact?: boolean }) => (
+    <AppointmentCard
+      appointment={apt}
+      compact={compact}
+      onView={setDetailId}
+      onEdit={openEdit}
+      actions={
+        apt.status !== 'cancelled' ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-xs">Status</Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs">Status</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {(['confirmed', 'completed', 'no_show'] as const).map((s) => (
+              {(['confirmed', 'completed', 'no_show', 'missed'] as const).map((s) => (
                 <DropdownMenuItem key={s} onClick={() => updateStatus(apt, s)}>
                   Mark {s.replace('_', ' ')}
                 </DropdownMenuItem>
               ))}
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => cancelAppointment.mutate(apt.id)}
-              >
+              <DropdownMenuItem className="text-destructive" onClick={() => cancelAppointment.mutate(apt.id)}>
                 Cancel
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      )}
-    </div>
+        ) : undefined
+      }
+    />
   );
 
   return (
@@ -410,7 +363,7 @@ export function AppointmentsPage() {
                       </span>
                     </div>
                     <div className="flex-1">
-                      <AppointmentCard apt={apt} />
+                      <AppointmentCardWrapper apt={apt} />
                     </div>
                   </div>
                 ))}
@@ -482,7 +435,7 @@ export function AppointmentsPage() {
                 ) : (
                   <div className="space-y-3">
                     {selectedAppointments.map((apt) => (
-                      <AppointmentCard key={apt.id} apt={apt} />
+                      <AppointmentCardWrapper key={apt.id} apt={apt} />
                     ))}
                   </div>
                 )}
@@ -496,9 +449,6 @@ export function AppointmentsPage() {
         appointmentId={detailId}
         open={Boolean(detailId)}
         onClose={() => setDetailId(null)}
-        onAction={(action) => {
-          if (detailId) appointmentAction.mutate({ id: detailId, action });
-        }}
       />
     </div>
   );

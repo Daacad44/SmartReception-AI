@@ -183,3 +183,144 @@ export async function processMissedAppointments(): Promise<void> {
     await sendMissedAppointmentNotification(appt.id, appt.businessId);
   }
 }
+
+async function sendWhatsAppToCustomer(
+  appointment: NonNullable<Awaited<ReturnType<typeof loadAppointment>>>,
+  content: string
+): Promise<boolean> {
+  const whatsappAccount = appointment.business.whatsappAccounts[0];
+  if (!whatsappAccount) return false;
+
+  const phone = appointment.customer.whatsappNumber || appointment.customer.phone;
+  const result = await whatsappService.sendOutbound({
+    phoneNumberId: whatsappAccount.phoneNumberId,
+    to: phone,
+    accessToken: whatsappAccount.accessToken || undefined,
+    type: 'TEXT',
+    content,
+  });
+  return result.success;
+}
+
+export async function sendAppointmentApproved(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  const appointment = await loadAppointment(appointmentId, businessId);
+  if (!appointment) return;
+
+  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
+  const customerName = appointment.customer.name;
+
+  const waMessage = `Mahadsanid ${customerName}.
+
+Ballantaadii waa la aqbalay.
+
+Fadlan waqtiga nala ilaali si aan kuu siino adeegga ugu wanaagsan.
+
+Taariikh:
+${date}
+
+Saacad:
+${time}
+
+Haddii aad u baahan tahay isbeddel fadlan nala soo xiriir.`;
+
+  await sendWhatsAppToCustomer(appointment, waMessage);
+
+  if (appointment.customer.email) {
+    const serviceName =
+      appointment.serviceRequested || appointment.service?.name || appointment.title;
+    const { subject, html } = appointmentConfirmationEmail({
+      customerName,
+      serviceName,
+      date,
+      time,
+      meetingLink: appointment.meetingLink || undefined,
+      details: appointment.additionalNotes || appointment.description || undefined,
+    });
+    await emailService.send(appointment.customer.email, subject, html);
+  }
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { confirmationSentAt: new Date() },
+  });
+}
+
+export async function sendAppointmentRejected(
+  appointmentId: string,
+  businessId: string,
+  reason?: string
+): Promise<void> {
+  const appointment = await loadAppointment(appointmentId, businessId);
+  if (!appointment) return;
+
+  const waMessage = `Mahadsanid ${appointment.customer.name}.
+
+Waan ka xunnahay, ballantaadii lama aqbali karin${reason ? `.\n\nSababta: ${reason}` : '.'}
+
+Fadlan nala soo xiriir si aad waqti kale u ballansato.`;
+
+  await sendWhatsAppToCustomer(appointment, waMessage);
+}
+
+export async function sendAppointmentRescheduled(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  const appointment = await loadAppointment(appointmentId, businessId);
+  if (!appointment) return;
+
+  const serviceName =
+    appointment.serviceRequested || appointment.service?.name || appointment.title;
+  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
+
+  const waMessage = `Mahadsanid ${appointment.customer.name}.
+
+Ballantaadii waa la beddelay.
+
+Adeegga: ${serviceName}
+Taariikh: ${date}
+Saacad: ${time}
+
+Fadlan waqtiga cusub nala ilaali.`;
+
+  await sendWhatsAppToCustomer(appointment, waMessage);
+
+  if (appointment.customer.email) {
+    const { subject, html } = appointmentConfirmationEmail({
+      customerName: appointment.customer.name,
+      serviceName,
+      date,
+      time,
+      meetingLink: appointment.meetingLink || undefined,
+      details: 'Your appointment has been rescheduled.',
+    });
+    await emailService.send(appointment.customer.email, subject, html);
+  }
+}
+
+export async function sendAppointmentCancelled(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  const appointment = await loadAppointment(appointmentId, businessId);
+  if (!appointment) return;
+
+  const serviceName =
+    appointment.serviceRequested || appointment.service?.name || appointment.title;
+  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
+
+  const waMessage = `Mahadsanid ${appointment.customer.name}.
+
+Ballantaadii waa la joojiyay.
+
+Adeegga: ${serviceName}
+Taariikh: ${date}
+Saacad: ${time}
+
+Fadlan nala soo xiriir haddii aad rabto inaad waqti cusub ballansato.`;
+
+  await sendWhatsAppToCustomer(appointment, waMessage);
+}

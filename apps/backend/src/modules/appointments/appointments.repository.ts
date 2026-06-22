@@ -33,9 +33,10 @@ export class AppointmentsRepository {
         take: limit,
         orderBy,
         include: {
-          customer: { select: { id: true, name: true, phone: true, email: true, source: true } },
+          customer: { select: { id: true, name: true, phone: true, email: true, source: true, customerType: true, companyName: true, whatsappNumber: true } },
           service: { select: { id: true, name: true, duration: true, price: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+          createdBy: { select: { id: true, firstName: true, lastName: true } },
         },
       }),
       prisma.appointment.count({ where }),
@@ -62,6 +63,7 @@ export class AppointmentsRepository {
         customer: true,
         service: true,
         assignedTo: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
         internalNotes: {
           orderBy: { createdAt: 'desc' },
           include: { createdBy: { select: { id: true, firstName: true, lastName: true } } },
@@ -86,6 +88,10 @@ export class AppointmentsRepository {
       leadSource?: string;
       assignedToId?: string;
       meetingLink?: string;
+      createdById?: string;
+      priority?: string;
+      serviceCategory?: string;
+      budget?: number;
     }
   ) {
     return prisma.appointment.create({
@@ -104,6 +110,10 @@ export class AppointmentsRepository {
         leadSource: data.leadSource,
         assignedToId: data.assignedToId,
         meetingLink: data.meetingLink,
+        createdById: data.createdById,
+        priority: data.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | undefined,
+        serviceCategory: data.serviceCategory,
+        budget: data.budget,
         status: 'SCHEDULED',
       },
       include: {

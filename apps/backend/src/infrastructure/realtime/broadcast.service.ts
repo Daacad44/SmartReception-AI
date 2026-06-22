@@ -37,3 +37,30 @@ export async function broadcastConversationEvent(
     logger.debug('Realtime broadcast failed (non-fatal)', { error, businessId });
   }
 }
+
+export async function broadcastBusinessEvent(
+  businessId: string,
+  payload: {
+    type: 'appointment' | 'campaign' | 'customer' | 'notification';
+    appointmentId?: string;
+    campaignId?: string;
+    customerId?: string;
+    action?: string;
+  }
+): Promise<void> {
+  const client = getAdminClient();
+  if (!client) return;
+
+  try {
+    const channel = client.channel(`business-${businessId}`);
+    await channel.subscribe();
+    await channel.send({
+      type: 'broadcast',
+      event: 'business_update',
+      payload,
+    });
+    await client.removeChannel(channel);
+  } catch (error) {
+    logger.debug('Business broadcast failed (non-fatal)', { error, businessId });
+  }
+}

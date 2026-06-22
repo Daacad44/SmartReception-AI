@@ -18,6 +18,8 @@ export class AuthRepository {
     emailOtpHash?: string;
     emailOtpExpires?: Date;
     emailOtpAttempts?: number;
+    isEmailVerified?: boolean;
+    isSuperAdmin?: boolean;
   }): Promise<User> {
     return prisma.user.create({ data });
   }
@@ -35,7 +37,7 @@ export class AuthRepository {
 
   async createBusinessWithOwner(
     userId: string,
-    businessData: { name: string; slug: string; industry?: string }
+    businessData: { name: string; slug: string; industry?: string; phone?: string }
   ): Promise<{ business: Business; membership: BusinessMember }> {
     return prisma.$transaction(async (tx) => {
       const business = await tx.business.create({
@@ -43,6 +45,7 @@ export class AuthRepository {
           name: businessData.name,
           slug: businessData.slug,
           industry: (businessData.industry as never) || 'OTHER',
+          phone: businessData.phone,
         },
       });
 

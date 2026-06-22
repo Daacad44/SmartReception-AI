@@ -61,6 +61,11 @@ export class CustomersRepository {
       phone: string;
       email?: string | null;
       notes?: string | null;
+      companyName?: string | null;
+      whatsappNumber?: string | null;
+      customerType?: string;
+      leadStatus?: string;
+      customerValue?: number;
       tagIds?: string[];
     }
   ): Promise<Customer> {
@@ -71,6 +76,11 @@ export class CustomersRepository {
         phone: data.phone,
         email: data.email || null,
         notes: data.notes,
+        companyName: data.companyName,
+        whatsappNumber: data.whatsappNumber || data.phone,
+        customerType: data.customerType as never,
+        leadStatus: data.leadStatus as never,
+        customerValue: data.customerValue,
         tags: data.tagIds?.length
           ? { create: data.tagIds.map((tagId) => ({ tagId })) }
           : undefined,

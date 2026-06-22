@@ -18,6 +18,7 @@ export const QUEUE_NAMES = {
   DOCUMENT_PROCESSING: 'document-processing',
   APPOINTMENT_REMINDER: 'appointment-reminder',
   EMAIL: 'email',
+  CAMPAIGN: 'campaign',
 } as const;
 
 let whatsappQueue: Queue | null = null;
@@ -25,6 +26,7 @@ let aiQueue: Queue | null = null;
 let documentQueue: Queue | null = null;
 let reminderQueue: Queue | null = null;
 let emailQueue: Queue | null = null;
+let campaignQueue: Queue | null = null;
 
 export function getWhatsappQueue(): Queue | null {
   const conn = getConnection();
@@ -59,6 +61,13 @@ export function getEmailQueue(): Queue | null {
   if (!conn) return null;
   if (!emailQueue) emailQueue = new Queue(QUEUE_NAMES.EMAIL, conn);
   return emailQueue;
+}
+
+export function getCampaignQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!campaignQueue) campaignQueue = new Queue(QUEUE_NAMES.CAMPAIGN, conn);
+  return campaignQueue;
 }
 
 export interface WhatsAppJobData {
@@ -96,6 +105,11 @@ export interface EmailJobData {
   to: string;
   subject: string;
   html: string;
+}
+
+export interface CampaignJobData {
+  campaignId: string;
+  businessId: string;
 }
 
 export function createWorker<T>(
