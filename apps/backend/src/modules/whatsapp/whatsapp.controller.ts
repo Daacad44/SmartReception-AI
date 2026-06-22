@@ -27,7 +27,7 @@ export class WhatsAppController {
 
       const result = whatsappModuleService.verifyWebhook(mode, token, challenge);
       if (result) {
-        console.log('[WhatsApp Webhook] Verification succeeded');
+        console.log('[WhatsApp] Webhook verification successful');
         await whatsappModuleService.recordWebhookVerificationSuccess();
         res.status(200).type('text/plain').send(result);
         return;
@@ -57,15 +57,13 @@ export class WhatsAppController {
         return;
       }
 
-      res.status(200).send('EVENT_RECEIVED');
-
-      whatsappModuleService.recordWebhookReceived(req.body).catch((error) => {
-        logger.error('WhatsApp webhook receipt recording error:', error);
-      });
-
-      whatsappModuleService.processWebhook(req.body).catch((error) => {
+      try {
+        await whatsappModuleService.handleWebhook(req.body);
+      } catch (error) {
         logger.error('WhatsApp webhook processing error:', error);
-      });
+      }
+
+      res.status(200).send('EVENT_RECEIVED');
     } catch (error) {
       next(error);
     }
@@ -98,6 +96,15 @@ export class WhatsAppController {
     try {
       const health = await whatsappModuleService.getWebhookHealth(req.user!.businessId!);
       res.json({ success: true, data: health });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDebug(req: Request, res: Response, next: NextFunction) {
+    try {
+      const debug = await whatsappModuleService.getDebug(req.user!.businessId!);
+      res.json({ success: true, data: debug });
     } catch (error) {
       next(error);
     }

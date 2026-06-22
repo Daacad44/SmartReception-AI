@@ -1,11 +1,13 @@
 import type {
   ParsedWebhookPayload,
+  WhatsAppWebhookContact,
   WhatsAppWebhookMessage,
   WhatsAppWebhookStatus,
 } from './whatsapp.types';
 
 export function parseWebhookBody(body: Record<string, unknown>): ParsedWebhookPayload {
   const result: ParsedWebhookPayload = {
+    contacts: [],
     messages: [],
     statuses: [],
   };
@@ -23,6 +25,11 @@ export function parseWebhookBody(body: Record<string, unknown>): ParsedWebhookPa
         result.displayPhoneNumber = metadata.display_phone_number;
       }
 
+      const incomingContacts = value.contacts as WhatsAppWebhookContact[] | undefined;
+      if (incomingContacts?.length) {
+        result.contacts.push(...incomingContacts);
+      }
+
       const incomingMessages = value.messages as WhatsAppWebhookMessage[] | undefined;
       if (incomingMessages?.length) {
         result.messages.push(...incomingMessages);
@@ -36,6 +43,24 @@ export function parseWebhookBody(body: Record<string, unknown>): ParsedWebhookPa
   }
 
   return result;
+}
+
+export function resolveContactName(
+  contacts: WhatsAppWebhookContact[],
+  senderPhone: string
+): string | undefined {
+  const normalizedSender = senderPhone.replace(/\D/g, '');
+  const match = contacts.find((contact) => {
+    const waId = contact.wa_id?.replace(/\D/g, '');
+    return waId === normalizedSender;
+  });
+
+  return (
+    match?.profile?.name ??
+    match?.name?.formatted_name ??
+    match?.name?.first_name ??
+    undefined
+  );
 }
 
 export function extractMessageContent(msg: WhatsAppWebhookMessage): {

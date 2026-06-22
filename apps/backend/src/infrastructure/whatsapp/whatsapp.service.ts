@@ -6,7 +6,7 @@ import type { WhatsAppWebhookMessage } from './whatsapp.types';
 import { parseWebhookBody } from './whatsapp-webhook.parser';
 
 export type { WhatsAppWebhookMessage, SendOutboundParams } from './whatsapp.types';
-export { parseWebhookBody, extractMessageContent } from './whatsapp-webhook.parser';
+export { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
 
 const MAX_RETRIES = 3;
 
