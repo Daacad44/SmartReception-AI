@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { SMARTRECEPTION_SYSTEM_PROMPT } from './smartreception-knowledge';
 import { config } from '../../config';
 import { prisma } from '../database/prisma';
 import { logger } from '../../core/logger';
@@ -63,7 +64,7 @@ export class AIService {
       .filter(Boolean)
       .join('\n\n');
 
-    const systemPrompt = aiConfig?.systemPrompt || this.getDefaultSystemPrompt();
+    const systemPrompt = aiConfig?.systemPrompt || SMARTRECEPTION_SYSTEM_PROMPT;
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: 'system',

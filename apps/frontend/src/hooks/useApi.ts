@@ -345,6 +345,8 @@ export function useConversations(params?: { status?: string; search?: string }) 
       }
       return conversations;
     },
+    staleTime: 3_000,
+    refetchInterval: 4_000,
   });
 }
 
@@ -358,6 +360,8 @@ export function useMessages(conversationId: string | null) {
       return (messages as unknown[]).map((m) => transformMessage(m, conversationId!));
     },
     enabled: !!conversationId,
+    staleTime: 0,
+    refetchInterval: 2_000,
   });
 }
 

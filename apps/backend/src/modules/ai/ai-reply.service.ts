@@ -9,6 +9,7 @@ import {
   recordGraphApiError,
 } from '../whatsapp/whatsapp-pipeline-state';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
+import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -66,6 +67,8 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     },
   });
 
+  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
+
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { lastMessageAt: new Date() },
@@ -113,6 +116,8 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
           : undefined,
     },
   });
+
+  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {
     await prisma.conversation.update({

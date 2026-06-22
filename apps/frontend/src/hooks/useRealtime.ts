@@ -18,6 +18,14 @@ export function useBusinessRealtime(userId?: string | null) {
     let channel = supabase.channel(`business-${businessId}`);
 
     channel = channel
+      .on('broadcast', { event: 'conversation_update' }, (payload) => {
+        const convId = (payload.payload as { conversationId?: string })?.conversationId;
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        if (convId) {
+          queryClient.invalidateQueries({ queryKey: ['messages', convId] });
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -118,13 +126,20 @@ export function useBusinessRealtime(userId?: string | null) {
  * so it never collides with the business-wide channel.
  */
 export function useConversationRealtime(conversationId: string | null) {
+  const businessId = useAuthStore((s) => s.currentBusinessId);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const supabase = getSupabase();
     if (!supabase || !conversationId) return;
 
-    const channel = supabase
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
+
+    const messageChannel = supabase
       .channel(`messages-${conversationId}`)
       .on(
         'postgres_changes',
@@ -134,11 +149,7 @@ export function useConversationRealtime(conversationId: string | null) {
           table: 'messages',
           filter: `conversationId=eq.${conversationId}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
+        invalidate
       )
       .on(
         'postgres_changes',
@@ -148,15 +159,24 @@ export function useConversationRealtime(conversationId: string | null) {
           table: 'conversations',
           filter: `id=eq.${conversationId}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-        }
+        invalidate
       )
       .subscribe();
 
+    let businessChannel: ReturnType<typeof supabase.channel> | null = null;
+    if (businessId) {
+      businessChannel = supabase
+        .channel(`business-${businessId}`)
+        .on('broadcast', { event: 'conversation_update' }, (payload) => {
+          const convId = (payload.payload as { conversationId?: string })?.conversationId;
+          if (!convId || convId === conversationId) invalidate();
+        })
+        .subscribe();
+    }
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messageChannel);
+      if (businessChannel) supabase.removeChannel(businessChannel);
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, businessId, queryClient]);
 }

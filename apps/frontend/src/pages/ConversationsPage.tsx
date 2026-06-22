@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversations, useMessages } from '@/hooks/useApi';
 import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
 import { useConversationRealtime } from '@/hooks/useRealtime';
@@ -33,6 +34,18 @@ import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { cn, getInitials, formatRelativeTime } from '@/lib/utils';
+import type { Message } from '@/lib/entities';
+
+function messageStatusLabel(status: Message['status']): string {
+  switch (status) {
+    case 'read':
+      return 'Message read';
+    case 'delivered':
+      return 'Message delivered';
+    default:
+      return 'Message sent';
+  }
+}
 import type { Conversation } from '@/lib/entities';
 
 const statusColors: Record<string, string> = {
@@ -302,17 +315,24 @@ export function ConversationsPage() {
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {msg.sender !== 'customer' && (
-                          <CheckCheck
-                            className={cn(
-                              'h-3 w-3',
-                              msg.status === 'read'
-                                ? 'text-success'
-                                : msg.status === 'delivered'
-                                  ? 'text-muted-foreground'
-                                  : 'text-muted-foreground/60'
-                            )}
-                            aria-label={msg.status}
-                          />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <CheckCheck
+                                  className={cn(
+                                    'h-3 w-3',
+                                    msg.status === 'read'
+                                      ? 'text-success'
+                                      : msg.status === 'delivered'
+                                        ? 'text-muted-foreground'
+                                        : 'text-muted-foreground/60'
+                                  )}
+                                  aria-label={messageStatusLabel(msg.status)}
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{messageStatusLabel(msg.status)}</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
