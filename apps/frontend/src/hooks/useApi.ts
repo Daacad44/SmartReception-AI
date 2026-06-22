@@ -343,6 +343,7 @@ export function useConversations(params?: { status?: string; search?: string }) 
           search: params?.search || undefined,
           status: apiStatus,
         },
+        timeout: ANALYTICS_TIMEOUT,
       });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
@@ -352,8 +353,8 @@ export function useConversations(params?: { status?: string; search?: string }) 
       }
       return conversations;
     },
-    staleTime: 3_000,
-    refetchInterval: 4_000,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
   });
 }
 
@@ -367,8 +368,8 @@ export function useMessages(conversationId: string | null) {
       return (messages as unknown[]).map((m) => transformMessage(m, conversationId!));
     },
     enabled: !!conversationId,
-    staleTime: 0,
-    refetchInterval: 2_000,
+    staleTime: 2_000,
+    refetchInterval: 5_000,
   });
 }
 

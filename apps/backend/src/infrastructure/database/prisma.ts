@@ -37,6 +37,14 @@ function resolveDatabaseUrl(): string | undefined {
       parsed.searchParams.set('pool_timeout', timeout);
     }
 
+    if (!parsed.searchParams.has('connect_timeout')) {
+      parsed.searchParams.set('connect_timeout', process.env.DATABASE_CONNECT_TIMEOUT || '10');
+    }
+
+    if (!parsed.searchParams.has('statement_timeout')) {
+      parsed.searchParams.set('statement_timeout', process.env.DATABASE_STATEMENT_TIMEOUT || '25000');
+    }
+
     return parsed.toString();
   } catch {
     return url;

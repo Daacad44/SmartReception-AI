@@ -1,5 +1,6 @@
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
@@ -72,7 +73,11 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 60_000,
       gcTime: 5 * 60_000,
-      retry: 2,
+      retry: (failureCount, error) => {
+        if (failureCount >= 3) return false;
+        if (axios.isAxiosError(error) && !error.response) return true;
+        return failureCount < 2;
+      },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
       refetchOnWindowFocus: false,
     },

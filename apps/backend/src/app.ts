@@ -115,7 +115,12 @@ export function createApp(): express.Application {
     const storageConfigured = isSupabaseStorageConfigured() || Boolean(process.env.R2_ACCESS_KEY_ID);
 
     try {
-      await prisma.$queryRaw`SELECT 1`;
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('health_check_timeout')), 5000)
+        ),
+      ]);
       res.json({
         status: 'ok',
         database: 'connected',

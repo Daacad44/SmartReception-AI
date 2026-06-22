@@ -23,6 +23,7 @@
     "@smartreception/shared": "*",
     "@supabase/supabase-js": "^2.108.2",
     "@types/speakeasy": "^2.0.10",
+    "@vercel/functions": "^2.2.13",
     "@vercel/node": "^5.8.17",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.34.8",

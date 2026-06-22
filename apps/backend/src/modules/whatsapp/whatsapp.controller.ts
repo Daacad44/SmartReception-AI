@@ -57,15 +57,25 @@ export class WhatsAppController {
         return;
       }
 
-      try {
-        await whatsappModuleService.handleWebhook(req.body);
-      } catch (error) {
-        logger.error('WhatsApp webhook processing error:', error);
-      }
-
+      // Acknowledge Meta immediately — processing AI/DB work in background prevents
+      // 30s Vercel timeouts that exhaust serverless concurrency and block API routes.
       res.status(200).send('EVENT_RECEIVED');
+
+      const processWebhook = () =>
+        whatsappModuleService.handleWebhook(req.body).catch((error) => {
+          logger.error('WhatsApp webhook background processing error:', error);
+        });
+
+      try {
+        const { waitUntil } = await import('@vercel/functions');
+        waitUntil(processWebhook());
+      } catch {
+        void processWebhook();
+      }
     } catch (error) {
-      next(error);
+      if (!res.headersSent) {
+        next(error);
+      }
     }
   }
 

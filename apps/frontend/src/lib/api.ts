@@ -3,13 +3,14 @@ import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const API_TIMEOUT_MS = 30_000;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: API_TIMEOUT_MS,
   withCredentials: true,
 });
 
