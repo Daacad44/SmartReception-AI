@@ -5,7 +5,10 @@ import { logger } from '../../core/logger';
 import {
   recordOutboundAttempt,
   recordOutboundSuccess,
+  recordGraphApiResponse,
+  recordGraphApiError,
 } from '../whatsapp/whatsapp-pipeline-state';
+import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -86,8 +89,17 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   if (sendResult.success && sendResult.whatsappMsgId) {
     recordOutboundSuccess(businessId, aiResponse.content);
+    recordGraphApiResponse(businessId, sendResult.response);
     console.log('[WhatsApp] Reply sent successfully');
+  } else {
+    recordGraphApiError(businessId, sendResult.error);
+    console.error('[WhatsApp] Message failed:', sendResult.error);
   }
+
+  await whatsappRepository.recordGraphApiResult(phoneNumberId, {
+    response: sendResult.response,
+    error: sendResult.error,
+  }).catch((error) => logger.warn('Failed to record Graph API result', { error }));
 
   await prisma.message.update({
     where: { id: outboundMessage.id },

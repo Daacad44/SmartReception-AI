@@ -5,7 +5,10 @@ import type { OutboundMessageType } from '../../infrastructure/whatsapp/whatsapp
 import {
   recordOutboundAttempt,
   recordOutboundSuccess,
+  recordGraphApiResponse,
+  recordGraphApiError,
 } from './whatsapp-pipeline-state';
+import { whatsappRepository } from './whatsapp.repository';
 
 export interface SendConversationMessageParams {
   businessId: string;
@@ -51,14 +54,16 @@ export async function sendConversationMessage(
 
   if (sendResult.success && sendResult.whatsappMsgId) {
     recordOutboundSuccess(businessId, content);
+    recordGraphApiResponse(businessId, sendResult.response);
     console.log('[WhatsApp] Reply sent successfully');
   } else {
-    logger.error('WhatsApp outbound send failed', {
-      messageId,
-      recipient: phoneNumber,
-      error: sendResult.error,
-    });
+    recordGraphApiError(businessId, sendResult.error);
   }
+
+  await whatsappRepository.recordGraphApiResult(phoneNumberId, {
+    response: sendResult.response,
+    error: sendResult.error,
+  }).catch((error) => logger.warn('Failed to record Graph API result', { error }));
 
   await prisma.message.update({
     where: { id: messageId },

@@ -95,29 +95,83 @@ Respond in JSON format:
     ];
 
     try {
-      const completion = await this.getClient().chat.completions.create({
-        model: config.openai.model,
-        messages,
-        temperature: aiConfig?.temperature ?? 0.7,
-        max_tokens: aiConfig?.maxTokens ?? 500,
-        response_format: { type: 'json_object' },
-      });
+      const controller = new AbortController();
+      const timeoutMs = 15000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      const completion = await this.getClient().chat.completions.create(
+        {
+          model: config.openai.model,
+          messages,
+          temperature: aiConfig?.temperature ?? 0.7,
+          max_tokens: aiConfig?.maxTokens ?? 500,
+          response_format: { type: 'json_object' },
+        },
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
 
       const responseText = completion.choices[0]?.message?.content || '{}';
-      const parsed = JSON.parse(responseText) as AIResponse;
+      let parsed: AIResponse;
+      try {
+        parsed = JSON.parse(responseText) as AIResponse;
+      } catch (parseError) {
+        console.error('[AI] Failed to parse JSON response:', responseText.slice(0, 200));
+        logger.error('AI JSON parse failed:', parseError);
+        return {
+          content: aiConfig?.fallbackMessage || 'I apologize, I could not process your request.',
+          intent: 'general',
+          actions: [{ type: 'none' }],
+          confidence: 0.3,
+        };
+      }
 
+      if (!parsed.content?.trim()) {
+        console.warn('[AI] Empty content in AI response');
+        return {
+          content: aiConfig?.fallbackMessage || 'How can I help you today?',
+          intent: parsed.intent || 'general',
+          actions: parsed.actions || [{ type: 'none' }],
+          confidence: parsed.confidence ?? 0.5,
+        };
+      }
+
+      console.log('[WhatsApp] AI response generated');
       return {
-        content: parsed.content || aiConfig?.fallbackMessage || 'I apologize, I could not process your request.',
+        content: parsed.content,
         intent: parsed.intent || 'general',
         actions: parsed.actions || [{ type: 'none' }],
         confidence: parsed.confidence ?? 0.5,
       };
     } catch (error) {
-      logger.error('AI generation failed:', error);
+      const isAbort = error instanceof Error && error.name === 'AbortError';
+      const isMissingKey = error instanceof Error && error.message.includes('API key');
+      const detail = isAbort
+        ? 'OpenAI request timed out after 15s'
+        : error instanceof Error
+          ? error.message
+          : String(error);
+
+      console.error('[AI] Generation failed:', detail);
+      logger.error('AI generation failed:', { detail, isMissingKey, isAbort });
+
+      if (isMissingKey) {
+        return {
+          content:
+            aiConfig?.fallbackMessage ||
+            'Our AI assistant is temporarily unavailable. A team member will respond shortly.',
+          intent: 'general',
+          actions: [{ type: 'none' }],
+          confidence: 0,
+        };
+      }
+
       return {
-        content: aiConfig?.fallbackMessage || 'I apologize, I am having trouble right now. A team member will assist you shortly.',
+        content:
+          aiConfig?.fallbackMessage ||
+          'I apologize, I am having trouble right now. A team member will assist you shortly.',
         intent: 'general',
-        actions: [{ type: 'escalate' }],
+        actions: isAbort ? [{ type: 'none' }] : [{ type: 'escalate' }],
         confidence: 0,
       };
     }

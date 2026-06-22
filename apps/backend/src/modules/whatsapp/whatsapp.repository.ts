@@ -1,4 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
+import { Prisma } from '@prisma/client';
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
@@ -129,7 +130,11 @@ export class WhatsAppRepository {
     });
   }
 
-  async updateMessageStatus(whatsappMsgId: string, status: string) {
+  async updateMessageStatus(
+    whatsappMsgId: string,
+    status: string,
+    errors?: Array<{ code?: number; title?: string; message?: string }>
+  ) {
     const statusMap: Record<string, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = {
       sent: 'SENT',
       delivered: 'DELIVERED',
@@ -139,10 +144,66 @@ export class WhatsAppRepository {
     const mapped = statusMap[status.toLowerCase()];
     if (!mapped) return null;
 
+    const metadataUpdate =
+      errors?.length ?
+        { deliveryErrors: errors, lastStatusUpdate: status, updatedAt: new Date().toISOString() }
+      : undefined;
+
+    const existing = await prisma.message.findFirst({
+      where: { whatsappMsgId },
+      select: { metadata: true },
+    });
+
+    const mergedMetadata =
+      metadataUpdate && existing?.metadata
+        ? { ...(existing.metadata as object), ...metadataUpdate }
+        : metadataUpdate;
+
     return prisma.message.updateMany({
       where: { whatsappMsgId },
-      data: { status: mapped },
+      data: {
+        status: mapped,
+        ...(mergedMetadata ? { metadata: mergedMetadata as object } : {}),
+      },
     });
+  }
+
+  async recordGraphApiResult(
+    phoneNumberId: string,
+    result: { response?: unknown; error?: unknown }
+  ): Promise<void> {
+    await prisma.whatsAppAccount.update({
+      where: { phoneNumberId },
+      data: {
+        lastOutgoingAt: new Date(),
+        lastSyncAt: new Date(),
+        ...(result.response !== undefined
+          ? {
+              lastGraphApiResponse: result.response as Prisma.InputJsonValue,
+              lastGraphApiError: Prisma.DbNull,
+            }
+          : {}),
+        ...(result.error !== undefined
+          ? { lastGraphApiError: result.error as Prisma.InputJsonValue }
+          : {}),
+      },
+    });
+  }
+
+  async validateAccessToken(phoneNumberId: string, accessToken?: string): Promise<boolean> {
+    const token = accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    if (!token) return false;
+
+    try {
+      const apiVersion = process.env.WHATSAPP_API_VERSION || 'v23.0';
+      const response = await fetch(
+        `https://graph.facebook.com/${apiVersion}/${phoneNumberId}?fields=display_phone_number`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   async markWebhookVerified(phoneNumberId: string) {

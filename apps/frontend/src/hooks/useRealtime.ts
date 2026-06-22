@@ -140,6 +140,19 @@ export function useConversationRealtime(conversationId: string | null) {
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+        }
+      )
       .subscribe();
 
     return () => {
