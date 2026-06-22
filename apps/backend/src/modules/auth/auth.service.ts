@@ -402,6 +402,7 @@ export class AuthService {
       lastName: user.lastName,
       avatarUrl: user.avatarUrl,
       isEmailVerified: user.isEmailVerified,
+      isSuperAdmin: user.isSuperAdmin,
       businesses: memberships.map((m) => ({
         id: m.business.id,
         name: m.business.name,

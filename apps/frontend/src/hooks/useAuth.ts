@@ -14,7 +14,7 @@ interface LoginResponse {
     lastName: string;
     avatarUrl?: string | null;
   };
-  businesses: Array<{
+  businesses?: Array<{
     id: string;
     name: string;
     slug: string;
@@ -23,8 +23,61 @@ interface LoginResponse {
     plan?: string;
   }>;
   isSuperAdmin?: boolean;
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
+  requiresTwoFactor?: boolean;
+  tempToken?: string;
+}
+
+function completeAuthLogin(
+  data: LoginResponse,
+  login: (accessToken: string, refreshToken: string, user: UserProfile, isSuperAdmin?: boolean) => void
+) {
+  if (!data.accessToken || !data.refreshToken) {
+    throw new Error('Invalid login response');
+  }
+  const profile = mapLoginToProfile(data);
+  login(data.accessToken, data.refreshToken, profile, data.isSuperAdmin ?? false);
+}
+
+function mapLoginToProfile(data: LoginResponse): UserProfile {
+  const businesses = data.businesses ?? [];
+  const primaryRole = businesses[0]?.role ?? 'AGENT';
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    firstName: data.user.firstName,
+    lastName: data.user.lastName,
+    avatar: data.user.avatarUrl ?? undefined,
+    role: primaryRole,
+    businesses: businesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      industry: b.industry ?? 'OTHER',
+      plan: b.plan ?? 'STARTER',
+      role: b.role,
+    })),
+  };
+}
+
+function mapProfileToUserProfile(data: ProfileResponse): UserProfile {
+  const businesses = data.businesses ?? [];
+  const primaryRole = businesses[0]?.role ?? 'AGENT';
+  return {
+    id: data.id,
+    email: data.email,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    avatar: data.avatarUrl ?? undefined,
+    role: primaryRole,
+    businesses: businesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      industry: b.industry ?? 'OTHER',
+      plan: b.plan ?? 'STARTER',
+      role: b.role,
+    })),
+  };
 }
 
 interface RegisterResponse {
@@ -40,7 +93,8 @@ interface ProfileResponse {
   lastName: string;
   avatarUrl?: string | null;
   isEmailVerified?: boolean;
-  businesses: Array<{
+  isSuperAdmin?: boolean;
+  businesses?: Array<{
     id: string;
     name: string;
     slug: string;
@@ -48,44 +102,6 @@ interface ProfileResponse {
     industry?: string;
     plan?: string;
   }>;
-}
-
-function mapLoginToProfile(data: LoginResponse): UserProfile {
-  const primaryRole = data.businesses[0]?.role ?? 'AGENT';
-  return {
-    id: data.user.id,
-    email: data.user.email,
-    firstName: data.user.firstName,
-    lastName: data.user.lastName,
-    avatar: data.user.avatarUrl ?? undefined,
-    role: primaryRole,
-    businesses: data.businesses.map((b) => ({
-      id: b.id,
-      name: b.name,
-      industry: b.industry ?? 'OTHER',
-      plan: b.plan ?? 'STARTER',
-      role: b.role,
-    })),
-  };
-}
-
-function mapProfileToUserProfile(data: ProfileResponse): UserProfile {
-  const primaryRole = data.businesses[0]?.role ?? 'AGENT';
-  return {
-    id: data.id,
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    avatar: data.avatarUrl ?? undefined,
-    role: primaryRole,
-    businesses: data.businesses.map((b) => ({
-      id: b.id,
-      name: b.name,
-      industry: b.industry ?? 'OTHER',
-      plan: b.plan ?? 'STARTER',
-      role: b.role,
-    })),
-  };
 }
 
 export function useAuth() {
@@ -100,11 +116,20 @@ export function useAuth() {
       return extractData<LoginResponse>(response);
     },
     onSuccess: (data) => {
-      const profile = mapLoginToProfile(data);
-      login(data.accessToken, data.refreshToken, profile, data.isSuperAdmin ?? false);
+      if (data.requiresTwoFactor && data.tempToken) {
+        navigate(`/verify-2fa?tempToken=${encodeURIComponent(data.tempToken)}`);
+        return;
+      }
+      completeAuthLogin(data, login);
       toast.success('Welcome back!');
       const redirect = searchParams.get('redirect');
-      navigate(redirect && redirect.startsWith('/') ? redirect : '/dashboard');
+      const destination =
+        data.isSuperAdmin && !(data.businesses?.length)
+          ? '/super-admin'
+          : redirect && redirect.startsWith('/')
+            ? redirect
+            : '/dashboard';
+      navigate(destination);
     },
     onError: (error, variables) => {
       const message = getErrorMessage(error);
@@ -112,6 +137,23 @@ export function useAuth() {
       if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
         navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
       }
+    },
+  });
+
+  const verifyTwoFactorMutation = useMutation({
+    mutationFn: async ({ tempToken, code }: { tempToken: string; code: string }) => {
+      const response = await api.post('/auth/verify-2fa', { tempToken, code });
+      return extractData<LoginResponse>(response);
+    },
+    onSuccess: (data) => {
+      completeAuthLogin(data, login);
+      toast.success('Welcome back!');
+      const destination =
+        data.isSuperAdmin && !(data.businesses?.length) ? '/super-admin' : '/dashboard';
+      navigate(destination);
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -216,6 +258,7 @@ export function useAuth() {
     user,
     isAuthenticated,
     login: loginMutation.mutate,
+    verifyTwoFactorLogin: verifyTwoFactorMutation.mutate,
     register: registerMutation.mutate,
     verifyOtp: verifyOtpMutation.mutate,
     resendOtp: resendOtpMutation.mutate,
@@ -223,6 +266,7 @@ export function useAuth() {
     resetPassword: resetPasswordMutation.mutate,
     logout,
     isLoggingIn: loginMutation.isPending,
+    isVerifyingTwoFactor: verifyTwoFactorMutation.isPending,
     isRegistering: registerMutation.isPending,
     isVerifyingOtp: verifyOtpMutation.isPending,
     isResendingOtp: resendOtpMutation.isPending,

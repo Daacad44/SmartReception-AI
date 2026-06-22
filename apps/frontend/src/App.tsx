@@ -11,6 +11,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
+import { TwoFactorLoginPage } from '@/pages/TwoFactorLoginPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
@@ -112,6 +113,7 @@ export default function App() {
                   }
                 />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/verify-2fa" element={<TwoFactorLoginPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
                 <Route

@@ -57,14 +57,14 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           refreshToken,
           user,
-          businesses: user.businesses.map((b) => ({
+          businesses: (user.businesses ?? []).map((b) => ({
             id: b.id,
             name: b.name,
             industry: b.industry,
             plan: b.plan,
             role: b.role,
           })),
-          currentBusinessId: user.businesses[0]?.id ?? null,
+          currentBusinessId: user.businesses?.[0]?.id ?? null,
           isAuthenticated: true,
           isSuperAdmin,
           hasHydrated: true,
@@ -92,6 +92,7 @@ export const useAuthStore = create<AuthState>()(
         businesses: state.businesses,
         currentBusinessId: state.currentBusinessId,
         isAuthenticated: state.isAuthenticated,
+        isSuperAdmin: state.isSuperAdmin,
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error && state?.isAuthenticated && !state.accessToken) {
