@@ -1,21 +1,11 @@
 /** SmartReception AI — Somali-first company knowledge for AI receptionist and KB seeding. */
 
+import { SMARTRECEPTION_SERVICE_MENU } from './somali-menu';
+
 export const GEMINI_ERROR_MESSAGE_SO =
   'Mahadsanid fariintaada. Waqtigan AI-ga waxaa ku dhacay cilad ku meel gaar ah. Fadlan sug wax yar ama la xiriir kooxdayada taageerada.';
 
-export const SMARTRECEPTION_WELCOME_SO = `Ku soo dhawoow SmartReception AI.
-
-Waxaan bixinaa adeegyada:
-
-• AI Receptionist
-• WhatsApp Automation
-• Appointment Systems
-• CRM Solutions
-• Website Development
-• Mobile App Development
-• Custom Software Development
-
-Sideen kuu caawin karnaa maanta?`;
+export const SMARTRECEPTION_WELCOME_SO = SMARTRECEPTION_SERVICE_MENU;
 
 export const SMARTRECEPTION_WELCOME_EN = `Welcome to SmartReception AI.
 
@@ -32,6 +22,8 @@ We provide:
 How can we help you today?`;
 
 export const SMARTRECEPTION_WELCOME_MESSAGE = SMARTRECEPTION_WELCOME_SO;
+
+export { SMARTRECEPTION_SERVICE_MENU } from './somali-menu';
 
 export const LEAD_THANK_YOU_SO =
   'Mahadsanid. Kooxdayadu waxay kula soo xiriiri doontaa dhawaan.';
@@ -90,9 +82,10 @@ SOMALI PHRASES YOU MUST UNDERSTAND:
 - "software ma samaysaan" → yes, custom software and SaaS platforms
 
 LANGUAGE RULES:
-- Somali message → reply in Somali
-- English message → reply in English
-- Mixed → reply naturally in both
+- DEFAULT: Always reply in Somali (Af-Soomaali)
+- English ONLY when customer explicitly requests English (e.g. "in English", "English please")
+- Never send generic fallback messages
+- Always end service answers with contact: WhatsApp +25268776299
 
 Never expose API errors. Never invent exact pricing — offer tailored quote.
 Keep WhatsApp messages concise and professional.`;

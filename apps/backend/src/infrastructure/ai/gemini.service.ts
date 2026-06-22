@@ -5,10 +5,16 @@ import { logger } from '../../core/logger';
 import {
   GEMINI_ERROR_MESSAGE_SO,
   SMARTRECEPTION_SYSTEM_PROMPT,
-  detectMessageLanguage,
 } from './smartreception-knowledge';
+import { CONTACT_FOOTER_SO } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
+import { requestsEnglish } from './somali-menu';
+
+export interface GenerateResponseOptions {
+  /** Reply in English only when customer explicitly requested it. */
+  preferEnglish?: boolean;
+}
 
 const CHAT_MODEL = 'gemini-2.5-flash';
 const EMBEDDING_MODEL = 'gemini-embedding-001';
@@ -37,26 +43,25 @@ function getChatModel(generationConfig?: Record<string, unknown>): GenerativeMod
   });
 }
 
-function buildLanguageInstruction(language: 'so' | 'en' | 'mixed'): string {
-  if (language === 'so') {
-    return 'Customer wrote in Somali. Reply ONLY in Somali (Af-Soomaali).';
+function buildLanguageInstruction(preferEnglish: boolean): string {
+  if (preferEnglish) {
+    return 'Customer explicitly requested English. Reply ONLY in English.';
   }
-  if (language === 'en') {
-    return 'Customer wrote in English. Reply ONLY in English.';
-  }
-  return 'Customer used mixed Somali-English. Reply naturally using both languages as appropriate.';
+  return 'ALWAYS reply ONLY in Somali (Af-Soomaali). Never use English unless the customer explicitly asked for English.';
 }
 
 export async function generateResponse(
   businessId: string,
   conversationId: string,
-  customerMessage: string
+  customerMessage: string,
+  options: GenerateResponseOptions = {}
 ): Promise<AIResponse> {
+  const preferEnglish = options.preferEnglish === true;
+  const language = preferEnglish ? 'en' : 'so';
   const aiConfig = await prisma.aIConfiguration.findUnique({
     where: { businessId },
   });
 
-  const language = detectMessageLanguage(customerMessage);
   const knowledgeContext = await searchKnowledgeContext(businessId, customerMessage);
 
   const conversationHistory = await prisma.message.findMany({
@@ -76,21 +81,21 @@ export async function generateResponse(
 
   const prompt = `${systemPrompt}
 
-${buildLanguageInstruction(language)}
+${buildLanguageInstruction(preferEnglish)}
 
 CRITICAL — ANSWER PRIORITY (follow strictly):
 1. KNOWLEDGE BASE excerpts below (primary — never contradict them)
 2. FAQ content in knowledge base
-3. Business settings / system prompt company facts
-4. Only if nothing above applies, use careful reasoning
+3. SmartReception service menu facts
+4. Only if nothing above applies, politely ask for more information in Somali
 
-${hasKnowledge ? 'You MUST answer using the KNOWLEDGE BASE below. Do NOT use general world knowledge when KB has the answer.' : 'No KB excerpts matched — use SmartReception company facts from the system prompt.'}
+${hasKnowledge ? 'You MUST answer using the KNOWLEDGE BASE below. Do NOT use general world knowledge when KB has the answer.' : 'No KB excerpts matched — use SmartReception company facts. If unsure, ask the customer for more details politely in Somali.'}
 
 KNOWLEDGE BASE EXCERPTS:
 ${knowledgeContext || '(none indexed)'}
 
 LEAD COLLECTION:
-If customer shows buying intent for any service, collect: Full Name, Business Name, Phone, Email, Service Required.
+If customer shows buying intent or selected pricing (option 8), collect: Full Name, Business Name, Phone, Email, Service Required.
 Ask one or two fields at a time. When all fields collected, set action collect_lead with complete:true.
 
 CONVERSATION HISTORY:
@@ -101,17 +106,20 @@ ${customerMessage}
 
 Respond in JSON only:
 {
-  "content": "your WhatsApp reply",
+  "content": "your WhatsApp reply in Somali",
   "intent": "support|booking|lead|pricing|services|general",
   "actions": [{"type": "none"}],
   "confidence": 0.0-1.0,
-  "language": "so|en|mixed"
+  "language": "so"
 }
 
 Action types: none, collect_lead, book_appointment, qualify_lead, escalate
 For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
 
-Never say "I am having trouble right now" unless Gemini truly failed. Be specific using KB facts.`;
+RULES:
+- Never say "I am having trouble right now" or generic fallbacks
+- End service-related answers with contact: WhatsApp +25268776299
+- Be specific using KB facts`;
 
   try {
     const model = getChatModel({ temperature: aiConfig?.temperature ?? 0.7 });
@@ -134,7 +142,7 @@ Never say "I am having trouble right now" unless Gemini truly failed. Be specifi
 
     if (!parsed.content?.trim()) {
       return {
-        content: language === 'en'
+        content: preferEnglish
           ? 'How can I help you today?'
           : 'Sideen kuu caawin karnaa maanta?',
         intent: parsed.intent || 'general',
@@ -144,9 +152,17 @@ Never say "I am having trouble right now" unless Gemini truly failed. Be specifi
       };
     }
 
+    let content = parsed.content;
+    if (
+      !preferEnglish &&
+      !content.includes('+25268776299') &&
+      ['services', 'pricing', 'general', 'support', 'lead'].includes(parsed.intent || 'general')
+    ) {
+      content = `${content}\n\n${CONTACT_FOOTER_SO}`;
+    }
     console.log('[AI] Response generated (Gemini)');
     return {
-      content: parsed.content,
+      content,
       intent: parsed.intent || 'general',
       actions: parsed.actions || [{ type: 'none' }],
       confidence: parsed.confidence ?? 0.7,
@@ -195,9 +211,9 @@ export async function extractKnowledge(text: string): Promise<string> {
 export async function answerQuestion(question: string, context: string): Promise<string> {
   try {
     const model = getChatModel();
-    const lang = detectMessageLanguage(question);
+    const preferEnglish = requestsEnglish(question);
     const result = await model.generateContent(
-      `${buildLanguageInstruction(lang)}\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer concisely for WhatsApp.`
+      `${buildLanguageInstruction(preferEnglish)}\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer concisely for WhatsApp.`
     );
     return result.response.text()?.trim() || GEMINI_ERROR_MESSAGE_SO;
   } catch {
