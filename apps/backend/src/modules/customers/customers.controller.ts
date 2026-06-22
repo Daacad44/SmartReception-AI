@@ -26,7 +26,14 @@ export class CustomersController {
     try {
       const params = paginationSchema.parse(req.query);
       const tagId = req.query.tagId as string | undefined;
-      const result = await customersService.list(req.user!.businessId!, { ...params, tagId });
+      const customerType = req.query.customerType as string | undefined;
+      const segmentId = req.query.segmentId as string | undefined;
+      const result = await customersService.list(req.user!.businessId!, {
+        ...params,
+        tagId,
+        customerType,
+        segmentId,
+      });
       res.json({ success: true, data: result.data, meta: result.meta });
     } catch (error) {
       next(error);

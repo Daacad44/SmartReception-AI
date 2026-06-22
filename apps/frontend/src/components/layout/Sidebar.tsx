@@ -16,6 +16,7 @@ import {
   Building2,
   Megaphone,
   Crown,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +29,9 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const },
   { to: '/customers', icon: Users, label: 'Customers' },
+  { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
-  { to: '/campaigns', icon: Megaphone, label: 'Campaigns', permission: 'campaigns:read' as const },
+  { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
   { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },

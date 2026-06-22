@@ -129,8 +129,10 @@ enum CustomerType {
   NEW_CUSTOMER
   RETURNING
   HIGH_VALUE
+  PREMIUM
   INACTIVE
   LEAD
+  PROSPECT
 }
 
 enum AppointmentPriority {
@@ -164,6 +166,14 @@ enum CampaignSchedule {
   DAILY
   WEEKLY
   MONTHLY
+  CUSTOM
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum CampaignStatus {
@@ -236,6 +246,8 @@ model Business {
   teamInvitations   TeamInvitation[]
   customerSegments  CustomerSegment[]
   campaigns         Campaign[]
+  messageTemplates  MessageTemplate[]
+  customerImportJobs CustomerImportJob[]
 
   @@index([slug])
   @@index([isActive])
@@ -281,6 +293,7 @@ model User {
   appointmentNotes    AppointmentInternalNote[] @relation("AppointmentNoteAuthor")
   createdAppointments Appointment[]           @relation("AppointmentCreator")
   createdCampaigns    Campaign[]              @relation("CampaignCreator")
+  createdImportJobs   CustomerImportJob[]     @relation("ImportJobCreator")
   auditLogs           AuditLog[]
   notifications       Notification[]
 
@@ -353,6 +366,9 @@ model Customer {
   whatsappId    String?
   whatsappNumber String?
   companyName   String?
+  address       String?
+  city          String?
+  country       String?
   notes         String?
   source        String?
   customerType  CustomerType @default(REGULAR)
@@ -608,7 +624,9 @@ model Campaign {
   schedule       CampaignSchedule @default(ONE_TIME)
   status         CampaignStatus   @default(DRAFT)
   segmentId      String?
+  templateId     String?
   customerTypes  CustomerType[]
+  sendToAll      Boolean          @default(false)
   scheduledAt    DateTime?
   nextRunAt      DateTime?
   lastRunAt      DateTime?
@@ -617,11 +635,14 @@ model Campaign {
   deliveredCount Int              @default(0)
   failedCount    Int              @default(0)
   readCount      Int              @default(0)
+  responseCount  Int              @default(0)
+  linkClickCount Int              @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   segment    CustomerSegment?    @relation(fields: [segmentId], references: [id])
+  template   MessageTemplate?    @relation(fields: [templateId], references: [id])
   createdBy  User?               @relation("CampaignCreator", fields: [createdById], references: [id])
   recipients CampaignRecipient[]
 
@@ -629,6 +650,7 @@ model Campaign {
   @@index([businessId, status])
   @@index([scheduledAt])
   @@index([nextRunAt])
+  @@index([templateId])
   @@map("campaigns")
 }
 
@@ -642,6 +664,8 @@ model CampaignRecipient {
   sentAt        DateTime?
   deliveredAt   DateTime?
   readAt        DateTime?
+  respondedAt   DateTime?
+  clickedAt     DateTime?
   failedReason  String?
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
@@ -654,6 +678,48 @@ model CampaignRecipient {
   @@index([customerId])
   @@index([status])
   @@map("campaign_recipients")
+}
+
+model MessageTemplate {
+  id          String       @id @default(uuid())
+  businessId  String
+  name        String
+  content     String
+  type        CampaignType @default(MARKETING)
+  isSystem    Boolean      @default(false)
+  variables   String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  business  Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("message_templates")
+}
+
+model CustomerImportJob {
+  id             String          @id @default(uuid())
+  businessId     String
+  fileName       String
+  fileType       String
+  status         ImportJobStatus @default(PENDING)
+  totalRows      Int             @default(0)
+  importedCount  Int             @default(0)
+  duplicateCount Int             @default(0)
+  invalidCount   Int             @default(0)
+  report         Json?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  completedAt    DateTime?
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("ImportJobCreator", fields: [createdById], references: [id])
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@map("customer_import_jobs")
 }
 
 // ─── KNOWLEDGE BASE ──────────────────────────────────────────────────────────

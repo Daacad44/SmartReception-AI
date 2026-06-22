@@ -37,11 +37,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   useCustomers,
   useCustomerTags,
   useCustomerNotes,
   useCustomerTimeline,
   useCustomerInsights,
+  useSegments,
 } from '@/hooks/useApi';
 import {
   useCreateCustomer,
@@ -63,10 +67,13 @@ const statusVariant: Record<string, 'success' | 'warning' | 'accent' | 'secondar
   inactive: 'secondary',
 };
 
+const CUSTOMER_TYPES = ['All', 'VIP', 'REGULAR', 'NEW_CUSTOMER', 'RETURNING', 'PREMIUM', 'HIGH_VALUE', 'LEAD', 'PROSPECT', 'INACTIVE'];
+
 export function CustomersPage() {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [typeFilter, setTypeFilter] = useState<string>('All');
   const [tagFilter, setTagFilter] = useState<string>('All');
+  const [segmentFilter, setSegmentFilter] = useState<string>('All');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
@@ -74,8 +81,16 @@ export function CustomersPage() {
   const [newNote, setNewNote] = useState('');
   const [newTagName, setNewTagName] = useState('');
 
-  const { data: customers, isLoading, isError } = useCustomers(search);
   const { data: tags } = useCustomerTags();
+  const selectedTag = tags?.find((t) => t.name === tagFilter);
+
+  const { data: customers, isLoading, isError } = useCustomers({
+    search: search || undefined,
+    tagId: tagFilter !== 'All' ? selectedTag?.id : undefined,
+    customerType: typeFilter !== 'All' ? typeFilter : undefined,
+    segmentId: segmentFilter !== 'All' ? segmentFilter : undefined,
+  });
+  const { data: segments } = useSegments();
   const { data: notes } = useCustomerNotes(detailCustomer?.id ?? null);
   const { data: timeline } = useCustomerTimeline(detailCustomer?.id ?? null);
   const { data: insights } = useCustomerInsights(detailCustomer?.id ?? null);
@@ -86,13 +101,7 @@ export function CustomersPage() {
   const assignTags = useAssignCustomerTags();
   const createTag = useCreateCustomerTag();
 
-  const filtered = customers?.filter((c) => {
-    if (statusFilter === 'VIP' && c.status !== 'vip') return false;
-    if (statusFilter === 'Active' && c.status !== 'active') return false;
-    if (statusFilter === 'Inactive' && c.status !== 'inactive') return false;
-    if (tagFilter !== 'All' && !c.tags.includes(tagFilter)) return false;
-    return true;
-  });
+  const filtered = customers;
 
   const openCreate = () => {
     setEditingCustomer(null);
@@ -160,8 +169,8 @@ export function CustomersPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by name, email, or phone..."
@@ -170,38 +179,35 @@ export function CustomersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
-          {['All', 'VIP', 'Active', 'Inactive'].map((tag) => (
-            <Button
-              key={tag}
-              variant={statusFilter === tag ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter(tag)}
-            >
-              {tag}
-            </Button>
-          ))}
-        </div>
-        {tags && tags.length > 0 && (
-          <div className="flex gap-2">
-            <Button
-              variant={tagFilter === 'All' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTagFilter('All')}
-            >
-              All Tags
-            </Button>
-            {tags.map((t) => (
-              <Button
-                key={t.id}
-                variant={tagFilter === t.name ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTagFilter(t.name)}
-              >
-                {t.name}
-              </Button>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectContent>
+            {CUSTOMER_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>{t === 'All' ? 'All Types' : t.replace('_', ' ')}</SelectItem>
             ))}
-          </div>
+          </SelectContent>
+        </Select>
+        {segments && segments.length > 0 && (
+          <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Segment" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Segments</SelectItem>
+              {segments.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {tags && tags.length > 0 && (
+          <Select value={tagFilter} onValueChange={setTagFilter}>
+            <SelectTrigger className="w-[130px]"><SelectValue placeholder="Tag" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Tags</SelectItem>
+              {tags.map((t) => (
+                <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
 

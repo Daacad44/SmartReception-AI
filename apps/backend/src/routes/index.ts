@@ -19,6 +19,8 @@ import twoFactorRoutes from '../modules/two-factor/two-factor.routes';
 import superAdminRoutes from '../modules/super-admin/super-admin.routes';
 import segmentsRoutes from '../modules/segments/segments.routes';
 import campaignsRoutes from '../modules/campaigns/campaigns.routes';
+import customerImportRoutes from '../modules/customer-import/customer-import.routes';
+import messageTemplatesRoutes from '../modules/message-templates/message-templates.routes';
 
 const router = Router();
 
@@ -42,5 +44,7 @@ router.use('/2fa', twoFactorRoutes);
 router.use('/super-admin', superAdminRoutes);
 router.use('/segments', segmentsRoutes);
 router.use('/campaigns', campaignsRoutes);
+router.use('/customer-import', customerImportRoutes);
+router.use('/message-templates', messageTemplatesRoutes);
 
 export default router;

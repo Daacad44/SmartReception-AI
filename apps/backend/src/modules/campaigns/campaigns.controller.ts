@@ -66,6 +66,15 @@ export class CampaignsController {
       next(error);
     }
   }
+
+  async analytics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await campaignsService.getAnalytics(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const campaignsController = new CampaignsController();

@@ -9,7 +9,10 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { billingService } from '../billing/billing.service';
 
 export class CustomersService {
-  async list(businessId: string, params: PaginationInput & { tagId?: string }) {
+  async list(
+    businessId: string,
+    params: PaginationInput & { tagId?: string; customerType?: string; segmentId?: string }
+  ) {
     const result = await customersRepository.findMany(businessId, params);
     return {
       data: result.customers.map((c) => ({
@@ -50,6 +53,9 @@ export class CustomersService {
       email: input.email || null,
       notes: input.notes,
       companyName: input.companyName,
+      address: input.address,
+      city: input.city,
+      country: input.country,
       whatsappNumber: input.whatsappNumber || input.phone,
       customerType: input.customerType,
       leadStatus: input.leadStatus,
@@ -89,6 +95,9 @@ export class CustomersService {
       email: input.email === '' ? null : input.email,
       notes: input.notes,
       companyName: input.companyName,
+      address: input.address,
+      city: input.city,
+      country: input.country,
       whatsappNumber: input.whatsappNumber,
       customerType: input.customerType,
       leadStatus: input.leadStatus,

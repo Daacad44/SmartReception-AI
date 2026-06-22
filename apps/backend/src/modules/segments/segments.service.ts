@@ -8,9 +8,11 @@ const SYSTEM_SEGMENTS: Array<{ name: string; customerType: CustomerType; color: 
   { name: 'Regular Customers', customerType: 'REGULAR', color: '#1E3A5F' },
   { name: 'New Customers', customerType: 'NEW_CUSTOMER', color: '#10B981' },
   { name: 'Returning Customers', customerType: 'RETURNING', color: '#3B82F6' },
+  { name: 'Premium Customers', customerType: 'PREMIUM', color: '#7C3AED' },
   { name: 'High Value Customers', customerType: 'HIGH_VALUE', color: '#8B5CF6' },
   { name: 'Inactive Customers', customerType: 'INACTIVE', color: '#6B7280' },
   { name: 'Leads', customerType: 'LEAD', color: '#F59E0B' },
+  { name: 'Prospects', customerType: 'PROSPECT', color: '#EC4899' },
 ];
 
 export class SegmentsService {

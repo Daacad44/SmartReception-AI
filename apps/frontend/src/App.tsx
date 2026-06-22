@@ -27,6 +27,9 @@ const ConversationsPage = lazyWithRetry(() =>
 const CustomersPage = lazyWithRetry(() =>
   import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
 );
+const CustomerImportPage = lazyWithRetry(() =>
+  import('@/pages/CustomerImportPage').then((m) => ({ default: m.CustomerImportPage }))
+);
 const AppointmentsPage = lazyWithRetry(() =>
   import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
 );
@@ -160,6 +163,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['customers:read']}>
                         <CustomersPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/customers/import"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['customers:write']}>
+                        <CustomerImportPage />
                       </PermissionRoute>
                     }
                   />
