@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import {
   SMARTRECEPTION_KB_FAQS,
   SMARTRECEPTION_SYSTEM_PROMPT,
-  SMARTRECEPTION_WELCOME_MESSAGE,
+  SMARTRECEPTION_WELCOME_SO,
 } from '../infrastructure/ai/smartreception-knowledge';
 
 const prisma = new PrismaClient();
@@ -22,7 +22,7 @@ async function main() {
     where: { businessId },
     update: {
       systemPrompt: SMARTRECEPTION_SYSTEM_PROMPT,
-      greetingMessage: SMARTRECEPTION_WELCOME_MESSAGE,
+      greetingMessage: SMARTRECEPTION_WELCOME_SO,
       enableAutoReply: true,
       enableBooking: true,
       enableLeadQualification: true,
@@ -30,11 +30,11 @@ async function main() {
     create: {
       businessId,
       systemPrompt: SMARTRECEPTION_SYSTEM_PROMPT,
-      greetingMessage: SMARTRECEPTION_WELCOME_MESSAGE,
+      greetingMessage: SMARTRECEPTION_WELCOME_SO,
       enableAutoReply: true,
       enableBooking: true,
       enableLeadQualification: true,
-      languages: ['en'],
+      languages: ['so', 'en'],
     },
   });
 
@@ -44,7 +44,7 @@ async function main() {
       data: {
         businessId,
         name: 'SmartReception AI Knowledge',
-        description: 'Company services, FAQs, and product information',
+        description: 'Company services, FAQs, and product information (Somali + English)',
         isActive: true,
       },
     }));
@@ -53,13 +53,22 @@ async function main() {
     const existing = await prisma.knowledgeDocument.findFirst({
       where: { knowledgeBaseId: kb.id, title: faq.title },
     });
-    const content = `Q: ${faq.question}\nA: ${faq.answer}`;
+
+    const questionSo = faq.questionSo || faq.question;
+    const answerSo = faq.answerSo || faq.answer;
+    const content = [
+      `EN Q: ${faq.question}`,
+      `EN A: ${faq.answer}`,
+      `SO Q: ${questionSo}`,
+      `SO A: ${answerSo}`,
+    ].join('\n');
+
     if (existing) {
       await prisma.knowledgeDocument.update({
         where: { id: existing.id },
         data: {
-          question: faq.question,
-          answer: faq.answer,
+          question: `${faq.question} / ${questionSo}`,
+          answer: `${faq.answer}\n\n${answerSo}`,
           content,
           category: faq.category,
           status: 'INDEXED',
@@ -72,8 +81,8 @@ async function main() {
           title: faq.title,
           type: 'FAQ',
           status: 'INDEXED',
-          question: faq.question,
-          answer: faq.answer,
+          question: `${faq.question} / ${questionSo}`,
+          answer: `${faq.answer}\n\n${answerSo}`,
           content,
           category: faq.category,
         },
