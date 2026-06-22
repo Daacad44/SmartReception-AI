@@ -4,6 +4,7 @@ import { storageService } from '../storage';
 import { getDocumentQueue } from '../queue/queues';
 import { extractDocumentText } from '../../modules/knowledge/document-processor';
 import { generateEmbeddings, extractKnowledge } from '../ai/gemini.service';
+import { invalidateKnowledgeCache } from '../ai/knowledge-search.service';
 import { logger } from '../../core/logger';
 import { notifyKnowledge } from '../notifications/notification-helper';
 
@@ -103,6 +104,7 @@ export async function processDocumentById(documentId: string, businessId: string
     });
 
     logger.info(`Document ${documentId} indexed with ${chunks.length} chunks`);
+    invalidateKnowledgeCache(businessId);
 
     await notifyKnowledge(
       businessId,

@@ -72,16 +72,25 @@ export async function generateResponse(
     .join('\n');
 
   const systemPrompt = aiConfig?.systemPrompt || SMARTRECEPTION_SYSTEM_PROMPT;
+  const hasKnowledge = Boolean(knowledgeContext?.trim());
 
   const prompt = `${systemPrompt}
 
 ${buildLanguageInstruction(language)}
 
-KNOWLEDGE BASE (use as primary source):
-${knowledgeContext || 'No indexed documents yet — use SmartReception company information above.'}
+CRITICAL — ANSWER PRIORITY (follow strictly):
+1. KNOWLEDGE BASE excerpts below (primary — never contradict them)
+2. FAQ content in knowledge base
+3. Business settings / system prompt company facts
+4. Only if nothing above applies, use careful reasoning
+
+${hasKnowledge ? 'You MUST answer using the KNOWLEDGE BASE below. Do NOT use general world knowledge when KB has the answer.' : 'No KB excerpts matched — use SmartReception company facts from the system prompt.'}
+
+KNOWLEDGE BASE EXCERPTS:
+${knowledgeContext || '(none indexed)'}
 
 LEAD COLLECTION:
-If customer shows interest in any service, collect: Full Name, Business Name, Phone, Email, Service Required.
+If customer shows buying intent for any service, collect: Full Name, Business Name, Phone, Email, Service Required.
 Ask one or two fields at a time. When all fields collected, set action collect_lead with complete:true.
 
 CONVERSATION HISTORY:
@@ -100,7 +109,9 @@ Respond in JSON only:
 }
 
 Action types: none, collect_lead, book_appointment, qualify_lead, escalate
-For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }`;
+For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
+
+Never say "I am having trouble right now" unless Gemini truly failed. Be specific using KB facts.`;
 
   try {
     const model = getChatModel({ temperature: aiConfig?.temperature ?? 0.7 });

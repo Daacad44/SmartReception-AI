@@ -137,6 +137,15 @@ export class ConversationsService {
     return conversationsRepository.transferToAi(businessId, conversationId);
   }
 
+  async handoffToHuman(businessId: string, conversationId: string, userId: string) {
+    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return conversationsRepository.handoffToHuman(businessId, conversationId, userId);
+  }
+
   async sendTypingIndicator(businessId: string, conversationId: string) {
     const conversation = await conversationsRepository.findConversationWithWhatsApp(
       businessId,

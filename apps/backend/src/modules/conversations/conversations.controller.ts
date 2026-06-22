@@ -96,6 +96,19 @@ export class ConversationsController {
     }
   }
 
+  async handoffToHuman(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.handoffToHuman(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async sendTyping(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await conversationsService.sendTypingIndicator(
