@@ -5,15 +5,17 @@ import { whatsappMediaService } from '../../infrastructure/whatsapp/whatsapp-med
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 import { notifyNewMessage } from '../../infrastructure/notifications/notification-helper';
+import {
+  isMenuOnlyTrigger,
+  parseMenuSelection,
+  requestsEnglish,
+} from '../../infrastructure/ai/somali-menu';
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { sendWelcomeMessage } from '../ai/welcome-message.service';
+import { sendMenuOptionReply, sendServiceMenu } from '../ai/menu-reply.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
-
-const SIMPLE_GREETINGS =
-  /^(hi|hello|hey|yo|salaam|asc|asalamu|waad salaaman|waan salaaman|good morning|good afternoon|good evening|subax wanaagsan)[\s!.?]*$/i;
 
 export interface HandleIncomingMessageParams {
   businessId: string;
@@ -31,17 +33,13 @@ export interface HandleIncomingMessageParams {
   };
 }
 
-function isSimpleGreeting(text: string): boolean {
-  return SIMPLE_GREETINGS.test(text.trim());
-}
-
-/** Returns true when AI should respond (hybrid + AI modes). */
 function shouldAiRespond(conversation: { isAiEnabled: boolean }): boolean {
   return conversation.isAiEnabled;
 }
 
 /**
- * Full inbound WhatsApp pipeline: save → welcome → KB-backed Gemini reply → WhatsApp send.
+ * Inbound WhatsApp pipeline:
+ * save → menu / menu-option / KB+Gemini reply
  */
 export async function handleIncomingMessage(params: HandleIncomingMessageParams): Promise<void> {
   const { businessId, whatsappAccountId, phoneNumberId, accessToken, msg, contactName, extracted } =
@@ -55,12 +53,12 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
   );
   console.log('[WhatsApp] Customer found');
 
-  const { conversation, isNew } = await whatsappRepository.findOrCreateConversation(
+  const { conversation } = await whatsappRepository.findOrCreateConversation(
     businessId,
     customer.id,
     whatsappAccountId
   );
-  console.log('[WhatsApp] Conversation found', isNew ? '(new)' : '(existing)');
+  console.log('[WhatsApp] Conversation ready');
 
   recordInboundMessage(businessId, extracted.content);
 
@@ -82,39 +80,14 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     type: 'message',
   });
 
-  const inboundCount = await prisma.message.count({
-    where: {
-      conversation: { businessId, customerId: customer.id },
-      direction: 'INBOUND',
-    },
-  });
-  const isFirstCustomerMessage = inboundCount === 1;
-
+  const aiText = extracted.content?.trim() ?? '';
   const autoReplyEnabled =
     config.aiReply.enabled && (await isAutoReplyEnabled(businessId));
-  const aiText = extracted.content?.trim() ?? '';
-  const canReplyWithAi = autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
+  const canReplyWithAi =
+    autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
 
-  let welcomeSent = false;
-  if (isFirstCustomerMessage && canReplyWithAi) {
-    welcomeSent = await sendWelcomeMessage({
-      businessId,
-      conversationId: conversation.id,
-      phoneNumberId,
-      customerPhone: msg.from,
-      accessToken,
-      firstMessageContent: aiText,
-    });
-    if (welcomeSent) {
-      console.log('[AI] Welcome message sent');
-    }
-  }
-
-  const skipAiForGreeting = welcomeSent && isSimpleGreeting(aiText);
-
-  if (canReplyWithAi && !skipAiForGreeting) {
-    console.log('[AI] Triggering automatic reply (Knowledge Base + Gemini)');
-    await processAndSendAiReply({
+  if (canReplyWithAi) {
+    await runSomaliMenuAgent({
       businessId,
       conversationId: conversation.id,
       inboundMessageId: message.id,
@@ -122,8 +95,9 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       phoneNumberId,
       customerPhone: msg.from,
       accessToken,
+      preferEnglish: requestsEnglish(aiText),
     });
-  } else if (!canReplyWithAi) {
+  } else {
     logger.debug('Auto-reply skipped', {
       conversationId: conversation.id,
       autoReplyEnabled,
@@ -132,7 +106,6 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     });
   }
 
-  // Defer media download so AI reply is not blocked
   if (extracted.mediaId) {
     const token = accessToken || config.whatsapp.accessToken;
     if (token) {
@@ -170,8 +143,58 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       logger.warn('Failed to write WhatsApp audit log', { error });
     });
 
-  const elapsed = Date.now() - startedAt;
-  console.log(`[WhatsApp] handleIncomingMessage completed in ${elapsed}ms`);
+  console.log(`[WhatsApp] handleIncomingMessage completed in ${Date.now() - startedAt}ms`);
+}
+
+interface SomaliMenuAgentParams {
+  businessId: string;
+  conversationId: string;
+  inboundMessageId: string;
+  customerMessage: string;
+  phoneNumberId: string;
+  customerPhone: string;
+  accessToken?: string;
+  preferEnglish?: boolean;
+}
+
+/**
+ * Somali menu agent — menu on every interaction; option details for 1-9;
+ * KB+Gemini for free-form questions (Somali unless English requested).
+ */
+async function runSomaliMenuAgent(params: SomaliMenuAgentParams): Promise<void> {
+  const base = {
+    businessId: params.businessId,
+    conversationId: params.conversationId,
+    phoneNumberId: params.phoneNumberId,
+    customerPhone: params.customerPhone,
+    accessToken: params.accessToken,
+  };
+
+  const menuOption = parseMenuSelection(params.customerMessage);
+  if (menuOption !== null) {
+    await sendMenuOptionReply({ ...base, option: menuOption });
+    return;
+  }
+
+  // Send service menu on every inbound message (new, returning, existing conversations)
+  await sendServiceMenu(base);
+
+  if (isMenuOnlyTrigger(params.customerMessage)) {
+    console.log('[AI] Greeting received — menu sent, awaiting selection');
+    return;
+  }
+
+  console.log('[AI] Free-form question — Knowledge Base + Gemini (Somali)');
+  await processAndSendAiReply({
+    businessId: params.businessId,
+    conversationId: params.conversationId,
+    inboundMessageId: params.inboundMessageId,
+    customerMessage: params.customerMessage,
+    phoneNumberId: params.phoneNumberId,
+    customerPhone: params.customerPhone,
+    accessToken: params.accessToken,
+    preferEnglish: params.preferEnglish,
+  });
 }
 
 async function downloadAndAttachMedia(params: {

@@ -8,6 +8,7 @@ import {
   SMARTRECEPTION_SYSTEM_PROMPT,
   SMARTRECEPTION_WELCOME_SO,
 } from '../infrastructure/ai/smartreception-knowledge';
+import { MENU_OPTIONS } from '../infrastructure/ai/somali-menu';
 
 const prisma = new PrismaClient();
 
@@ -90,7 +91,36 @@ async function main() {
     }
   }
 
-  console.log(`SmartReception KB seeded for business ${businessId} (${SMARTRECEPTION_KB_FAQS.length} FAQs)`);
+  for (const [num, option] of Object.entries(MENU_OPTIONS)) {
+    const title = `Menu Option ${num}: ${option.title}`;
+    const existing = await prisma.knowledgeDocument.findFirst({
+      where: { knowledgeBaseId: kb.id, title },
+    });
+    const content = `Menu ${num} — ${option.title}\n\n${option.content}`;
+    if (existing) {
+      await prisma.knowledgeDocument.update({
+        where: { id: existing.id },
+        data: { content, category: 'Services', status: 'INDEXED' },
+      });
+    } else {
+      await prisma.knowledgeDocument.create({
+        data: {
+          knowledgeBaseId: kb.id,
+          title,
+          type: 'FAQ',
+          status: 'INDEXED',
+          question: `Dooro ${num} — ${option.title}`,
+          answer: option.content,
+          content,
+          category: 'Services',
+        },
+      });
+    }
+  }
+
+  console.log(
+    `SmartReception KB seeded for business ${businessId} (${SMARTRECEPTION_KB_FAQS.length} FAQs + ${Object.keys(MENU_OPTIONS).length} menu options)`
+  );
 }
 
 main()

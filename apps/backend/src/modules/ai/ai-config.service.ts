@@ -1,8 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
-import {
-  SMARTRECEPTION_SYSTEM_PROMPT,
-  SMARTRECEPTION_WELCOME_SO,
-} from '../../infrastructure/ai/smartreception-knowledge';
+import { SMARTRECEPTION_SYSTEM_PROMPT } from '../../infrastructure/ai/smartreception-knowledge';
+import { SMARTRECEPTION_SERVICE_MENU } from '../../infrastructure/ai/somali-menu';
 
 /** Ensure AI configuration exists with auto-reply enabled (hybrid default). */
 export async function ensureAiConfiguration(businessId: string) {
@@ -11,7 +9,7 @@ export async function ensureAiConfiguration(businessId: string) {
     create: {
       businessId,
       systemPrompt: SMARTRECEPTION_SYSTEM_PROMPT,
-      greetingMessage: SMARTRECEPTION_WELCOME_SO,
+      greetingMessage: SMARTRECEPTION_SERVICE_MENU,
       enableAutoReply: true,
       enableBooking: true,
       enableLeadQualification: true,

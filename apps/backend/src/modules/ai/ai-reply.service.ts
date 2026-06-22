@@ -21,6 +21,7 @@ export interface ProcessAiReplyParams {
   phoneNumberId: string;
   customerPhone: string;
   accessToken?: string;
+  preferEnglish?: boolean;
 }
 
 function parseLeadData(data: Record<string, unknown> | undefined): LeadData | null {
@@ -113,7 +114,12 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     data: { isTyping: true },
   });
 
-  const aiResponse = await aiService.generateResponse(businessId, conversationId, customerMessage);
+  const aiResponse = await aiService.generateResponse(
+    businessId,
+    conversationId,
+    customerMessage,
+    { preferEnglish: params.preferEnglish }
+  );
   console.log('[AI] Response generated (Gemini)', {
     intent: aiResponse.intent,
     preview: aiResponse.content.slice(0, 120),
