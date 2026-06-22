@@ -1,17 +1,22 @@
-import { generateSecret, generateURI, verify } from 'otplib';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
+import speakeasy from 'speakeasy';
 
 const BACKUP_CODE_COUNT = 8;
 
 export class TotpService {
   generateSecret(): string {
-    return generateSecret();
+    return speakeasy.generateSecret({ length: 20 }).base32;
   }
 
   getOtpAuthUrl(email: string, secret: string): string {
-    return generateURI({ issuer: 'SmartReception AI', label: email, secret });
+    return speakeasy.otpauthURL({
+      secret,
+      label: email,
+      issuer: 'SmartReception AI',
+      encoding: 'base32',
+    });
   }
 
   async generateQrCodeDataUrl(otpAuthUrl: string): Promise<string> {
@@ -19,8 +24,12 @@ export class TotpService {
   }
 
   async verifyToken(secret: string, token: string): Promise<boolean> {
-    const result = await verify({ secret, token: token.replace(/\s/g, '') });
-    return result.valid;
+    return speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token: token.replace(/\s/g, ''),
+      window: 1,
+    });
   }
 
   generateBackupCodes(): string[] {
