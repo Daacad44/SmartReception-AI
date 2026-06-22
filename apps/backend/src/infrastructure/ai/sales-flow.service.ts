@@ -131,8 +131,8 @@ function getQuestionsForState(state: SalesFlowState) {
 function advanceToPortfolio(state: SalesFlowState): SalesFlowResult {
   return {
     handled: true,
-    reply: PORTFOLIO_MESSAGE,
-    nextState: { ...state, phase: 'portfolio', questionIndex: 0 },
+    reply: `${PORTFOLIO_MESSAGE}\n\n${APPOINTMENT_OFFER}`,
+    nextState: { ...state, phase: 'appointment_offer', questionIndex: 0 },
   };
 }
 
