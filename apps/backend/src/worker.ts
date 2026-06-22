@@ -6,6 +6,7 @@ import {
   DocumentJobData,
   ReminderJobData,
   WhatsAppJobData,
+  CampaignJobData,
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
@@ -16,6 +17,7 @@ import {
 } from './infrastructure/appointments/appointment-notification.service';
 import { processAndSendAiReply } from './modules/ai/ai-reply.service';
 import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
+import { executeCampaignSend } from './modules/campaigns/campaigns.service';
 import { logger } from './core/logger';
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
@@ -89,6 +91,11 @@ async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
   await sendAppointmentReminder(appointmentId, businessId, interval as ReminderInterval);
 }
 
+async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
+  const { campaignId, businessId } = job.data;
+  await executeCampaignSend(campaignId, businessId);
+}
+
 async function startWorkers(): Promise<void> {
   await connectDatabase();
 
@@ -96,6 +103,7 @@ async function startWorkers(): Promise<void> {
   createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5);
   createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2);
   createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJob, 3);
+  createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2);
 
   logger.info('BullMQ workers started');
 }

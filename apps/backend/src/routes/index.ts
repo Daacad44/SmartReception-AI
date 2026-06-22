@@ -17,6 +17,8 @@ import auditRoutes from '../modules/audit/audit.routes';
 import webhooksRoutes from '../modules/webhooks/webhooks.routes';
 import twoFactorRoutes from '../modules/two-factor/two-factor.routes';
 import superAdminRoutes from '../modules/super-admin/super-admin.routes';
+import segmentsRoutes from '../modules/segments/segments.routes';
+import campaignsRoutes from '../modules/campaigns/campaigns.routes';
 
 const router = Router();
 
@@ -38,5 +40,7 @@ router.use('/audit', auditRoutes);
 router.use('/webhooks', webhooksRoutes);
 router.use('/2fa', twoFactorRoutes);
 router.use('/super-admin', superAdminRoutes);
+router.use('/segments', segmentsRoutes);
+router.use('/campaigns', campaignsRoutes);
 
 export default router;

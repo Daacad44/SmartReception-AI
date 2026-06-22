@@ -22,6 +22,7 @@ interface LoginResponse {
     industry?: string;
     plan?: string;
   }>;
+  isSuperAdmin?: boolean;
   accessToken: string;
   refreshToken: string;
 }
@@ -100,7 +101,7 @@ export function useAuth() {
     },
     onSuccess: (data) => {
       const profile = mapLoginToProfile(data);
-      login(data.accessToken, data.refreshToken, profile);
+      login(data.accessToken, data.refreshToken, profile, data.isSuperAdmin ?? false);
       toast.success('Welcome back!');
       const redirect = searchParams.get('redirect');
       navigate(redirect && redirect.startsWith('/') ? redirect : '/dashboard');

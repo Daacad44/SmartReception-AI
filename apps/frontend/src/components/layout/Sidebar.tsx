@@ -13,6 +13,9 @@ import {
   Bell,
   Shield,
   Sparkles,
+  Building2,
+  Megaphone,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +29,7 @@ const navItems = [
   { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const },
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
+  { to: '/campaigns', icon: Megaphone, label: 'Campaigns', permission: 'campaigns:read' as const },
   { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
@@ -33,6 +37,12 @@ const navItems = [
   { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const },
   { to: '/settings', icon: Settings, label: 'Settings' },
   { to: '/billing', icon: CreditCard, label: 'Billing' },
+];
+
+const adminNavItems = [
+  { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const },
+  { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const },
+  { to: '/admin/users', icon: UsersRound, label: 'User Management', permission: 'platform:admin' as const },
 ];
 
 interface SidebarProps {
@@ -59,7 +69,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     appointments: upcomingAppointments,
   };
 
-  const visibleItems = navItems.filter((item) => {
+  const visibleItems = [...navItems, ...adminNavItems].filter((item) => {
     const permission =
       'permission' in item && item.permission
         ? PERMISSIONS[item.permission]
@@ -96,7 +106,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           >
             <item.icon className="h-4 w-4 shrink-0" />
             <span className="flex-1">{item.label}</span>
-            {item.badgeKey && badges[item.badgeKey] > 0 && (
+            {'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
               <Badge className="bg-accent text-white hover:bg-accent/90 h-5 min-w-5 justify-center px-1.5 text-[10px]">
                 {badges[item.badgeKey]}
               </Badge>

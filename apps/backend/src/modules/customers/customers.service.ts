@@ -49,6 +49,11 @@ export class CustomersService {
       phone: input.phone,
       email: input.email || null,
       notes: input.notes,
+      companyName: input.companyName,
+      whatsappNumber: input.whatsappNumber || input.phone,
+      customerType: input.customerType,
+      leadStatus: input.leadStatus,
+      customerValue: input.customerValue,
       tagIds: input.tagIds,
     });
 
@@ -83,6 +88,11 @@ export class CustomersService {
       phone: input.phone,
       email: input.email === '' ? null : input.email,
       notes: input.notes,
+      companyName: input.companyName,
+      whatsappNumber: input.whatsappNumber,
+      customerType: input.customerType,
+      leadStatus: input.leadStatus,
+      customerValue: input.customerValue,
     });
 
     if (input.tagIds) {
@@ -270,6 +280,46 @@ export class CustomersService {
       lastActivity: customer.lastContactAt?.toISOString() ?? customer.updatedAt.toISOString(),
       lastConversationStatus: lastConversation?.status ?? null,
       tags: customer.tags.map((t) => t.tag),
+    };
+  }
+
+  async getProfile(businessId: string, customerId: string) {
+    const customer = await customersRepository.findById(businessId, customerId);
+    if (!customer) throw new NotFoundError('Customer not found');
+
+    const [appointments, messages, campaigns, insights] = await Promise.all([
+      prisma.appointment.findMany({
+        where: { businessId, customerId },
+        orderBy: { startTime: 'desc' },
+        take: 20,
+        include: { service: true, assignedTo: { select: { firstName: true, lastName: true } } },
+      }),
+      prisma.message.findMany({
+        where: { conversation: { businessId, customerId } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: { id: true, content: true, direction: true, createdAt: true, isAiGenerated: true },
+      }),
+      prisma.campaignRecipient.findMany({
+        where: { customerId, campaign: { businessId } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { campaign: { select: { id: true, name: true, type: true, status: true } } },
+      }),
+      this.getInsights(businessId, customerId),
+    ]);
+
+    return {
+      ...customer,
+      tags: customer.tags.map((t) => t.tag),
+      appointments,
+      messages,
+      campaignHistory: campaigns,
+      insights,
+      aiSummary: customer.aiSummary,
+      servicesInterestedIn: appointments
+        .map((a) => a.serviceRequested || a.service?.name)
+        .filter(Boolean),
     };
   }
 }

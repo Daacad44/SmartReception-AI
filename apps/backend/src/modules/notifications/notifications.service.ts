@@ -12,6 +12,10 @@ const TYPE_MAP: Record<NotificationType, 'info' | 'success' | 'warning' | 'error
   MISSED_APPOINTMENT: 'warning',
   NEW_CUSTOMER: 'success',
   AI_ESCALATION: 'warning',
+  APPOINTMENT_APPROVED: 'success',
+  APPOINTMENT_CANCELLED: 'warning',
+  CAMPAIGN_DELIVERED: 'success',
+  CAMPAIGN_FAILED: 'error',
 };
 
 function mapNotification(notification: {

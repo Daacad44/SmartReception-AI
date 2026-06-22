@@ -10,13 +10,14 @@ interface AuthState {
   businesses: Business[];
   currentBusinessId: string | null;
   isAuthenticated: boolean;
+  isSuperAdmin: boolean;
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: UserProfile) => void;
   setBusinesses: (businesses: Business[]) => void;
   setCurrentBusiness: (businessId: string) => void;
-  login: (accessToken: string, refreshToken: string, user: UserProfile) => void;
+  login: (accessToken: string, refreshToken: string, user: UserProfile, isSuperAdmin?: boolean) => void;
   logout: () => void;
 }
 
@@ -33,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       businesses: [],
       currentBusinessId: null,
       isAuthenticated: false,
+      isSuperAdmin: false,
       hasHydrated: false,
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
@@ -50,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
 
       setCurrentBusiness: (businessId) => set({ currentBusinessId: businessId }),
 
-      login: (accessToken, refreshToken, user) =>
+      login: (accessToken, refreshToken, user, isSuperAdmin = false) =>
         set({
           accessToken,
           refreshToken,
@@ -64,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
           })),
           currentBusinessId: user.businesses[0]?.id ?? null,
           isAuthenticated: true,
+          isSuperAdmin,
           hasHydrated: true,
         }),
 
@@ -75,6 +78,7 @@ export const useAuthStore = create<AuthState>()(
           businesses: [],
           currentBusinessId: null,
           isAuthenticated: false,
+          isSuperAdmin: false,
           hasHydrated: true,
         });
       },

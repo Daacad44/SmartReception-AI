@@ -26,6 +26,19 @@ export function useBusinessRealtime(userId?: string | null) {
           queryClient.invalidateQueries({ queryKey: ['messages', convId] });
         }
       })
+      .on('broadcast', { event: 'business_update' }, (payload) => {
+        const event = payload.payload as { type?: string };
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        if (event.type === 'appointment') {
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+        }
+        if (event.type === 'campaign') {
+          queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+        }
+        if (event.type === 'customer') {
+          queryClient.invalidateQueries({ queryKey: ['customers'] });
+        }
+      })
       .on(
         'postgres_changes',
         {

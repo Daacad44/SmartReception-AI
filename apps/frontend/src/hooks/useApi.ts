@@ -137,18 +137,25 @@ export function transformAppointment(raw: any): Appointment {
     CANCELLED: 'cancelled',
     COMPLETED: 'completed',
     NO_SHOW: 'no_show',
+    MISSED: 'missed',
   };
+  const assignedTo = raw.assignedTo;
 
   return {
     id: raw.id,
     customerId: raw.customerId,
     customerName: raw.customer?.name ?? '',
-    service: raw.service?.name ?? raw.title,
+    service: raw.serviceRequested || raw.service?.name || raw.title,
+    serviceRequested: raw.serviceRequested,
     date: start.toISOString().split('T')[0],
     time: start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
     duration: raw.service?.duration ?? Math.round((new Date(raw.endTime).getTime() - start.getTime()) / 60000),
     status: statusMap[raw.status] ?? 'pending',
     notes: raw.notes ?? undefined,
+    assignedStaff: assignedTo ? `${assignedTo.firstName} ${assignedTo.lastName}` : undefined,
+    assignedToId: raw.assignedToId,
+    customerType: raw.customer?.customerType,
+    priority: raw.priority,
   };
 }
 

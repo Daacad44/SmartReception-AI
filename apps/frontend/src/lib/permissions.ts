@@ -18,6 +18,8 @@ export const PERMISSIONS = {
   'settings:write': 'settings:write',
   'ai:configure': 'ai:configure',
   'audit:read': 'audit:read',
+  'campaigns:read': 'campaigns:read',
+  'campaigns:write': 'campaigns:write',
   'platform:admin': 'platform:admin',
 } as const;
 
@@ -43,6 +45,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['analytics:read'],
     PERMISSIONS['settings:read'],
     PERMISSIONS['audit:read'],
+    PERMISSIONS['campaigns:read'],
+    PERMISSIONS['campaigns:write'],
   ],
   AGENT: [
     PERMISSIONS['customers:read'],
@@ -52,6 +56,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['appointments:read'],
     PERMISSIONS['appointments:write'],
     PERMISSIONS['knowledge:read'],
+    PERMISSIONS['campaigns:read'],
   ],
   RECEPTIONIST: [
     PERMISSIONS['customers:read'],
@@ -62,6 +67,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['appointments:write'],
     PERMISSIONS['knowledge:read'],
     PERMISSIONS['analytics:read'],
+    PERMISSIONS['campaigns:read'],
+    PERMISSIONS['campaigns:write'],
   ],
   STAFF: [
     PERMISSIONS['customers:read'],
@@ -89,5 +96,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/billing': PERMISSIONS['billing:read'],
   '/notifications': PERMISSIONS['conversations:read'],
   '/audit-logs': PERMISSIONS['audit:read'],
+  '/campaigns': PERMISSIONS['campaigns:read'],
   '/super-admin': PERMISSIONS['platform:admin'],
+  '/admin/businesses': PERMISSIONS['platform:admin'],
+  '/admin/users': PERMISSIONS['platform:admin'],
 };
