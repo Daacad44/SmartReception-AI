@@ -9,8 +9,9 @@ import {
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
-import { aiService } from './infrastructure/ai/openai.service';
 import { whatsappService } from './infrastructure/whatsapp/whatsapp.service';
+import { processAndSendAiReply } from './modules/ai/ai-reply.service';
+import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
 import { logger } from './core/logger';
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
@@ -18,115 +19,23 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
 
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId, businessId },
-    include: {
-      customer: true,
-      whatsappAccount: true,
-    },
+    include: { customer: true, whatsappAccount: true },
   });
 
-  if (!conversation || !conversation.isAiEnabled) {
+  if (!conversation?.whatsappAccount) {
     logger.debug(`Skipping AI job for conversation ${conversationId}`);
     return;
   }
 
-  const aiResponse = await aiService.generateResponse(
+  await processAndSendAiReply({
     businessId,
     conversationId,
-    customerMessage
-  );
-
-  const outboundMessage = await prisma.message.create({
-    data: {
-      conversationId,
-      direction: 'OUTBOUND',
-      content: aiResponse.content,
-      type: 'TEXT',
-      isAiGenerated: true,
-      status: 'PENDING',
-    },
+    inboundMessageId: messageId,
+    customerMessage,
+    phoneNumberId: conversation.whatsappAccount.phoneNumberId,
+    customerPhone: conversation.customer.phone,
+    accessToken: conversation.whatsappAccount.accessToken || undefined,
   });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { lastMessageAt: new Date() },
-  });
-
-  if (conversation.whatsappAccount) {
-    await whatsappService.sendTypingIndicator(
-      conversation.whatsappAccount.phoneNumberId,
-      conversation.customer.phone,
-      conversation.whatsappAccount.accessToken || undefined
-    );
-
-    const whatsappMsgId = await whatsappService.sendOutbound({
-      phoneNumberId: conversation.whatsappAccount.phoneNumberId,
-      to: conversation.customer.phone,
-      accessToken: conversation.whatsappAccount.accessToken || undefined,
-      type: 'TEXT',
-      content: aiResponse.content,
-    });
-
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { isTyping: false },
-    });
-
-    await prisma.message.update({
-      where: { id: outboundMessage.id },
-      data: {
-        status: whatsappMsgId ? 'SENT' : 'FAILED',
-        whatsappMsgId,
-      },
-    });
-  } else {
-    await prisma.message.update({
-      where: { id: outboundMessage.id },
-      data: { status: 'SENT' },
-    });
-  }
-
-  if (aiResponse.actions.some((a) => a.type === 'escalate')) {
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { isAiEnabled: false, status: 'PENDING' },
-    });
-  }
-
-  const bookAction = aiResponse.actions.find((a) => a.type === 'book_appointment');
-  if (bookAction?.data) {
-    const data = bookAction.data as { title?: string; startTime?: string; endTime?: string };
-    if (data.startTime && data.endTime) {
-      const start = new Date(data.startTime);
-      const end = new Date(data.endTime);
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
-        await prisma.appointment.create({
-          data: {
-            businessId,
-            customerId: conversation.customerId,
-            title: data.title || 'AI Booked Appointment',
-            startTime: start,
-            endTime: end,
-            status: 'SCHEDULED',
-          },
-        });
-        logger.info(`AI booked appointment for conversation ${conversationId}`);
-      }
-    }
-  }
-
-  const qualifyAction = aiResponse.actions.find((a) => a.type === 'qualify_lead');
-  if (qualifyAction?.data) {
-    const score = Number(qualifyAction.data.score);
-    if (!isNaN(score) && score >= 0 && score <= 100) {
-      await prisma.customer.update({
-        where: { id: conversation.customerId },
-        data: { leadScore: Math.round(score) },
-      });
-      logger.info(`AI updated lead score for customer ${conversation.customerId}: ${score}`);
-    }
-  }
-
-  logger.info(`AI response sent for conversation ${conversationId}, inbound message ${messageId}`);
 }
 
 async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
@@ -146,23 +55,17 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     return;
   }
 
-  const msgType = (type ?? 'TEXT') as 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO';
-  const whatsappMsgId = await whatsappService.sendOutbound({
+  await sendConversationMessage({
+    businessId,
+    conversationId,
+    messageId,
+    phoneNumber,
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
-    to: phoneNumber,
-    accessToken: conversation.whatsappAccount.accessToken || undefined,
-    type: msgType,
     content,
+    type,
     mediaUrl,
     mediaFilename,
-  });
-
-  await prisma.message.update({
-    where: { id: messageId },
-    data: {
-      status: whatsappMsgId ? 'SENT' : 'FAILED',
-      whatsappMsgId,
-    },
+    accessToken: conversation.whatsappAccount.accessToken || undefined,
   });
 }
 
@@ -204,14 +107,15 @@ async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
     appointment.service ? ` for ${appointment.service.name}` : ''
   } scheduled on ${startTime}. Reply to confirm or reschedule.`;
 
-  const whatsappMsgId = await whatsappService.sendMessage({
+  const result = await whatsappService.sendOutbound({
     phoneNumberId: whatsappAccount.phoneNumberId,
     to: customerPhone,
-    message,
     accessToken: whatsappAccount.accessToken || undefined,
+    type: 'TEXT',
+    content: message,
   });
 
-  if (whatsappMsgId) {
+  if (result.success) {
     await prisma.appointment.update({
       where: { id: appointmentId },
       data: { reminderSent: true },

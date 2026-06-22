@@ -7,13 +7,15 @@ import {
   resolveContactName,
 } from '../../infrastructure/whatsapp/whatsapp.service';
 import { whatsappMediaService } from '../../infrastructure/whatsapp/whatsapp-media.service';
-import { getAiQueue } from '../../infrastructure/queue/queues';
+import { getAiQueue, getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { config } from '../../config';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
 import { ConnectWhatsAppInput } from '@smartreception/shared';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { notifyNewMessage } from '../../infrastructure/notifications/notification-helper';
+import { processAndSendAiReply } from '../ai/ai-reply.service';
+import { getPipelineState, recordInboundMessage } from './whatsapp-pipeline-state';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -40,6 +42,14 @@ export interface WhatsAppDebugInfo {
   totalCustomers: number;
   totalConversations: number;
   webhookStatus: 'verified' | 'pending' | 'not_configured';
+}
+
+export interface WhatsAppSendStatus {
+  lastInboundMessage: string | null;
+  lastOutboundAttempt: string | null;
+  lastOutboundSuccess: string | null;
+  pendingQueueJobs: number;
+  failedJobs: number;
 }
 
 export class WhatsAppModuleService {
@@ -229,6 +239,7 @@ export class WhatsAppModuleService {
       const contactName = resolveContactName(parsed.contacts, msg.from);
       const extracted = extractMessageContent(msg);
 
+      console.log('[WhatsApp] Incoming message received');
       console.log('[WhatsApp] Processing message from:', msg.from);
       console.log('[WhatsApp] Name:', contactName ?? 'Unknown');
       console.log('[WhatsApp] Message:', extracted.content);
@@ -238,12 +249,16 @@ export class WhatsAppModuleService {
         msg.from,
         contactName ?? msg.from
       );
+      console.log('[WhatsApp] Customer found');
 
       const conversation = await whatsappRepository.findOrCreateConversation(
         account.businessId,
         customer.id,
         account.id
       );
+      console.log('[WhatsApp] Conversation found');
+
+      recordInboundMessage(account.businessId, extracted.content);
 
       let mediaUrl: string | undefined;
       let metadata = extracted.metadata ?? {};
@@ -293,6 +308,21 @@ export class WhatsAppModuleService {
       });
 
       const accessToken = account.accessToken || config.whatsapp.accessToken || undefined;
+
+      const aiText = extracted.content;
+
+      if (conversation.isAiEnabled && aiConfig?.enableAutoReply && aiText) {
+        await processAndSendAiReply({
+          businessId: account.businessId,
+          conversationId: conversation.id,
+          inboundMessageId: message.id,
+          customerMessage: aiText,
+          phoneNumberId: account.phoneNumberId,
+          customerPhone: msg.from,
+          accessToken,
+        });
+      }
+
       await whatsappService.markAsRead(account.phoneNumberId, msg.id, accessToken).catch((error) => {
         logger.warn('Failed to mark WhatsApp message as read', { error });
       });
@@ -312,29 +342,6 @@ export class WhatsAppModuleService {
       }
 
       await notifyNewMessage(account.businessId, customer.name, conversation.id);
-
-      const aiText =
-        extracted.type === 'TEXT' || extracted.type === 'INTERACTIVE'
-          ? extracted.content
-          : extracted.content;
-
-      if (conversation.isAiEnabled && aiConfig?.enableAutoReply && aiText) {
-        await whatsappService.sendTypingIndicator(account.phoneNumberId, msg.from, accessToken);
-        await prisma.conversation.update({
-          where: { id: conversation.id },
-          data: { isTyping: true },
-        });
-
-        const queue = getAiQueue();
-        if (queue) {
-          await queue.add('process-ai', {
-            businessId: account.businessId,
-            conversationId: conversation.id,
-            messageId: message.id,
-            customerMessage: aiText,
-          });
-        }
-      }
     }
 
     await whatsappRepository.markWebhookVerified(account.phoneNumberId);
@@ -380,6 +387,66 @@ export class WhatsAppModuleService {
       receivingEvents,
       lastWebhookReceived: lastWebhookReceivedAt?.toISOString() ?? null,
       status,
+    };
+  }
+
+  async getSendStatus(businessId: string): Promise<WhatsAppSendStatus> {
+    const pipelineState = getPipelineState(businessId);
+
+    const [lastInbound, lastOutboundAttempt, lastOutboundSuccess] = await Promise.all([
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'OUTBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true, status: true },
+      }),
+      prisma.message.findFirst({
+        where: {
+          conversation: { businessId },
+          direction: 'OUTBOUND',
+          status: { in: ['SENT', 'DELIVERED', 'READ'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+    ]);
+
+    let pendingQueueJobs = 0;
+    let failedJobs = 0;
+
+    const aiQueue = getAiQueue();
+    const whatsappQueue = getWhatsappQueue();
+    for (const queue of [aiQueue, whatsappQueue]) {
+      if (!queue) continue;
+      try {
+        const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
+        pendingQueueJobs += (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+        failedJobs += counts.failed ?? 0;
+      } catch (error) {
+        logger.warn('Failed to read queue job counts', { error, queue: queue.name });
+      }
+    }
+
+    return {
+      lastInboundMessage:
+        pipelineState.lastInboundMessage ??
+        (lastInbound ? `${lastInbound.content} (${lastInbound.createdAt.toISOString()})` : null),
+      lastOutboundAttempt:
+        pipelineState.lastOutboundAttempt ??
+        (lastOutboundAttempt
+          ? `${lastOutboundAttempt.content} (${lastOutboundAttempt.createdAt.toISOString()}, ${lastOutboundAttempt.status})`
+          : null),
+      lastOutboundSuccess:
+        pipelineState.lastOutboundSuccess ??
+        (lastOutboundSuccess
+          ? `${lastOutboundSuccess.content} (${lastOutboundSuccess.createdAt.toISOString()})`
+          : null),
+      pendingQueueJobs,
+      failedJobs,
     };
   }
 

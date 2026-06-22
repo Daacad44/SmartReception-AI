@@ -18,7 +18,7 @@ export function useBusinessRealtime(userId?: string | null) {
     let channel = supabase.channel(`business-${businessId}`);
 
     channel = channel
-        .on(
+      .on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -28,6 +28,17 @@ export function useBusinessRealtime(userId?: string | null) {
         () => {
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
       .on(

@@ -90,3 +90,16 @@ export interface SendOutboundParams {
     rows: Array<{ id: string; title: string; description?: string }>;
   }>;
 }
+
+export interface GraphApiError {
+  code: number | string;
+  message: string;
+  recipient: string;
+}
+
+export interface SendOutboundResult {
+  success: boolean;
+  whatsappMsgId: string | null;
+  error?: GraphApiError;
+  response?: unknown;
+}
