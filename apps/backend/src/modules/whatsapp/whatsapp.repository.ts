@@ -63,7 +63,7 @@ export class WhatsAppRepository {
     businessId: string,
     customerId: string,
     whatsappAccountId: string
-  ) {
+  ): Promise<{ conversation: Awaited<ReturnType<typeof prisma.conversation.create>>; isNew: boolean }> {
     const existing = await prisma.conversation.findFirst({
       where: {
         businessId,
@@ -73,7 +73,7 @@ export class WhatsAppRepository {
     });
 
     if (existing) {
-      return existing;
+      return { conversation: existing, isNew: false };
     }
 
     const conversation = await prisma.conversation.create({
@@ -86,7 +86,7 @@ export class WhatsAppRepository {
       },
     });
     console.log('[WhatsApp] Conversation created');
-    return conversation;
+    return { conversation, isNew: true };
   }
 
   async createInboundMessage(data: {

@@ -15,6 +15,8 @@ import { ConnectWhatsAppInput } from '@smartreception/shared';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { notifyNewMessage } from '../../infrastructure/notifications/notification-helper';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
+import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
+import { sendWelcomeMessage } from '../ai/welcome-message.service';
 import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState, recordInboundMessage } from './whatsapp-pipeline-state';
 
@@ -258,17 +260,36 @@ export class WhatsAppModuleService {
       );
       console.log('[WhatsApp] Customer found');
 
-      const conversation = await whatsappRepository.findOrCreateConversation(
+      const { conversation, isNew } = await whatsappRepository.findOrCreateConversation(
         account.businessId,
         customer.id,
         account.id
       );
-      console.log('[WhatsApp] Conversation found');
+      console.log('[WhatsApp] Conversation found', isNew ? '(new)' : '(existing)');
 
       recordInboundMessage(account.businessId, extracted.content);
 
       let mediaUrl: string | undefined;
       let metadata = extracted.metadata ?? {};
+
+      const message = await whatsappRepository.createInboundMessage({
+        conversationId: conversation.id,
+        customerId: customer.id,
+        content: extracted.content,
+        whatsappMsgId: msg.id,
+        type: extracted.type,
+        mediaUrl: undefined,
+        metadata: {
+          ...metadata,
+          senderName: contactName,
+          whatsappTimestamp: msg.timestamp,
+        },
+      });
+
+      await broadcastConversationEvent(account.businessId, {
+        conversationId: conversation.id,
+        type: 'message',
+      });
 
       if (extracted.mediaId) {
         const token = account.accessToken || config.whatsapp.accessToken;
@@ -293,30 +314,32 @@ export class WhatsAppModuleService {
               storageKey: stored.key,
               whatsappMediaId: extracted.mediaId,
             };
+            await prisma.message.update({
+              where: { id: message.id },
+              data: { mediaUrl, metadata: metadata as object },
+            });
+            await broadcastConversationEvent(account.businessId, {
+              conversationId: conversation.id,
+              type: 'message',
+            });
           } catch (error) {
             logger.error('Failed to download/store WhatsApp media:', error);
-            metadata = { ...metadata, mediaDownloadFailed: true, whatsappMediaId: extracted.mediaId };
           }
         }
       }
 
-      const message = await whatsappRepository.createInboundMessage({
-        conversationId: conversation.id,
-        customerId: customer.id,
-        content: extracted.content,
-        whatsappMsgId: msg.id,
-        type: extracted.type,
-        mediaUrl,
-        metadata: {
-          ...metadata,
-          senderName: contactName,
-          whatsappTimestamp: msg.timestamp,
-        },
-      });
-
       const accessToken = account.accessToken || config.whatsapp.accessToken || undefined;
-
       const aiText = extracted.content;
+
+      if (isNew && conversation.isAiEnabled && aiConfig?.enableAutoReply) {
+        await sendWelcomeMessage({
+          businessId: account.businessId,
+          conversationId: conversation.id,
+          phoneNumberId: account.phoneNumberId,
+          customerPhone: msg.from,
+          accessToken,
+        });
+      }
 
       if (conversation.isAiEnabled && aiConfig?.enableAutoReply && aiText) {
         await processAndSendAiReply({
