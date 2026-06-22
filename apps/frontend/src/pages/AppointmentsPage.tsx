@@ -47,6 +47,10 @@ import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
 import type { Appointment } from '@/lib/entities';
+import { AppointmentDetailSheet } from '@/components/appointments/AppointmentDetailSheet';
+import api from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
   confirmed: 'bg-success/10 text-success border-success/20',
@@ -90,6 +94,18 @@ export function AppointmentsPage() {
   const [time, setTime] = useState('09:00');
   const [duration, setDuration] = useState('30');
   const [notes, setNotes] = useState('');
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const appointmentAction = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: string }) => {
+      await api.post(`/appointments/${id}/actions`, { action });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Appointment updated');
+    },
+  });
 
   const { data: appointments, isLoading, isError } = useAppointments();
   const { data: customers } = useCustomers();
@@ -270,6 +286,9 @@ export function AppointmentsPage() {
       </div>
       {apt.status !== 'cancelled' && (
         <div className={cn('flex gap-1', compact ? '' : 'mt-2')}>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDetailId(apt.id)}>
+            View
+          </Button>
           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(apt)}>
             <Pencil className="h-3 w-3 mr-1" />
             Edit
@@ -472,6 +491,15 @@ export function AppointmentsPage() {
           </div>
         </>
       )}
+
+      <AppointmentDetailSheet
+        appointmentId={detailId}
+        open={Boolean(detailId)}
+        onClose={() => setDetailId(null)}
+        onAction={(action) => {
+          if (detailId) appointmentAction.mutate({ id: detailId, action });
+        }}
+      />
     </div>
   );
 }

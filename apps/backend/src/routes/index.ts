@@ -15,6 +15,8 @@ import aiRoutes from '../modules/ai/ai.routes';
 import servicesRoutes from '../modules/services/services.routes';
 import auditRoutes from '../modules/audit/audit.routes';
 import webhooksRoutes from '../modules/webhooks/webhooks.routes';
+import twoFactorRoutes from '../modules/two-factor/two-factor.routes';
+import superAdminRoutes from '../modules/super-admin/super-admin.routes';
 
 const router = Router();
 
@@ -34,5 +36,7 @@ router.use('/ai', aiRoutes);
 router.use('/services', servicesRoutes);
 router.use('/audit', auditRoutes);
 router.use('/webhooks', webhooksRoutes);
+router.use('/2fa', twoFactorRoutes);
+router.use('/super-admin', superAdminRoutes);
 
 export default router;

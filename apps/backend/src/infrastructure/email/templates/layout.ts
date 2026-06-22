@@ -9,7 +9,7 @@ export const BRAND = {
   primaryColor: '#0F172A',
   secondaryColor: '#635147',
   backgroundColor: '#F8FAFC',
-  accentColor: '#651147',
+  accentColor: '#F59E0B',
 } as const;
 
 export interface EmailLayoutOptions {

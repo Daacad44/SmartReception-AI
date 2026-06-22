@@ -58,12 +58,21 @@ export async function authenticate(
 
     const { ROLE_PERMISSIONS } = await import('@smartreception/shared');
     const role = membership?.role || 'VIEWER';
-    const permissions = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
+    let permissions = [...(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [])];
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { isSuperAdmin: true },
+    });
+    if (user?.isSuperAdmin) {
+      permissions.push('platform:admin' as typeof permissions[number]);
+    }
 
     req.user = {
       ...decoded,
       role: membership?.role,
-      permissions: [...permissions],
+      permissions,
+      isSuperAdmin: user?.isSuperAdmin,
     };
 
     next();

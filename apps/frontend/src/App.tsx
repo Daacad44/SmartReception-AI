@@ -44,6 +44,15 @@ const SettingsPage = lazyWithRetry(() =>
 const BillingPage = lazyWithRetry(() =>
   import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
 );
+const NotificationsPage = lazyWithRetry(() =>
+  import('@/pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage }))
+);
+const AuditLogsPage = lazyWithRetry(() =>
+  import('@/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage }))
+);
+const SuperAdminPage = lazyWithRetry(() =>
+  import('@/pages/SuperAdminPage').then((m) => ({ default: m.SuperAdminPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -188,6 +197,30 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['billing:read']}>
                         <BillingPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['conversations:read']}>
+                        <NotificationsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/audit-logs"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['audit:read']}>
+                        <AuditLogsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/super-admin"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <SuperAdminPage />
                       </PermissionRoute>
                     }
                   />

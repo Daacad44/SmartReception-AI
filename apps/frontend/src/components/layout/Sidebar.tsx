@@ -10,6 +10,8 @@ import {
   Settings,
   CreditCard,
   Bot,
+  Bell,
+  Shield,
   Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useConversations, useBilling, useAppointments } from '@/hooks/useApi';
 import { usePermissions } from '@/hooks/usePermissions';
-import { ROUTE_PERMISSIONS } from '@/lib/permissions';
+import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +29,8 @@ const navItems = [
   { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const },
   { to: '/settings', icon: Settings, label: 'Settings' },
   { to: '/billing', icon: CreditCard, label: 'Billing' },
 ];
@@ -56,7 +60,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   };
 
   const visibleItems = navItems.filter((item) => {
-    const permission = ROUTE_PERMISSIONS[item.to];
+    const permission =
+      'permission' in item && item.permission
+        ? PERMISSIONS[item.permission]
+        : ROUTE_PERMISSIONS[item.to];
     return permission ? hasPermission(permission) : true;
   });
 

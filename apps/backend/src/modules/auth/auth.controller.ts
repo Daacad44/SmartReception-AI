@@ -8,6 +8,7 @@ import {
   resetPasswordSchema,
   verifyOtpSchema,
   resendOtpSchema,
+  twoFactorVerifySchema,
 } from '@smartreception/shared';
 import { setAuthCookies, clearAuthCookies, getRefreshTokenFromCookies } from '../../core/auth-cookies';
 
@@ -27,6 +28,23 @@ export class AuthController {
       const input = loginSchema.parse(req.body);
       const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
       const result = await authService.login(input, ipAddress);
+      if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+        res.json({ success: true, data: result });
+        return;
+      }
+      const tokens = result as { accessToken: string; refreshToken: string };
+      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyTwoFactor(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { tempToken, code } = twoFactorVerifySchema.parse(req.body);
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+      const result = await authService.verifyTwoFactorLogin(tempToken, code, ipAddress);
       setAuthCookies(res, result.accessToken, result.refreshToken);
       res.json({ success: true, data: result });
     } catch (error) {

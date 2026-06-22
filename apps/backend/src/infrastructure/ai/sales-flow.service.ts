@@ -15,6 +15,9 @@ import {
   buildLeadSummary,
 } from './sales-flow-content';
 import { MENU_OPTIONS } from './somali-menu';
+import { isValidEmail, INVALID_EMAIL_MESSAGE, normalizeEmail } from '../appointments/email-validation';
+import { scheduleAppointmentReminders } from '../appointments/appointment-scheduler.service';
+import { sendAppointmentConfirmation } from '../appointments/appointment-notification.service';
 
 const FLOW_META_TYPE = 'sales_flow';
 
@@ -254,6 +257,14 @@ export async function processSalesFlowMessage(
     const key = APPOINTMENT_QUESTIONS[state.questionIndex]?.key;
     if (!key) return { handled: false };
 
+    if (key === 'apptEmail' && !isValidEmail(trimmed)) {
+      return {
+        handled: true,
+        reply: INVALID_EMAIL_MESSAGE,
+        nextState: state,
+      };
+    }
+
     const answers = { ...state.answers, [key]: trimmed };
     const nextIndex = state.questionIndex + 1;
 
@@ -353,21 +364,50 @@ async function createAppointmentFromFlow(
     const timeStr = state.answers.apptTime ?? '10:00';
     const start = parseAppointmentStart(dateStr, timeStr);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const email = state.answers.apptEmail;
+    const name = state.answers.apptName || state.answers.fullName;
+    const phone = state.answers.apptPhone;
 
-    await prisma.appointment.create({
+    if (email && isValidEmail(email)) {
+      await prisma.customer.update({
+        where: { id: ctx.customerId },
+        data: {
+          email: normalizeEmail(email),
+          ...(name && { name }),
+          ...(phone && { phone }),
+        },
+      });
+    }
+
+    const appointment = await prisma.appointment.create({
       data: {
         businessId: ctx.businessId,
         customerId: ctx.customerId,
         title: `Kulan: ${state.serviceName}`,
+        serviceRequested: state.serviceName,
         description: Object.entries(state.answers)
           .map(([k, v]) => `${k}: ${v}`)
           .join('\n'),
         startTime: start,
         endTime: end,
         status: 'SCHEDULED',
+        leadSource: 'WHATSAPP',
         notes: 'WhatsApp Sales Flow',
+        additionalNotes: state.answers.additionalNotes,
+        companyName: state.answers.businessName || state.answers.companyName,
       },
     });
+
+    const customer = await prisma.customer.findUnique({ where: { id: ctx.customerId } });
+    if (customer) {
+      await scheduleAppointmentReminders({
+        appointmentId: appointment.id,
+        businessId: ctx.businessId,
+        customerPhone: customer.phone,
+        startTime: start,
+      });
+      void sendAppointmentConfirmation(appointment.id, ctx.businessId).catch(() => undefined);
+    }
   } catch (err) {
     logger.warn('Failed to create appointment from sales flow', { err });
   }

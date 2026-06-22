@@ -17,14 +17,18 @@ export const PERMISSIONS = {
   'settings:read': 'settings:read',
   'settings:write': 'settings:write',
   'ai:configure': 'ai:configure',
+  'audit:read': 'audit:read',
+  'platform:admin': 'platform:admin',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
-export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'AGENT' | 'VIEWER';
+export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'AGENT' | 'VIEWER' | 'RECEPTIONIST' | 'STAFF';
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  OWNER: Object.values(PERMISSIONS),
-  ADMIN: Object.values(PERMISSIONS).filter((p) => !p.startsWith('billing:write')),
+  OWNER: Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS['platform:admin']),
+  ADMIN: Object.values(PERMISSIONS).filter(
+    (p) => !p.startsWith('billing:write') && p !== PERMISSIONS['platform:admin']
+  ),
   MANAGER: [
     PERMISSIONS['business:read'],
     PERMISSIONS['team:read'],
@@ -38,6 +42,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['knowledge:write'],
     PERMISSIONS['analytics:read'],
     PERMISSIONS['settings:read'],
+    PERMISSIONS['audit:read'],
   ],
   AGENT: [
     PERMISSIONS['customers:read'],
@@ -46,6 +51,22 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['conversations:write'],
     PERMISSIONS['appointments:read'],
     PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+  ],
+  RECEPTIONIST: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['customers:write'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['conversations:write'],
+    PERMISSIONS['appointments:read'],
+    PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+    PERMISSIONS['analytics:read'],
+  ],
+  STAFF: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['appointments:read'],
     PERMISSIONS['knowledge:read'],
   ],
   VIEWER: [
@@ -66,4 +87,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/team': PERMISSIONS['team:read'],
   '/settings': PERMISSIONS['settings:read'],
   '/billing': PERMISSIONS['billing:read'],
+  '/notifications': PERMISSIONS['conversations:read'],
+  '/audit-logs': PERMISSIONS['audit:read'],
+  '/super-admin': PERMISSIONS['platform:admin'],
 };

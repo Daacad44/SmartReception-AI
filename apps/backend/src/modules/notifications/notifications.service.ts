@@ -8,6 +8,10 @@ const TYPE_MAP: Record<NotificationType, 'info' | 'success' | 'warning' | 'error
   TEAM: 'info',
   SYSTEM: 'warning',
   BILLING: 'error',
+  REMINDER: 'info',
+  MISSED_APPOINTMENT: 'warning',
+  NEW_CUSTOMER: 'success',
+  AI_ESCALATION: 'warning',
 };
 
 function mapNotification(notification: {

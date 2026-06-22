@@ -596,6 +596,18 @@ export function useMarkNotificationRead() {
   });
 }
 
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await api.patch('/notifications/read-all');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 export function useAnalytics() {
   return useAuthQuery<AnalyticsData>({
     queryKey: ['analytics'],
