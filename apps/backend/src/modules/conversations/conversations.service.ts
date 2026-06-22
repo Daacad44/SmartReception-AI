@@ -4,6 +4,7 @@ import { PaginationInput, SendMessageInput } from '@smartreception/shared';
 import { getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
+import { sendConversationMessage } from '../whatsapp/whatsapp-outbound.service';
 
 export class ConversationsService {
   async list(
@@ -58,20 +59,32 @@ export class ConversationsService {
     if (conversation.whatsappAccount) {
       const queue = getWhatsappQueue();
       if (queue) {
-        await queue.add('send-message', {
+        await queue.add(
+          'send-message',
+          {
+            businessId,
+            conversationId,
+            messageId: message.id,
+            phoneNumber: conversation.customer.phone,
+            content: input.content,
+            type: input.type,
+            mediaUrl: input.mediaUrl,
+            mediaFilename: input.mediaFilename,
+          },
+          { removeOnComplete: true, removeOnFail: 100 }
+        );
+      } else {
+        await sendConversationMessage({
           businessId,
           conversationId,
           messageId: message.id,
           phoneNumber: conversation.customer.phone,
+          phoneNumberId: conversation.whatsappAccount.phoneNumberId,
           content: input.content,
           type: input.type,
           mediaUrl: input.mediaUrl,
           mediaFilename: input.mediaFilename,
-        });
-      } else {
-        await prisma.message.update({
-          where: { id: message.id },
-          data: { status: 'SENT' },
+          accessToken: conversation.whatsappAccount.accessToken || undefined,
         });
       }
     } else {

@@ -1,11 +1,11 @@
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 import { prisma } from '../database/prisma';
-import type { SendOutboundParams } from './whatsapp.types';
+import type { SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 import type { WhatsAppWebhookMessage } from './whatsapp.types';
 import { parseWebhookBody } from './whatsapp-webhook.parser';
 
-export type { WhatsAppWebhookMessage, SendOutboundParams } from './whatsapp.types';
+export type { WhatsAppWebhookMessage, SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 export { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
 
 const MAX_RETRIES = 3;
@@ -40,14 +40,23 @@ export class WhatsAppService {
     return accessToken || config.whatsapp.accessToken || null;
   }
 
-  async sendOutbound(params: SendOutboundParams): Promise<string | null> {
+  async sendOutbound(params: SendOutboundParams): Promise<SendOutboundResult> {
     const token = this.getToken(params.accessToken);
+    const to = params.to.replace(/\D/g, '');
+
+    console.log('[WhatsApp] Phone Number ID:', params.phoneNumberId);
+    console.log('[WhatsApp] Access Token configured:', Boolean(token));
+    console.log('[WhatsApp] Recipient:', to);
+    console.log('[WhatsApp] Message body:', params.content?.slice(0, 500) ?? '');
+
     if (!token) {
       logger.warn('WhatsApp access token not configured');
-      return null;
+      return {
+        success: false,
+        whatsappMsgId: null,
+        error: { code: 'NO_TOKEN', message: 'Access token not configured', recipient: to },
+      };
     }
-
-    const to = params.to.replace(/\D/g, '');
     let body: Record<string, unknown>;
 
     switch (params.type) {
@@ -168,17 +177,39 @@ export class WhatsAppService {
         }
       );
 
+      const responseText = await response.text();
+
       if (!response.ok) {
-        const error = await response.text();
-        logger.error('WhatsApp send failed:', error);
-        return null;
+        let errorCode: number | string = response.status;
+        let errorMessage = responseText;
+        try {
+          const parsed = JSON.parse(responseText) as {
+            error?: { code?: number; message?: string; error_subcode?: number };
+          };
+          if (parsed.error) {
+            errorCode = parsed.error.code ?? parsed.error.error_subcode ?? response.status;
+            errorMessage = parsed.error.message ?? responseText;
+          }
+        } catch {
+          // keep raw response text
+        }
+
+        const graphError = { code: errorCode, message: errorMessage, recipient: to };
+        console.error('[WhatsApp] Graph API error:', graphError);
+        logger.error('WhatsApp send failed:', graphError);
+        return { success: false, whatsappMsgId: null, error: graphError };
       }
 
-      const data = (await response.json()) as { messages: { id: string }[] };
-      return data.messages[0]?.id ?? null;
+      const data = JSON.parse(responseText) as { messages?: { id: string }[] };
+      console.log('[WhatsApp] API response:', responseText);
+      const whatsappMsgId = data.messages?.[0]?.id ?? null;
+      return { success: Boolean(whatsappMsgId), whatsappMsgId, response: data };
     } catch (error) {
-      logger.error('WhatsApp send error:', error);
-      return null;
+      const message = error instanceof Error ? error.message : String(error);
+      const graphError = { code: 'NETWORK_ERROR', message, recipient: to };
+      console.error('[WhatsApp] Graph API error:', graphError);
+      logger.error('WhatsApp send error:', graphError);
+      return { success: false, whatsappMsgId: null, error: graphError };
     }
   }
 
@@ -188,13 +219,14 @@ export class WhatsAppService {
     message: string;
     accessToken?: string;
   }): Promise<string | null> {
-    return this.sendOutbound({
+    const result = await this.sendOutbound({
       phoneNumberId: params.phoneNumberId,
       to: params.to,
       accessToken: params.accessToken,
       type: 'TEXT',
       content: params.message,
     });
+    return result.whatsappMsgId;
   }
 
   async sendTypingIndicator(phoneNumberId: string, to: string, accessToken?: string): Promise<void> {

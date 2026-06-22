@@ -101,6 +101,15 @@ export class WhatsAppController {
     }
   }
 
+  async getSendStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = await whatsappModuleService.getSendStatus(req.user!.businessId!);
+      res.json({ success: true, data: status });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getDebug(req: Request, res: Response, next: NextFunction) {
     try {
       const debug = await whatsappModuleService.getDebug(req.user!.businessId!);

@@ -111,8 +111,8 @@ export const config = {
       process.env.WHATSAPP_APP_SECRET ||
       process.env.META_APP_SECRET ||
       '',
-    apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
-    apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,
+    apiVersion: process.env.WHATSAPP_API_VERSION || 'v23.0',
+    apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v23.0'}`,
     webhookUrl,
   },
 

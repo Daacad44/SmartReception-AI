@@ -12,6 +12,9 @@ router.post('/webhook', (req, res, next) => whatsappController.webhook(req, res,
 
 router.use(authenticate, requireBusiness);
 
+router.get('/debug/send-status', authorize(PERMISSIONS['settings:read']), (req, res, next) =>
+  whatsappController.getSendStatus(req, res, next)
+);
 router.get('/debug', authorize(PERMISSIONS['settings:read']), (req, res, next) =>
   whatsappController.getDebug(req, res, next)
 );
