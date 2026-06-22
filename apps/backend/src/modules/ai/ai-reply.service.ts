@@ -1,4 +1,4 @@
-import { aiService } from '../../infrastructure/ai/openai.service';
+import { aiService } from '../../infrastructure/ai/conversation-ai.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
@@ -10,6 +10,8 @@ import {
 } from '../whatsapp/whatsapp-pipeline-state';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
+import { LEAD_THANK_YOU_SO } from '../../infrastructure/ai/smartreception-knowledge';
+import type { LeadData } from '../../infrastructure/ai/ai.types';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -19,6 +21,44 @@ export interface ProcessAiReplyParams {
   phoneNumberId: string;
   customerPhone: string;
   accessToken?: string;
+}
+
+function parseLeadData(data: Record<string, unknown> | undefined): LeadData | null {
+  if (!data) return null;
+  return {
+    fullName: typeof data.fullName === 'string' ? data.fullName : undefined,
+    businessName: typeof data.businessName === 'string' ? data.businessName : undefined,
+    phone: typeof data.phone === 'string' ? data.phone : undefined,
+    email: typeof data.email === 'string' ? data.email : undefined,
+    service: typeof data.service === 'string' ? data.service : undefined,
+    complete: data.complete === true,
+  };
+}
+
+async function persistLeadData(
+  businessId: string,
+  customerId: string,
+  lead: LeadData
+): Promise<void> {
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, businessId },
+  });
+  if (!customer) return;
+
+  const notesParts: string[] = [];
+  if (customer.notes) notesParts.push(customer.notes);
+  if (lead.businessName) notesParts.push(`Business: ${lead.businessName}`);
+  if (lead.service) notesParts.push(`Service: ${lead.service}`);
+
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      name: lead.fullName || customer.name,
+      email: lead.email || customer.email,
+      phone: lead.phone || customer.phone,
+      notes: notesParts.length ? notesParts.join('\n') : customer.notes,
+    },
+  });
 }
 
 export async function processAndSendAiReply(params: ProcessAiReplyParams): Promise<void> {
@@ -42,7 +82,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     return;
   }
 
-  console.log('[AI] Processing started');
+  console.log('[AI] Processing started (Gemini)');
 
   whatsappService
     .sendTypingIndicator(phoneNumberId, customerPhone, accessToken)
@@ -54,13 +94,24 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   });
 
   const aiResponse = await aiService.generateResponse(businessId, conversationId, customerMessage);
-  console.log('[AI] Response generated');
+  console.log('[AI] Response generated (Gemini)');
+
+  const collectLeadAction = aiResponse.actions.find((a) => a.type === 'collect_lead');
+  const leadData = parseLeadData(collectLeadAction?.data);
+  if (leadData) {
+    await persistLeadData(businessId, conversation.customerId, leadData);
+  }
+
+  let replyContent = aiResponse.content;
+  if (leadData?.complete) {
+    replyContent = `${replyContent}\n\n${LEAD_THANK_YOU_SO}`;
+  }
 
   const outboundMessage = await prisma.message.create({
     data: {
       conversationId,
       direction: 'OUTBOUND',
-      content: aiResponse.content,
+      content: replyContent,
       type: 'TEXT',
       isAiGenerated: true,
       status: 'PENDING',
@@ -74,7 +125,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     data: { lastMessageAt: new Date() },
   });
 
-  recordOutboundAttempt(businessId, aiResponse.content);
+  recordOutboundAttempt(businessId, replyContent);
   console.log('[WhatsApp] Sending reply');
 
   const sendResult = await whatsappService.sendOutbound({
@@ -82,7 +133,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     to: customerPhone,
     accessToken,
     type: 'TEXT',
-    content: aiResponse.content,
+    content: replyContent,
   });
 
   await prisma.conversation.update({
@@ -91,7 +142,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   });
 
   if (sendResult.success && sendResult.whatsappMsgId) {
-    recordOutboundSuccess(businessId, aiResponse.content);
+    recordOutboundSuccess(businessId, replyContent);
     recordGraphApiResponse(businessId, sendResult.response);
     console.log('[WhatsApp] Reply sent successfully');
   } else {
@@ -99,10 +150,12 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     console.error('[WhatsApp] Message failed:', sendResult.error);
   }
 
-  await whatsappRepository.recordGraphApiResult(phoneNumberId, {
-    response: sendResult.response,
-    error: sendResult.error,
-  }).catch((error) => logger.warn('Failed to record Graph API result', { error }));
+  await whatsappRepository
+    .recordGraphApiResult(phoneNumberId, {
+      response: sendResult.response,
+      error: sendResult.error,
+    })
+    .catch((error) => logger.warn('Failed to record Graph API result', { error }));
 
   await prisma.message.update({
     where: { id: outboundMessage.id },

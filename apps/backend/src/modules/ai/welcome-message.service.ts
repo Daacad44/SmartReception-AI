@@ -1,6 +1,9 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
-import { SMARTRECEPTION_WELCOME_MESSAGE } from '../../infrastructure/ai/smartreception-knowledge';
+import {
+  detectMessageLanguage,
+  getWelcomeForLanguage,
+} from '../../infrastructure/ai/smartreception-knowledge';
 import { logger } from '../../core/logger';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 
@@ -10,10 +13,18 @@ export interface SendWelcomeParams {
   phoneNumberId: string;
   customerPhone: string;
   accessToken?: string;
+  firstMessageContent?: string;
 }
 
 export async function sendWelcomeMessage(params: SendWelcomeParams): Promise<boolean> {
-  const { businessId, conversationId, phoneNumberId, customerPhone, accessToken } = params;
+  const {
+    businessId,
+    conversationId,
+    phoneNumberId,
+    customerPhone,
+    accessToken,
+    firstMessageContent,
+  } = params;
 
   const aiConfig = await prisma.aIConfiguration.findUnique({
     where: { businessId },
@@ -24,7 +35,9 @@ export async function sendWelcomeMessage(params: SendWelcomeParams): Promise<boo
     return false;
   }
 
-  const content = aiConfig.greetingMessage?.trim() || SMARTRECEPTION_WELCOME_MESSAGE;
+  const lang = detectMessageLanguage(firstMessageContent || '');
+  const content =
+    aiConfig.greetingMessage?.trim() || getWelcomeForLanguage(lang);
 
   const outboundMessage = await prisma.message.create({
     data: {
@@ -34,7 +47,7 @@ export async function sendWelcomeMessage(params: SendWelcomeParams): Promise<boo
       type: 'TEXT',
       isAiGenerated: true,
       status: 'PENDING',
-      metadata: { type: 'welcome' },
+      metadata: { type: 'welcome', language: lang },
     },
   });
 

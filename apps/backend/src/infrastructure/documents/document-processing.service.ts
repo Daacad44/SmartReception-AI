@@ -3,7 +3,7 @@ import { prisma } from '../database/prisma';
 import { storageService } from '../storage';
 import { getDocumentQueue } from '../queue/queues';
 import { extractDocumentText } from '../../modules/knowledge/document-processor';
-import { generateEmbeddings } from '../ai/embedding.service';
+import { generateEmbeddings, extractKnowledge } from '../ai/gemini.service';
 import { logger } from '../../core/logger';
 import { notifyKnowledge } from '../notifications/notification-helper';
 
@@ -74,12 +74,15 @@ export async function processDocumentById(documentId: string, businessId: string
       throw new Error('No text could be extracted from this document');
     }
 
+    const enriched = await extractKnowledge(trimmed.slice(0, 50000));
+    const indexableText = enriched || trimmed;
+
     await prisma.knowledgeDocument.update({
       where: { id: documentId },
-      data: { status: 'INDEXING', content: trimmed.slice(0, 50000) },
+      data: { status: 'INDEXING', content: indexableText.slice(0, 50000) },
     });
 
-    const chunks = chunkText(trimmed.slice(0, 50000));
+    const chunks = chunkText(indexableText.slice(0, 50000));
     const embeddings = await generateEmbeddings(chunks);
     const indexedChunks = chunks.map((text, index) => ({
       text,

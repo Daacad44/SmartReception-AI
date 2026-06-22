@@ -95,17 +95,18 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
 
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  ai: {
+    provider: (process.env.AI_PROVIDER || 'gemini').toLowerCase(),
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    embeddingModel: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
   },
 
   whatsapp: {
     verifyToken: resolveVerifyToken(),
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-    businessAccountId:
-      process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+    businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
     appId: process.env.META_APP_ID || '',
     appSecret:
       process.env.WHATSAPP_APP_SECRET ||
@@ -114,6 +115,7 @@ export const config = {
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v23.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v23.0'}`,
     webhookUrl,
+    displayPhone: process.env.WHATSAPP_DISPLAY_PHONE || '+25268776299',
   },
 
   r2: {
@@ -149,6 +151,12 @@ export const config = {
     secretKey: process.env.STRIPE_SECRET_KEY || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   },
+
+  aiReply: {
+    enabled: process.env.AI_REPLY_ENABLED !== 'false',
+    maxContextMessages: parseInt(process.env.AI_MAX_CONTEXT_MESSAGES || '20', 10),
+    timeoutMs: parseInt(process.env.AI_REPLY_TIMEOUT_MS || '5000', 10),
+  },
 } as const;
 
 const INSECURE_JWT_SECRETS = new Set([
@@ -183,4 +191,6 @@ export function logWhatsAppConfig(): void {
   console.log('[WhatsApp] Expected verify token:', verifyToken);
   console.log('[WhatsApp] App secret configured:', Boolean(config.whatsapp.appSecret));
   console.log('[WhatsApp] Access token configured:', Boolean(config.whatsapp.accessToken));
+  console.log('[AI] Provider:', config.ai.provider);
+  console.log('[AI] Gemini API key configured:', Boolean(config.ai.geminiApiKey));
 }
