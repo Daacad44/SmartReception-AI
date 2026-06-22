@@ -22,6 +22,7 @@ import { useUpdateBusinessSettings, useUpdateAiConfig } from '@/hooks/useMutatio
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { WhatsAppSettings } from '@/components/settings/WhatsAppSettings';
+import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const businessSchema = z.object({
@@ -315,18 +316,8 @@ export function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="security" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your account security</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 max-w-lg">
-              <p className="text-sm text-muted-foreground">
-                Use the forgot password flow on the login page to reset your password via email.
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="security" className="mt-6 space-y-4">
+          <TwoFactorSettings />
         </TabsContent>
       </Tabs>
     </div>

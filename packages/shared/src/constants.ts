@@ -4,6 +4,8 @@ export const ROLES = {
   MANAGER: 'MANAGER',
   AGENT: 'AGENT',
   VIEWER: 'VIEWER',
+  RECEPTIONIST: 'RECEPTIONIST',
+  STAFF: 'STAFF',
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -27,13 +29,17 @@ export const PERMISSIONS = {
   'settings:read': 'settings:read',
   'settings:write': 'settings:write',
   'ai:configure': 'ai:configure',
+  'audit:read': 'audit:read',
+  'platform:admin': 'platform:admin',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  OWNER: Object.values(PERMISSIONS),
-  ADMIN: Object.values(PERMISSIONS).filter((p) => !p.startsWith('billing:write')),
+  OWNER: Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS['platform:admin']),
+  ADMIN: Object.values(PERMISSIONS).filter(
+    (p) => !p.startsWith('billing:write') && p !== PERMISSIONS['platform:admin']
+  ),
   MANAGER: [
     PERMISSIONS['business:read'],
     PERMISSIONS['team:read'],
@@ -47,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['knowledge:write'],
     PERMISSIONS['analytics:read'],
     PERMISSIONS['settings:read'],
+    PERMISSIONS['audit:read'],
   ],
   AGENT: [
     PERMISSIONS['customers:read'],
@@ -55,6 +62,22 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['conversations:write'],
     PERMISSIONS['appointments:read'],
     PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+  ],
+  RECEPTIONIST: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['customers:write'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['conversations:write'],
+    PERMISSIONS['appointments:read'],
+    PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+    PERMISSIONS['analytics:read'],
+  ],
+  STAFF: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['appointments:read'],
     PERMISSIONS['knowledge:read'],
   ],
   VIEWER: [

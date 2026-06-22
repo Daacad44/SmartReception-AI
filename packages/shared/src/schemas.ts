@@ -74,10 +74,43 @@ export const createAppointmentSchema = z.object({
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   notes: z.string().max(1000).optional(),
+  companyName: z.string().max(200).optional(),
+  serviceRequested: z.string().max(200).optional(),
+  additionalNotes: z.string().max(2000).optional(),
+  leadSource: z.enum(['WHATSAPP', 'WEBSITE', 'FORM', 'PHONE', 'REFERRAL', 'OTHER']).optional(),
+  assignedToId: z.string().uuid().optional(),
+  meetingLink: z.string().url().optional().or(z.literal('')),
+  customerEmail: z.string().email().optional(),
 });
 
 export const updateAppointmentSchema = createAppointmentSchema.partial().extend({
-  status: z.enum(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']).optional(),
+  status: z.enum(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'MISSED']).optional(),
+});
+
+export const appointmentActionSchema = z.object({
+  action: z.enum(['approve', 'reschedule', 'cancel', 'complete', 'mark_missed', 'assign']),
+  assignedToId: z.string().uuid().optional(),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
+  internalNote: z.string().max(2000).optional(),
+});
+
+export const addInternalNoteSchema = z.object({
+  content: z.string().min(1).max(2000),
+});
+
+export const twoFactorVerifySchema = z.object({
+  tempToken: z.string().min(1),
+  code: z.string().min(6).max(8),
+});
+
+export const twoFactorSetupVerifySchema = z.object({
+  code: z.string().length(6).regex(/^\d{6}$/),
+});
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1),
+  code: z.string().min(6).max(8),
 });
 
 export const acceptInviteSchema = z.object({
@@ -114,11 +147,11 @@ export const sendMessageSchema = z.object({
 
 export const inviteTeamMemberSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']),
 });
 
 export const updateTeamMemberSchema = z.object({
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']),
 });
 
 export const createServiceSchema = z.object({
@@ -173,4 +206,8 @@ export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;
-export type KnowledgeSearchInput = z.infer<typeof knowledgeSearchSchema>;
+export type TwoFactorVerifyInput = z.infer<typeof twoFactorVerifySchema>;
+export type TwoFactorSetupVerifyInput = z.infer<typeof twoFactorSetupVerifySchema>;
+export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
+export type AppointmentActionInput = z.infer<typeof appointmentActionSchema>;
+export type AddInternalNoteInput = z.infer<typeof addInternalNoteSchema>;

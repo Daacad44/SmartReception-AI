@@ -210,3 +210,92 @@ export function accountActivatedEmail(data: AccountActivatedEmailData): { subjec
     }),
   };
 }
+
+interface AppointmentEmailData {
+  customerName: string;
+  serviceName: string;
+  date: string;
+  time: string;
+  meetingLink?: string;
+  details?: string;
+}
+
+export function appointmentConfirmationEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Confirmation</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Dear ${data.customerName}, your appointment has been successfully scheduled.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Full Name:</strong> ${data.customerName}<br />
+        <strong>Service:</strong> ${data.serviceName}<br />
+        <strong>Date:</strong> ${data.date}<br />
+        <strong>Time:</strong> ${data.time}
+        ${data.meetingLink ? `<br /><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:${BRAND.accentColor};">${data.meetingLink}</a>` : ''}
+        ${data.details ? `<br /><strong>Details:</strong> ${data.details}` : ''}
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
+      We look forward to speaking with you. You will receive reminders before your appointment.
+    </p>
+  `;
+
+  return {
+    subject: 'Appointment Confirmation – SmartReception',
+    html: renderEmailLayout({
+      preheader: `Your appointment on ${data.date} at ${data.time} is confirmed`,
+      title: 'Appointment Confirmation',
+      body,
+    }),
+  };
+}
+
+export function appointmentReminderEmail(
+  data: AppointmentEmailData & { reminderLabel: string }
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Reminder</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.customerName}, this is a reminder that your appointment is in <strong>${data.reminderLabel}</strong>.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Service:</strong> ${data.serviceName}<br />
+        <strong>Date:</strong> ${data.date}<br />
+        <strong>Time:</strong> ${data.time}
+        ${data.meetingLink ? `<br /><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:${BRAND.accentColor};">${data.meetingLink}</a>` : ''}
+      </td></tr>
+    </table>
+  `;
+
+  return {
+    subject: `Appointment Reminder – ${data.reminderLabel}`,
+    html: renderEmailLayout({
+      preheader: `Reminder: ${data.serviceName} on ${data.date}`,
+      title: 'Appointment Reminder',
+      body,
+    }),
+  };
+}
+
+export function appointmentMissedEmail(data: { customerName: string }): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Missed Appointment</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.customerName}, we noticed that your appointment was missed.
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
+      You may book a new appointment after 24 hours. Contact us on WhatsApp if you need assistance.
+    </p>
+  `;
+
+  return {
+    subject: 'Missed Appointment – SmartReception',
+    html: renderEmailLayout({
+      preheader: 'Your appointment was missed',
+      title: 'Missed Appointment',
+      body,
+    }),
+  };
+}

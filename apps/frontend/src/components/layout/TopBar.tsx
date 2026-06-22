@@ -132,8 +132,13 @@ export function TopBar({ onMenuClick }: TopBarProps) {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-80 z-50" sideOffset={8}>
+            <DropdownMenuLabel className="flex items-center justify-between">
+              Notifications
+              <Button variant="ghost" size="sm" className="h-auto p-0 text-xs text-accent" onClick={() => navigate('/notifications')}>
+                View all
+              </Button>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <ScrollArea className="h-64">
               {notifications?.map((notif) => (

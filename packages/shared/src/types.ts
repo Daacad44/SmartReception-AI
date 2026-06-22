@@ -23,6 +23,8 @@ export interface JwtPayload {
   email: string;
   businessId?: string;
   role?: string;
+  isSuperAdmin?: boolean;
+  purpose?: 'access' | '2fa';
 }
 
 export interface DashboardStats {

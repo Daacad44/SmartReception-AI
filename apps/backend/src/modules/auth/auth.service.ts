@@ -17,6 +17,7 @@ import {
   recordFailedLogin,
   clearLoginAttempts,
 } from '../../infrastructure/auth/login-lockout.service';
+import { twoFactorService } from '../two-factor/two-factor.service';
 
 const VERIFY_EXPIRY_HOURS = 24;
 
@@ -103,6 +104,26 @@ export class AuthService {
     const memberships = await authRepository.getUserBusinesses(user.id);
     const primaryMembership = memberships[0];
 
+    const mustVerify2fa = twoFactorService.requiresTwoFactor(
+      primaryMembership?.role,
+      user.totpEnabled,
+      user.isSuperAdmin
+    );
+
+    if (mustVerify2fa && user.totpEnabled) {
+      const tempToken = twoFactorService.createTempToken(user.id, user.email);
+      return {
+        requiresTwoFactor: true,
+        tempToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+    }
+
     await authRepository.updateUser(user.id, { lastLoginAt: new Date() });
 
     const tokens = await tokenService.createTokenPair(
@@ -144,6 +165,54 @@ export class AuthService {
         industry: m.business.industry,
         plan: m.business.subscription?.plan ?? 'STARTER',
       })),
+      isSuperAdmin: user.isSuperAdmin,
+      ...tokens,
+    };
+  }
+
+  async verifyTwoFactorLogin(tempToken: string, code: string, ipAddress?: string) {
+    const user = await twoFactorService.verifyLogin(tempToken, code);
+    const memberships = await authRepository.getUserBusinesses(user.id);
+    const primaryMembership = memberships[0];
+
+    await authRepository.updateUser(user.id, { lastLoginAt: new Date() });
+
+    const tokens = await tokenService.createTokenPair(
+      user.id,
+      user.email,
+      primaryMembership?.businessId,
+      primaryMembership?.role
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        businessId: primaryMembership?.businessId,
+        userId: user.id,
+        action: 'LOGIN',
+        entity: 'User',
+        entityId: user.id,
+        ipAddress,
+        newData: { event: 'login_2fa' },
+      },
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+      },
+      businesses: memberships.map((m) => ({
+        id: m.business.id,
+        name: m.business.name,
+        slug: m.business.slug,
+        role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'STARTER',
+      })),
+      isSuperAdmin: user.isSuperAdmin,
       ...tokens,
     };
   }

@@ -9,7 +9,11 @@ import {
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
-import { whatsappService } from './infrastructure/whatsapp/whatsapp.service';
+import {
+  sendAppointmentReminder,
+  sendMissedAppointmentNotification,
+  type ReminderInterval,
+} from './infrastructure/appointments/appointment-notification.service';
 import { processAndSendAiReply } from './modules/ai/ai-reply.service';
 import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
 import { logger } from './core/logger';
@@ -75,53 +79,14 @@ async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
 }
 
 async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
-  const { appointmentId, businessId, customerPhone } = job.data;
+  const { appointmentId, businessId, interval = '24h' } = job.data;
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId, businessId },
-    include: {
-      customer: true,
-      service: true,
-      business: {
-        include: { whatsappAccounts: { where: { isActive: true }, take: 1 } },
-      },
-    },
-  });
-
-  if (!appointment || appointment.status === 'CANCELLED' || appointment.reminderSent) {
+  if (interval === 'missed') {
+    await sendMissedAppointmentNotification(appointmentId, businessId);
     return;
   }
 
-  const whatsappAccount = appointment.business.whatsappAccounts[0];
-  if (!whatsappAccount) {
-    logger.warn(`No WhatsApp account for reminder on appointment ${appointmentId}`);
-    return;
-  }
-
-  const startTime = appointment.startTime.toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-
-  const message = `Reminder: You have an appointment "${appointment.title}"${
-    appointment.service ? ` for ${appointment.service.name}` : ''
-  } scheduled on ${startTime}. Reply to confirm or reschedule.`;
-
-  const result = await whatsappService.sendOutbound({
-    phoneNumberId: whatsappAccount.phoneNumberId,
-    to: customerPhone,
-    accessToken: whatsappAccount.accessToken || undefined,
-    type: 'TEXT',
-    content: message,
-  });
-
-  if (result.success) {
-    await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { reminderSent: true },
-    });
-    logger.info(`Reminder sent for appointment ${appointmentId}`);
-  }
+  await sendAppointmentReminder(appointmentId, businessId, interval as ReminderInterval);
 }
 
 async function startWorkers(): Promise<void> {
