@@ -18,6 +18,8 @@ export interface WhatsAppWebhookLocation {
 }
 
 export interface WhatsAppWebhookContact {
+  wa_id?: string;
+  profile?: { name?: string };
   name?: { formatted_name?: string; first_name?: string };
   phones?: Array<{ phone?: string; type?: string }>;
 }
@@ -56,6 +58,7 @@ export interface WhatsAppWebhookStatus {
 export interface ParsedWebhookPayload {
   phoneNumberId?: string;
   displayPhoneNumber?: string;
+  contacts: WhatsAppWebhookContact[];
   messages: WhatsAppWebhookMessage[];
   statuses: WhatsAppWebhookStatus[];
 }

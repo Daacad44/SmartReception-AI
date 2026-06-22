@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { parseWebhookBody, extractMessageContent } from './whatsapp-webhook.parser';
+import { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
 
 describe('WhatsApp webhook parser', () => {
   it('parses inbound text messages', () => {
@@ -32,6 +32,36 @@ describe('WhatsApp webhook parser', () => {
     assert.equal(parsed.phoneNumberId, '12345');
     assert.equal(parsed.messages.length, 1);
     assert.equal(parsed.messages[0].text?.body, 'Hello');
+  });
+
+  it('parses contact profile names from value.contacts', () => {
+    const body = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: '12345' },
+                contacts: [{ wa_id: '252687716299', profile: { name: 'John Doe' } }],
+                messages: [
+                  {
+                    from: '252687716299',
+                    id: 'wamid.contact',
+                    timestamp: '1710000002',
+                    type: 'text',
+                    text: { body: 'Hello' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseWebhookBody(body);
+    assert.equal(parsed.contacts.length, 1);
+    assert.equal(resolveContactName(parsed.contacts, '252687716299'), 'John Doe');
   });
 
   it('parses delivery status updates', () => {

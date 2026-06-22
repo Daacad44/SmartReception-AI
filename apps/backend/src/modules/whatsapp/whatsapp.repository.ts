@@ -36,10 +36,16 @@ export class WhatsAppRepository {
     });
 
     if (existing) {
+      if (name && name !== existing.name && name !== normalizedPhone) {
+        return prisma.customer.update({
+          where: { id: existing.id },
+          data: { name, whatsappId: phone },
+        });
+      }
       return existing;
     }
 
-    return prisma.customer.create({
+    const customer = await prisma.customer.create({
       data: {
         businessId,
         phone: normalizedPhone,
@@ -48,6 +54,8 @@ export class WhatsAppRepository {
         source: 'whatsapp',
       },
     });
+    console.log('[WhatsApp] Customer created');
+    return customer;
   }
 
   async findOrCreateConversation(
@@ -67,7 +75,7 @@ export class WhatsAppRepository {
       return existing;
     }
 
-    return prisma.conversation.create({
+    const conversation = await prisma.conversation.create({
       data: {
         businessId,
         customerId,
@@ -76,6 +84,8 @@ export class WhatsAppRepository {
         isAiEnabled: true,
       },
     });
+    console.log('[WhatsApp] Conversation created');
+    return conversation;
   }
 
   async createInboundMessage(data: {
@@ -114,6 +124,7 @@ export class WhatsAppRepository {
         data: { lastContactAt: new Date() },
       });
 
+      console.log('[WhatsApp] Message stored');
       return message;
     });
   }

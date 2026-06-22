@@ -4,6 +4,7 @@ import {
   whatsappService,
   parseWebhookBody,
   extractMessageContent,
+  resolveContactName,
 } from '../../infrastructure/whatsapp/whatsapp.service';
 import { whatsappMediaService } from '../../infrastructure/whatsapp/whatsapp-media.service';
 import { getAiQueue } from '../../infrastructure/queue/queues';
@@ -32,7 +33,33 @@ export interface WhatsAppWebhookHealth {
   status: 'verified' | 'pending' | 'not_configured';
 }
 
+export interface WhatsAppDebugInfo {
+  lastWebhookReceived: string | null;
+  lastMessageProcessed: string | null;
+  totalMessages: number;
+  totalCustomers: number;
+  totalConversations: number;
+  webhookStatus: 'verified' | 'pending' | 'not_configured';
+}
+
 export class WhatsAppModuleService {
+  private logWebhookPayload(body: Record<string, unknown>, parsed: ReturnType<typeof parseWebhookBody>) {
+    console.log('[WhatsApp] Webhook payload:', JSON.stringify(body));
+
+    for (const msg of parsed.messages) {
+      const contactName = resolveContactName(parsed.contacts, msg.from);
+      const extracted = extractMessageContent(msg);
+      console.log('[WhatsApp] Message type:', msg.type);
+      console.log('[WhatsApp] From:', msg.from);
+      console.log('[WhatsApp] Name:', contactName ?? 'Unknown');
+      console.log('[WhatsApp] Message:', extracted.content);
+      console.log('[WhatsApp] Timestamp:', msg.timestamp);
+    }
+
+    for (const status of parsed.statuses) {
+      console.log('[WhatsApp] Status update:', status.status, 'for', status.recipient_id);
+    }
+  }
   private isWebhookInfrastructureReady(): boolean {
     return Boolean(config.whatsapp.verifyToken && config.whatsapp.webhookUrl);
   }
@@ -93,14 +120,20 @@ export class WhatsAppModuleService {
     return null;
   }
 
-  async recordWebhookReceived(body: Record<string, unknown>): Promise<void> {
+  async handleWebhook(body: Record<string, unknown>): Promise<void> {
     console.log('[WhatsApp] Incoming webhook received');
+    await this.recordWebhookReceived(body);
+    await this.processWebhook(body);
+  }
 
+  async recordWebhookReceived(body: Record<string, unknown>): Promise<void> {
     if (!this.isWebhookInfrastructureReady()) {
       return;
     }
 
     const parsed = parseWebhookBody(body);
+    this.logWebhookPayload(body, parsed);
+
     const phoneNumberId = parsed.phoneNumberId ?? config.whatsapp.phoneNumberId;
     const account = await whatsappRepository.resolveAccountForWebhook(phoneNumberId);
 
@@ -109,7 +142,12 @@ export class WhatsAppModuleService {
       return;
     }
 
-    await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+    try {
+      await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+    } catch (error) {
+      logger.warn('Failed to record webhook receipt timestamp', { error });
+    }
+
     await whatsappRepository.markWebhookVerified(account.phoneNumberId);
 
     const syncData: {
@@ -143,7 +181,17 @@ export class WhatsAppModuleService {
       return;
     }
 
-    await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+    if (!parsed.messages.length && !parsed.statuses.length) {
+      logger.info('Webhook received with no messages or statuses to process');
+      await whatsappRepository.markWebhookVerified(account.phoneNumberId);
+      return;
+    }
+
+    try {
+      await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+    } catch (error) {
+      logger.warn('Failed to record webhook receipt timestamp', { error });
+    }
 
     if (!account.webhookVerified) {
       await whatsappRepository.markWebhookVerified(account.phoneNumberId);
@@ -178,11 +226,17 @@ export class WhatsAppModuleService {
       );
       if (!recorded) continue;
 
+      const contactName = resolveContactName(parsed.contacts, msg.from);
       const extracted = extractMessageContent(msg);
+
+      console.log('[WhatsApp] Processing message from:', msg.from);
+      console.log('[WhatsApp] Name:', contactName ?? 'Unknown');
+      console.log('[WhatsApp] Message:', extracted.content);
+
       const customer = await whatsappRepository.findOrCreateCustomer(
         account.businessId,
         msg.from,
-        msg.from
+        contactName ?? msg.from
       );
 
       const conversation = await whatsappRepository.findOrCreateConversation(
@@ -231,21 +285,31 @@ export class WhatsAppModuleService {
         whatsappMsgId: msg.id,
         type: extracted.type,
         mediaUrl,
-        metadata,
+        metadata: {
+          ...metadata,
+          senderName: contactName,
+          whatsappTimestamp: msg.timestamp,
+        },
       });
 
       const accessToken = account.accessToken || config.whatsapp.accessToken || undefined;
-      await whatsappService.markAsRead(phoneNumberId, msg.id, accessToken);
-
-      await prisma.auditLog.create({
-        data: {
-          businessId: account.businessId,
-          action: 'CREATE',
-          entity: 'WhatsAppMessage',
-          entityId: message.id,
-          newData: { direction: 'INBOUND', type: extracted.type, from: msg.from },
-        },
+      await whatsappService.markAsRead(account.phoneNumberId, msg.id, accessToken).catch((error) => {
+        logger.warn('Failed to mark WhatsApp message as read', { error });
       });
+
+      try {
+        await prisma.auditLog.create({
+          data: {
+            businessId: account.businessId,
+            action: 'CREATE',
+            entity: 'WhatsAppMessage',
+            entityId: message.id,
+            newData: { direction: 'INBOUND', type: extracted.type, from: msg.from },
+          },
+        });
+      } catch (error) {
+        logger.warn('Failed to write WhatsApp audit log', { error });
+      }
 
       await notifyNewMessage(account.businessId, customer.name, conversation.id);
 
@@ -255,7 +319,7 @@ export class WhatsAppModuleService {
           : extracted.content;
 
       if (conversation.isAiEnabled && aiConfig?.enableAutoReply && aiText) {
-        await whatsappService.sendTypingIndicator(phoneNumberId, msg.from, accessToken);
+        await whatsappService.sendTypingIndicator(account.phoneNumberId, msg.from, accessToken);
         await prisma.conversation.update({
           where: { id: conversation.id },
           data: { isTyping: true },
@@ -274,6 +338,11 @@ export class WhatsAppModuleService {
     }
 
     await whatsappRepository.markWebhookVerified(account.phoneNumberId);
+    await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
+      webhookStatus: 'verified',
+      webhookVerified: true,
+      lastWebhookReceivedAt: new Date(),
+    });
   }
 
   async getWebhookHealth(businessId: string): Promise<WhatsAppWebhookHealth> {
@@ -281,21 +350,29 @@ export class WhatsAppModuleService {
     const infrastructureReady = this.isWebhookInfrastructureReady();
     const lastWebhookReceivedAt = await whatsappRepository.getLastWebhookReceived(businessId);
     const hasStoredEvents = await whatsappRepository.hasWebhookActivity(businessId);
-    const receivingEvents = Boolean(lastWebhookReceivedAt || hasStoredEvents);
+    const receivingEvents = Boolean(
+      lastWebhookReceivedAt || hasStoredEvents || account?.webhookVerified
+    );
     const webhookVerified = Boolean(account?.webhookVerified || receivingEvents);
 
-    let status = this.resolveWebhookStatus({
+    const status = this.resolveWebhookStatus({
       webhookVerified,
       receivingEvents,
       infrastructureReady,
     });
 
-    if (account?.isActive && status === 'verified') {
+    if (account?.isActive && (status === 'verified' || receivingEvents)) {
       await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
         webhookStatus: 'verified',
         webhookVerified: true,
-        lastWebhookReceivedAt: lastWebhookReceivedAt ?? undefined,
+        lastWebhookReceivedAt: lastWebhookReceivedAt ?? new Date(),
       });
+      return {
+        verified: true,
+        receivingEvents: true,
+        lastWebhookReceived: (lastWebhookReceivedAt ?? new Date()).toISOString(),
+        status: 'verified',
+      };
     }
 
     return {
@@ -303,6 +380,30 @@ export class WhatsAppModuleService {
       receivingEvents,
       lastWebhookReceived: lastWebhookReceivedAt?.toISOString() ?? null,
       status,
+    };
+  }
+
+  async getDebug(businessId: string): Promise<WhatsAppDebugInfo> {
+    const webhookHealth = await this.getWebhookHealth(businessId);
+    const [totalMessages, totalCustomers, totalConversations, lastInboundMessage] =
+      await Promise.all([
+        prisma.message.count({ where: { conversation: { businessId } } }),
+        prisma.customer.count({ where: { businessId } }),
+        prisma.conversation.count({ where: { businessId } }),
+        prisma.message.findFirst({
+          where: { conversation: { businessId }, direction: 'INBOUND' },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+      ]);
+
+    return {
+      lastWebhookReceived: webhookHealth.lastWebhookReceived,
+      lastMessageProcessed: lastInboundMessage?.createdAt.toISOString() ?? null,
+      totalMessages,
+      totalCustomers,
+      totalConversations,
+      webhookStatus: webhookHealth.receivingEvents ? 'verified' : webhookHealth.status,
     };
   }
 
@@ -354,7 +455,7 @@ export class WhatsAppModuleService {
     }
 
     const webhookHealth = await this.getWebhookHealth(businessId);
-    const webhook = webhookHealth.status;
+    const webhook = webhookHealth.receivingEvents ? 'verified' : webhookHealth.status;
 
     const synced = await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
       webhookStatus: webhook,

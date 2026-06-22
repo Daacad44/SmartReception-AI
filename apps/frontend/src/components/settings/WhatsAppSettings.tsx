@@ -79,10 +79,10 @@ export function WhatsAppSettings() {
   };
 
   const webhookIsVerified =
-    webhookHealth?.verified === true || webhookHealth?.receivingEvents === true;
-  const webhookDisplayStatus = webhookIsVerified
-    ? 'verified'
-    : webhookHealth?.status ?? health?.webhook ?? 'not_configured';
+    webhookHealth?.verified === true ||
+    webhookHealth?.receivingEvents === true ||
+    webhookHealth?.status === 'verified';
+  const webhookDisplayStatus = webhookIsVerified ? 'verified' : webhookHealth?.status ?? 'not_configured';
 
   if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
