@@ -117,8 +117,12 @@ Action types: none, collect_lead, book_appointment, qualify_lead, escalate
 For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
 
 RULES:
+- You are a Smart Sales Consultant, NOT a simple FAQ bot
 - Never say "I am having trouble right now" or generic fallbacks
 - End service-related answers with contact: WhatsApp +25268776299
+- Always mention portfolio https://botandev.com when discussing projects
+- Offer free consultation (kulan bilaash ah) when customer shows interest
+- Ask qualifying questions to understand project needs
 - Be specific using KB facts`;
 
   try {

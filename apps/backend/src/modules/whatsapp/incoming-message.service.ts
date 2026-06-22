@@ -10,9 +10,16 @@ import {
   parseMenuSelection,
   requestsEnglish,
 } from '../../infrastructure/ai/somali-menu';
+import {
+  createSalesFlow,
+  getActiveSalesFlow,
+  processSalesFlowMessage,
+  salesFlowMetadata,
+} from '../../infrastructure/ai/sales-flow.service';
+import type { SalesFlowContext } from '../../infrastructure/ai/sales-flow.types';
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { sendMenuOptionReply, sendServiceMenu } from '../ai/menu-reply.service';
+import { sendAutomatedReply, sendServiceMenu } from '../ai/menu-reply.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
@@ -37,13 +44,16 @@ function shouldAiRespond(conversation: { isAiEnabled: boolean }): boolean {
   return conversation.isAiEnabled;
 }
 
-/**
- * Inbound WhatsApp pipeline:
- * save → menu / menu-option / KB+Gemini reply
- */
 export async function handleIncomingMessage(params: HandleIncomingMessageParams): Promise<void> {
-  const { businessId, whatsappAccountId, phoneNumberId, accessToken, msg, contactName, extracted } =
-    params;
+  const {
+    businessId,
+    whatsappAccountId,
+    phoneNumberId,
+    accessToken,
+    msg,
+    contactName,
+    extracted,
+  } = params;
   const startedAt = Date.now();
 
   const customer = await whatsappRepository.findOrCreateCustomer(
@@ -51,14 +61,12 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     msg.from,
     contactName ?? msg.from
   );
-  console.log('[WhatsApp] Customer found');
 
   const { conversation } = await whatsappRepository.findOrCreateConversation(
     businessId,
     customer.id,
     whatsappAccountId
   );
-  console.log('[WhatsApp] Conversation ready');
 
   recordInboundMessage(businessId, extracted.content);
 
@@ -87,9 +95,10 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
 
   if (canReplyWithAi) {
-    await runSomaliMenuAgent({
+    await runSomaliSalesAgent({
       businessId,
       conversationId: conversation.id,
+      customerId: customer.id,
       inboundMessageId: message.id,
       customerMessage: aiText,
       phoneNumberId,
@@ -146,9 +155,10 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
   console.log(`[WhatsApp] handleIncomingMessage completed in ${Date.now() - startedAt}ms`);
 }
 
-interface SomaliMenuAgentParams {
+interface SomaliSalesAgentParams {
   businessId: string;
   conversationId: string;
+  customerId: string;
   inboundMessageId: string;
   customerMessage: string;
   phoneNumberId: string;
@@ -157,11 +167,7 @@ interface SomaliMenuAgentParams {
   preferEnglish?: boolean;
 }
 
-/**
- * Somali menu agent — menu on every interaction; option details for 1-9;
- * KB+Gemini for free-form questions (Somali unless English requested).
- */
-async function runSomaliMenuAgent(params: SomaliMenuAgentParams): Promise<void> {
+async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
   const base = {
     businessId: params.businessId,
     conversationId: params.conversationId,
@@ -170,21 +176,56 @@ async function runSomaliMenuAgent(params: SomaliMenuAgentParams): Promise<void> 
     accessToken: params.accessToken,
   };
 
-  const menuOption = parseMenuSelection(params.customerMessage);
-  if (menuOption !== null) {
-    await sendMenuOptionReply({ ...base, option: menuOption });
-    return;
+  const flowCtx: SalesFlowContext = {
+    businessId: params.businessId,
+    conversationId: params.conversationId,
+    customerId: params.customerId,
+    phoneNumberId: params.phoneNumberId,
+    customerPhone: params.customerPhone,
+    accessToken: params.accessToken,
+  };
+
+  const menuReset = /^(menu|adeegyada|bilow|start)$/i.test(params.customerMessage.trim());
+  const activeFlow = menuReset ? null : await getActiveSalesFlow(params.conversationId);
+
+  if (activeFlow) {
+    console.log('[AI] Sales flow active', {
+      service: activeFlow.serviceOption,
+      phase: activeFlow.phase,
+    });
+    const result = await processSalesFlowMessage(params.customerMessage, activeFlow, flowCtx);
+    if (result.handled && result.reply) {
+      await sendAutomatedReply({
+        ...base,
+        content: result.reply,
+        metadata: salesFlowMetadata(result.nextState ?? null),
+      });
+      return;
+    }
   }
 
-  // Send service menu on every inbound message (new, returning, existing conversations)
+  const menuOption = parseMenuSelection(params.customerMessage);
+  if (menuOption !== null && !activeFlow) {
+    console.log('[AI] Starting sales consultant flow', { option: menuOption });
+    const start = createSalesFlow(menuOption);
+    if (start.handled && start.reply) {
+      await sendAutomatedReply({
+        ...base,
+        content: start.reply,
+        metadata: salesFlowMetadata(start.nextState ?? null),
+      });
+      return;
+    }
+  }
+
   await sendServiceMenu(base);
 
   if (isMenuOnlyTrigger(params.customerMessage)) {
-    console.log('[AI] Greeting received — menu sent, awaiting selection');
+    console.log('[AI] Greeting — menu sent, awaiting selection');
     return;
   }
 
-  console.log('[AI] Free-form question — Knowledge Base + Gemini (Somali)');
+  console.log('[AI] Free-form — Knowledge Base + Gemini (Somali sales consultant)');
   await processAndSendAiReply({
     businessId: params.businessId,
     conversationId: params.conversationId,
