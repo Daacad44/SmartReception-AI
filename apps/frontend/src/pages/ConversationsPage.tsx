@@ -311,7 +311,7 @@ export function ConversationsPage() {
                                   ? 'text-muted-foreground'
                                   : 'text-muted-foreground/60'
                             )}
-                            title={msg.status}
+                            aria-label={msg.status}
                           />
                         )}
                       </div>
