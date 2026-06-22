@@ -3,8 +3,11 @@ import { Customer, Prisma } from '@prisma/client';
 import { PaginationInput } from '@smartreception/shared';
 
 export class CustomersRepository {
-  async findMany(businessId: string, params: PaginationInput & { tagId?: string }) {
-    const { page, limit, search, sortBy, sortOrder, tagId } = params;
+  async findMany(
+    businessId: string,
+    params: PaginationInput & { tagId?: string; customerType?: string; segmentId?: string }
+  ) {
+    const { page, limit, search, sortBy, sortOrder, tagId, customerType, segmentId } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.CustomerWhereInput = {
@@ -15,10 +18,16 @@ export class CustomersRepository {
           { name: { contains: search, mode: 'insensitive' } },
           { phone: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
+          { companyName: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
         ],
       }),
       ...(tagId && {
         tags: { some: { tagId } },
+      }),
+      ...(customerType && { customerType: customerType as never }),
+      ...(segmentId && {
+        segmentMembers: { some: { segmentId } },
       }),
     };
 
@@ -62,6 +71,9 @@ export class CustomersRepository {
       email?: string | null;
       notes?: string | null;
       companyName?: string | null;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
       whatsappNumber?: string | null;
       customerType?: string;
       leadStatus?: string;
@@ -77,6 +89,9 @@ export class CustomersRepository {
         email: data.email || null,
         notes: data.notes,
         companyName: data.companyName,
+        address: data.address,
+        city: data.city,
+        country: data.country,
         whatsappNumber: data.whatsappNumber || data.phone,
         customerType: data.customerType as never,
         leadStatus: data.leadStatus as never,

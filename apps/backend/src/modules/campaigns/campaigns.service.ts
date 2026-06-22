@@ -26,9 +26,18 @@ function computeNextRun(schedule: string, from: Date): Date | null {
 
 async function resolveRecipients(
   businessId: string,
-  segmentId?: string | null,
-  customerTypes?: CustomerType[]
+  options: {
+    segmentId?: string | null;
+    customerTypes?: CustomerType[];
+    sendToAll?: boolean;
+  }
 ) {
+  const { segmentId, customerTypes, sendToAll } = options;
+
+  if (sendToAll) {
+    return prisma.customer.findMany({ where: { businessId, isActive: true } });
+  }
+
   if (segmentId) {
     const segment = await prisma.customerSegment.findFirst({
       where: { id: segmentId, businessId },
@@ -50,7 +59,7 @@ async function resolveRecipients(
     });
   }
 
-  return prisma.customer.findMany({ where: { businessId, isActive: true }, take: 500 });
+  return prisma.customer.findMany({ where: { businessId, isActive: true } });
 }
 
 export async function executeCampaignSend(campaignId: string, businessId: string): Promise<void> {
@@ -200,7 +209,20 @@ export class CampaignsService {
   }
 
   async create(businessId: string, input: CreateCampaignInput, userId: string) {
-    const customers = await resolveRecipients(businessId, input.segmentId, input.customerTypes);
+    let message = input.message;
+    if (input.templateId) {
+      const template = await prisma.messageTemplate.findFirst({
+        where: { id: input.templateId, businessId },
+      });
+      if (!template) throw new NotFoundError('Template not found');
+      if (!message) message = template.content;
+    }
+
+    const customers = await resolveRecipients(businessId, {
+      segmentId: input.segmentId,
+      customerTypes: input.customerTypes,
+      sendToAll: input.sendToAll,
+    });
     if (customers.length === 0) {
       throw new ValidationError('No customers match the selected segment or filters');
     }
@@ -213,12 +235,14 @@ export class CampaignsService {
       data: {
         businessId,
         name: input.name,
-        message: input.message,
+        message,
         type: input.type,
         schedule: input.schedule,
         status,
         segmentId: input.segmentId,
+        templateId: input.templateId,
         customerTypes: input.customerTypes ?? [],
+        sendToAll: input.sendToAll ?? false,
         scheduledAt: sendNow ? new Date() : scheduledAt,
         nextRunAt: sendNow ? null : scheduledAt,
         createdById: userId,
@@ -303,6 +327,69 @@ export class CampaignsService {
     await prisma.auditLog.create({
       data: { businessId, userId, action: 'UPDATE', entity: 'Campaign', entityId: id, newData: { sendNow: true } },
     });
+  }
+
+  async getAnalytics(businessId: string) {
+    const campaigns = await prisma.campaign.findMany({
+      where: { businessId },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        status: true,
+        sentCount: true,
+        deliveredCount: true,
+        failedCount: true,
+        readCount: true,
+        responseCount: true,
+        linkClickCount: true,
+        createdAt: true,
+        lastRunAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const totals = campaigns.reduce(
+      (acc, c) => ({
+        sent: acc.sent + c.sentCount,
+        delivered: acc.delivered + c.deliveredCount,
+        failed: acc.failed + c.failedCount,
+        read: acc.read + c.readCount,
+        responses: acc.responses + c.responseCount,
+        linkClicks: acc.linkClicks + c.linkClickCount,
+      }),
+      { sent: 0, delivered: 0, failed: 0, read: 0, responses: 0, linkClicks: 0 }
+    );
+
+    const responseRate =
+      totals.delivered > 0 ? Math.round((totals.responses / totals.delivered) * 1000) / 10 : 0;
+    const deliveryRate =
+      totals.sent > 0 ? Math.round((totals.delivered / totals.sent) * 1000) / 10 : 0;
+    const readRate =
+      totals.delivered > 0 ? Math.round((totals.read / totals.delivered) * 1000) / 10 : 0;
+
+    const byType = Object.entries(
+      campaigns.reduce<Record<string, { count: number; sent: number }>>((acc, c) => {
+        if (!acc[c.type]) acc[c.type] = { count: 0, sent: 0 };
+        acc[c.type].count++;
+        acc[c.type].sent += c.sentCount;
+        return acc;
+      }, {})
+    ).map(([type, data]) => ({ type, ...data }));
+
+    const recentActivity = campaigns.slice(0, 10).map((c) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      sentCount: c.sentCount,
+      deliveredCount: c.deliveredCount,
+      failedCount: c.failedCount,
+      readCount: c.readCount,
+      lastRunAt: c.lastRunAt,
+    }));
+
+    return { totals, responseRate, deliveryRate, readRate, byType, recentActivity, campaigns };
   }
 }
 

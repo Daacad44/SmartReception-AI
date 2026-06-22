@@ -372,15 +372,29 @@ export function useMessages(conversationId: string | null) {
   });
 }
 
-export function useCustomers(search?: string) {
+export function useCustomers(filters?: {
+  search?: string;
+  tagId?: string;
+  customerType?: string;
+  segmentId?: string;
+}) {
   return useAuthQuery<Customer[]>({
-    queryKey: ['customers', search],
+    queryKey: ['customers', filters],
     queryFn: async () => {
-      const response = await api.get('/customers', { params: { search, limit: 100 } });
+      const response = await api.get('/customers', {
+        params: { search: filters?.search, tagId: filters?.tagId, customerType: filters?.customerType, segmentId: filters?.segmentId, limit: 100 },
+      });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
       return items.map(transformCustomer);
     },
+  });
+}
+
+export function useSegments() {
+  return useAuthQuery<Array<{ id: string; name: string; memberCount: number; isSystem: boolean }>>({
+    queryKey: ['segments'],
+    queryFn: async () => extractData(await api.get('/segments')),
   });
 }
 

@@ -56,16 +56,31 @@ export const createBusinessSchema = z.object({
 
 export const updateBusinessSchema = createBusinessSchema.partial();
 
+export const CUSTOMER_TYPES = [
+  'VIP',
+  'REGULAR',
+  'NEW_CUSTOMER',
+  'RETURNING',
+  'HIGH_VALUE',
+  'PREMIUM',
+  'INACTIVE',
+  'LEAD',
+  'PROSPECT',
+] as const;
+
+export const customerTypeSchema = z.enum(CUSTOMER_TYPES);
+
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(1).max(20),
   email: z.string().email().optional().or(z.literal('')),
   notes: z.string().max(5000).optional(),
   companyName: z.string().max(200).optional(),
+  address: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  country: z.string().max(100).optional(),
   whatsappNumber: z.string().max(20).optional(),
-  customerType: z
-    .enum(['VIP', 'REGULAR', 'NEW_CUSTOMER', 'RETURNING', 'HIGH_VALUE', 'INACTIVE', 'LEAD'])
-    .optional(),
+  customerType: customerTypeSchema.optional(),
   leadStatus: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'WON', 'LOST']).optional(),
   customerValue: z.number().min(0).optional(),
   tagIds: z.array(z.string().uuid()).optional(),
@@ -202,9 +217,7 @@ export const createSegmentSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
-  customerType: z
-    .enum(['VIP', 'REGULAR', 'NEW_CUSTOMER', 'RETURNING', 'HIGH_VALUE', 'INACTIVE', 'LEAD'])
-    .optional(),
+  customerType: customerTypeSchema.optional(),
   customerIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -216,18 +229,27 @@ export const createCampaignSchema = z.object({
   type: z
     .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
     .default('MARKETING'),
-  schedule: z.enum(['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY']).default('ONE_TIME'),
+  schedule: z.enum(['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM']).default('ONE_TIME'),
   segmentId: z.string().uuid().optional(),
-  customerTypes: z
-    .array(
-      z.enum(['VIP', 'REGULAR', 'NEW_CUSTOMER', 'RETURNING', 'HIGH_VALUE', 'INACTIVE', 'LEAD'])
-    )
-    .optional(),
+  templateId: z.string().uuid().optional(),
+  customerTypes: z.array(customerTypeSchema).optional(),
+  sendToAll: z.boolean().optional(),
   scheduledAt: z.string().datetime().optional(),
   sendNow: z.boolean().optional(),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const createMessageTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  content: z.string().min(1).max(4096),
+  type: z
+    .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
+    .default('MARKETING'),
+  variables: z.array(z.string().max(50)).optional(),
+});
+
+export const updateMessageTemplateSchema = createMessageTemplateSchema.partial();
 
 export const superAdminCreateBusinessSchema = z.object({
   name: z.string().min(1).max(200),
@@ -302,6 +324,8 @@ export type CreateSegmentInput = z.infer<typeof createSegmentSchema>;
 export type UpdateSegmentInput = z.infer<typeof updateSegmentSchema>;
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 export type UpdateCampaignInput = z.infer<typeof updateCampaignSchema>;
+export type CreateMessageTemplateInput = z.infer<typeof createMessageTemplateSchema>;
+export type UpdateMessageTemplateInput = z.infer<typeof updateMessageTemplateSchema>;
 export type SuperAdminCreateBusinessInput = z.infer<typeof superAdminCreateBusinessSchema>;
 export type SuperAdminUpdateBusinessInput = z.infer<typeof superAdminUpdateBusinessSchema>;
 export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;
