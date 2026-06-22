@@ -48,6 +48,7 @@ function mapConversationStatus(
 function mapMessageStatus(status: string | null | undefined): Message['status'] {
   if (!status) return 'sent';
   const normalized = status.toLowerCase();
+  if (normalized === 'failed' || normalized === 'pending') return 'sent';
   if (normalized === 'delivered' || normalized === 'read' || normalized === 'sent') {
     return normalized as Message['status'];
   }
@@ -696,11 +697,38 @@ export function useWhatsAppHealth() {
         phoneNumber: string | null;
         phoneNumberId: string | null;
         wabaId: string | null;
+        businessName: string | null;
+        tokenStatus: 'valid' | 'invalid' | 'not_configured';
         lastSync: string | null;
+        lastWebhookReceived: string | null;
+        lastIncomingMessage: string | null;
+        lastOutgoingMessage: string | null;
         envConfigured: boolean;
       }>(response);
     },
     refetchInterval: 30_000,
+  });
+}
+
+export function useWhatsAppDebug() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-debug'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/debug');
+      return extractData<{
+        webhook: string;
+        token: string;
+        phone_status: string;
+        ai_status: string;
+        last_incoming_message: string | null;
+        last_outgoing_message: string | null;
+        last_graph_api_response: string | null;
+        last_graph_api_error: string | null;
+        lastWebhookReceived: string | null;
+        totalMessages: number;
+      }>(response);
+    },
+    refetchInterval: 15_000,
   });
 }
 

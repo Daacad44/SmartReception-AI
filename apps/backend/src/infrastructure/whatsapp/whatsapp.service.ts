@@ -164,20 +164,22 @@ export class WhatsAppService {
         };
     }
 
+    const url = `${config.whatsapp.apiUrl}/${params.phoneNumberId}/messages`;
+    console.log('[WhatsApp] Sending message');
+    console.log('[WhatsApp] Graph API request:', JSON.stringify({ url, to, type: params.type }));
+
     try {
-      const response = await fetchWithRetry(
-        `${config.whatsapp.apiUrl}/${params.phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const response = await fetchWithRetry(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
 
       const responseText = await response.text();
+      console.log('[WhatsApp] Graph API response:', responseText);
 
       if (!response.ok) {
         let errorCode: number | string = response.status;
@@ -195,22 +197,43 @@ export class WhatsAppService {
         }
 
         const graphError = { code: errorCode, message: errorMessage, recipient: to };
-        console.error('[WhatsApp] Graph API error:', graphError);
+        console.error('[WhatsApp] Message failed:', graphError);
         logger.error('WhatsApp send failed:', graphError);
         return { success: false, whatsappMsgId: null, error: graphError };
       }
 
       const data = JSON.parse(responseText) as { messages?: { id: string }[] };
-      console.log('[WhatsApp] API response:', responseText);
       const whatsappMsgId = data.messages?.[0]?.id ?? null;
+      console.log('[WhatsApp] Message delivered:', whatsappMsgId ?? 'unknown id');
       return { success: Boolean(whatsappMsgId), whatsappMsgId, response: data };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const graphError = { code: 'NETWORK_ERROR', message, recipient: to };
-      console.error('[WhatsApp] Graph API error:', graphError);
+      console.error('[WhatsApp] Message failed:', graphError);
       logger.error('WhatsApp send error:', graphError);
       return { success: false, whatsappMsgId: null, error: graphError };
     }
+  }
+
+  /** Alias for text-only outbound sends */
+  async sendTextMessage(params: {
+    phoneNumberId: string;
+    to: string;
+    message: string;
+    accessToken?: string;
+  }): Promise<SendOutboundResult> {
+    return this.sendOutbound({
+      phoneNumberId: params.phoneNumberId,
+      to: params.to,
+      accessToken: params.accessToken,
+      type: 'TEXT',
+      content: params.message,
+    });
+  }
+
+  /** Alias for any outbound WhatsApp message */
+  async sendWhatsAppMessage(params: SendOutboundParams): Promise<SendOutboundResult> {
+    return this.sendOutbound(params);
   }
 
   async sendMessage(params: {

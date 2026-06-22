@@ -15,6 +15,7 @@ import { ConnectWhatsAppInput } from '@smartreception/shared';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { notifyNewMessage } from '../../infrastructure/notifications/notification-helper';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
+import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState, recordInboundMessage } from './whatsapp-pipeline-state';
 
 export interface WhatsAppHealth {
@@ -24,7 +25,12 @@ export interface WhatsAppHealth {
   phoneNumber: string | null;
   phoneNumberId: string | null;
   wabaId: string | null;
+  businessName: string | null;
+  tokenStatus: 'valid' | 'invalid' | 'not_configured';
   lastSync: string | null;
+  lastWebhookReceived: string | null;
+  lastIncomingMessage: string | null;
+  lastOutgoingMessage: string | null;
   envConfigured: boolean;
 }
 
@@ -36,6 +42,14 @@ export interface WhatsAppWebhookHealth {
 }
 
 export interface WhatsAppDebugInfo {
+  webhook: 'verified' | 'pending' | 'not_configured';
+  token: 'valid' | 'invalid' | 'not_configured';
+  phone_status: 'active' | 'unknown' | 'inactive';
+  ai_status: 'active' | 'misconfigured' | 'degraded' | 'inactive';
+  last_incoming_message: string | null;
+  last_outgoing_message: string | null;
+  last_graph_api_response: string | null;
+  last_graph_api_error: string | null;
   lastWebhookReceived: string | null;
   lastMessageProcessed: string | null;
   totalMessages: number;
@@ -59,11 +73,7 @@ export class WhatsAppModuleService {
     for (const msg of parsed.messages) {
       const contactName = resolveContactName(parsed.contacts, msg.from);
       const extracted = extractMessageContent(msg);
-      console.log('[WhatsApp] Message type:', msg.type);
-      console.log('[WhatsApp] From:', msg.from);
-      console.log('[WhatsApp] Name:', contactName ?? 'Unknown');
-      console.log('[WhatsApp] Message:', extracted.content);
-      console.log('[WhatsApp] Timestamp:', msg.timestamp);
+      console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
     }
 
     for (const status of parsed.statuses) {
@@ -224,7 +234,8 @@ export class WhatsAppModuleService {
       );
       if (!recorded) continue;
 
-      await whatsappRepository.updateMessageStatus(status.id, status.status);
+      await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
+      console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
       logger.info(`WhatsApp status ${status.status} for message ${status.id}`);
     }
 
@@ -238,11 +249,7 @@ export class WhatsAppModuleService {
 
       const contactName = resolveContactName(parsed.contacts, msg.from);
       const extracted = extractMessageContent(msg);
-
-      console.log('[WhatsApp] Incoming message received');
-      console.log('[WhatsApp] Processing message from:', msg.from);
-      console.log('[WhatsApp] Name:', contactName ?? 'Unknown');
-      console.log('[WhatsApp] Message:', extracted.content);
+      console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
 
       const customer = await whatsappRepository.findOrCreateCustomer(
         account.businessId,
@@ -323,12 +330,17 @@ export class WhatsAppModuleService {
         });
       }
 
-      await whatsappService.markAsRead(account.phoneNumberId, msg.id, accessToken).catch((error) => {
+      // Non-blocking post-processing for lower webhook latency
+      whatsappService.markAsRead(account.phoneNumberId, msg.id, accessToken).catch((error) => {
         logger.warn('Failed to mark WhatsApp message as read', { error });
       });
 
-      try {
-        await prisma.auditLog.create({
+      notifyNewMessage(account.businessId, customer.name, conversation.id).catch((error) => {
+        logger.warn('Failed to send new message notification', { error });
+      });
+
+      prisma.auditLog
+        .create({
           data: {
             businessId: account.businessId,
             action: 'CREATE',
@@ -336,12 +348,10 @@ export class WhatsAppModuleService {
             entityId: message.id,
             newData: { direction: 'INBOUND', type: extracted.type, from: msg.from },
           },
+        })
+        .catch((error) => {
+          logger.warn('Failed to write WhatsApp audit log', { error });
         });
-      } catch (error) {
-        logger.warn('Failed to write WhatsApp audit log', { error });
-      }
-
-      await notifyNewMessage(account.businessId, customer.name, conversation.id);
     }
 
     await whatsappRepository.markWebhookVerified(account.phoneNumberId);
@@ -357,10 +367,9 @@ export class WhatsAppModuleService {
     const infrastructureReady = this.isWebhookInfrastructureReady();
     const lastWebhookReceivedAt = await whatsappRepository.getLastWebhookReceived(businessId);
     const hasStoredEvents = await whatsappRepository.hasWebhookActivity(businessId);
-    const receivingEvents = Boolean(
-      lastWebhookReceivedAt || hasStoredEvents || account?.webhookVerified
-    );
-    const webhookVerified = Boolean(account?.webhookVerified || receivingEvents);
+    const receivingEvents = Boolean(lastWebhookReceivedAt || hasStoredEvents);
+    const subscriptionVerified = Boolean(account?.webhookVerified);
+    const webhookVerified = subscriptionVerified || receivingEvents;
 
     const status = this.resolveWebhookStatus({
       webhookVerified,
@@ -368,22 +377,16 @@ export class WhatsAppModuleService {
       infrastructureReady,
     });
 
-    if (account?.isActive && (status === 'verified' || receivingEvents)) {
+    if (account?.isActive && webhookVerified) {
       await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
         webhookStatus: 'verified',
         webhookVerified: true,
-        lastWebhookReceivedAt: lastWebhookReceivedAt ?? new Date(),
+        ...(lastWebhookReceivedAt ? { lastWebhookReceivedAt } : {}),
       });
-      return {
-        verified: true,
-        receivingEvents: true,
-        lastWebhookReceived: (lastWebhookReceivedAt ?? new Date()).toISOString(),
-        status: 'verified',
-      };
     }
 
     return {
-      verified: status === 'verified',
+      verified: webhookVerified,
       receivingEvents,
       lastWebhookReceived: lastWebhookReceivedAt?.toISOString() ?? null,
       status,
@@ -451,26 +454,71 @@ export class WhatsAppModuleService {
   }
 
   async getDebug(businessId: string): Promise<WhatsAppDebugInfo> {
-    const webhookHealth = await this.getWebhookHealth(businessId);
-    const [totalMessages, totalCustomers, totalConversations, lastInboundMessage] =
-      await Promise.all([
-        prisma.message.count({ where: { conversation: { businessId } } }),
-        prisma.customer.count({ where: { businessId } }),
-        prisma.conversation.count({ where: { businessId } }),
-        prisma.message.findFirst({
-          where: { conversation: { businessId }, direction: 'INBOUND' },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true },
-        }),
-      ]);
+    const [webhookHealth, aiHealth, account, pipelineState] = await Promise.all([
+      this.getWebhookHealth(businessId),
+      getAiHealth(businessId),
+      whatsappRepository.findAccountByBusiness(businessId),
+      Promise.resolve(getPipelineState(businessId)),
+    ]);
 
-    return {
-      lastWebhookReceived: webhookHealth.lastWebhookReceived,
-      lastMessageProcessed: lastInboundMessage?.createdAt.toISOString() ?? null,
+    const [
       totalMessages,
       totalCustomers,
       totalConversations,
-      webhookStatus: webhookHealth.receivingEvents ? 'verified' : webhookHealth.status,
+      lastInbound,
+      lastOutbound,
+    ] = await Promise.all([
+      prisma.message.count({ where: { conversation: { businessId } } }),
+      prisma.customer.count({ where: { businessId } }),
+      prisma.conversation.count({ where: { businessId } }),
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'OUTBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true, status: true },
+      }),
+    ]);
+
+    const token =
+      account?.accessToken || config.whatsapp.accessToken ?
+        await whatsappRepository.validateAccessToken(
+          account?.phoneNumberId ?? config.whatsapp.phoneNumberId,
+          account?.accessToken || config.whatsapp.accessToken
+        )
+      : false;
+
+    const graphResponse =
+      pipelineState.lastGraphApiResponse ??
+      (account?.lastGraphApiResponse ? JSON.stringify(account.lastGraphApiResponse) : null);
+    const graphError =
+      pipelineState.lastGraphApiError ??
+      (account?.lastGraphApiError ? JSON.stringify(account.lastGraphApiError) : null);
+
+    const webhookStatus = webhookHealth.verified ? 'verified' : webhookHealth.status;
+
+    return {
+      webhook: webhookStatus,
+      token: !account && !config.whatsapp.accessToken ? 'not_configured' : token ? 'valid' : 'invalid',
+      phone_status: (account?.phoneNumberStatus === 'active' ? 'active' : 'unknown') as WhatsAppDebugInfo['phone_status'],
+      ai_status: aiHealth.status,
+      last_incoming_message:
+        pipelineState.lastInboundMessage ??
+        (lastInbound ? `${lastInbound.content} (${lastInbound.createdAt.toISOString()})` : null),
+      last_outgoing_message:
+        pipelineState.lastOutboundSuccess ??
+        (lastOutbound ? `${lastOutbound.content} (${lastOutbound.createdAt.toISOString()}, ${lastOutbound.status})` : null),
+      last_graph_api_response: graphResponse,
+      last_graph_api_error: graphError,
+      lastWebhookReceived: webhookHealth.lastWebhookReceived,
+      lastMessageProcessed: lastInbound?.createdAt.toISOString() ?? null,
+      totalMessages,
+      totalCustomers,
+      totalConversations,
+      webhookStatus,
     };
   }
 
@@ -491,7 +539,12 @@ export class WhatsAppModuleService {
         phoneNumber: null,
         phoneNumberId: null,
         wabaId: null,
+        businessName: null,
+        tokenStatus: envConfigured ? 'invalid' : 'not_configured',
         lastSync: null,
+        lastWebhookReceived: null,
+        lastIncomingMessage: null,
+        lastOutgoingMessage: null,
         envConfigured,
       };
     }
@@ -501,12 +554,18 @@ export class WhatsAppModuleService {
     let phoneStatus: WhatsAppHealth['phoneStatus'] =
       account.phoneNumberStatus === 'active' ? 'active' : 'unknown';
     let wabaId = account.wabaId ?? config.whatsapp.businessAccountId ?? null;
+    let businessName = account.displayName ?? null;
+    let tokenStatus: WhatsAppHealth['tokenStatus'] = token ? 'invalid' : 'not_configured';
 
     if (token) {
+      const tokenValid = await whatsappRepository.validateAccessToken(account.phoneNumberId, token);
+      tokenStatus = tokenValid ? 'valid' : 'invalid';
+
       const info = await whatsappService.getPhoneNumberInfo(account.phoneNumberId, token);
       if (info?.displayPhoneNumber) {
         phoneNumber = info.displayPhoneNumber;
         phoneStatus = 'active';
+        businessName = info.verifiedName ?? businessName;
         console.log('[WhatsApp] Phone active');
         await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
           phoneNumber: info.displayPhoneNumber,
@@ -515,6 +574,7 @@ export class WhatsAppModuleService {
           wabaId: wabaId ?? undefined,
         });
       } else if (info) {
+        businessName = info.verifiedName ?? businessName;
         await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
           displayName: info.verifiedName ?? account.displayName ?? undefined,
         });
@@ -522,7 +582,20 @@ export class WhatsAppModuleService {
     }
 
     const webhookHealth = await this.getWebhookHealth(businessId);
-    const webhook = webhookHealth.receivingEvents ? 'verified' : webhookHealth.status;
+    const webhook = webhookHealth.verified ? 'verified' : webhookHealth.status;
+
+    const [lastInbound, lastOutbound] = await Promise.all([
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+      prisma.message.findFirst({
+        where: { conversation: { businessId }, direction: 'OUTBOUND' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+    ]);
 
     const synced = await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
       webhookStatus: webhook,
@@ -530,9 +603,9 @@ export class WhatsAppModuleService {
       phoneNumberStatus: phoneStatus,
       phoneNumber,
       wabaId: wabaId ?? undefined,
-      lastWebhookReceivedAt: webhookHealth.lastWebhookReceived
-        ? new Date(webhookHealth.lastWebhookReceived)
-        : undefined,
+      ...(webhookHealth.lastWebhookReceived
+        ? { lastWebhookReceivedAt: new Date(webhookHealth.lastWebhookReceived) }
+        : {}),
     });
 
     console.log('[WhatsApp] Health check successful');
@@ -544,7 +617,16 @@ export class WhatsAppModuleService {
       phoneNumber: synced.phoneNumber,
       phoneNumberId: synced.phoneNumberId,
       wabaId: synced.wabaId ?? wabaId,
+      businessName,
+      tokenStatus,
       lastSync: synced.lastSyncAt?.toISOString() ?? new Date().toISOString(),
+      lastWebhookReceived: webhookHealth.lastWebhookReceived,
+      lastIncomingMessage: lastInbound
+        ? `${lastInbound.content} (${lastInbound.createdAt.toISOString()})`
+        : null,
+      lastOutgoingMessage: lastOutbound
+        ? `${lastOutbound.content} (${lastOutbound.createdAt.toISOString()})`
+        : null,
       envConfigured,
     };
   }
@@ -695,7 +777,6 @@ export class WhatsAppModuleService {
     await whatsappRepository.updateAccountSync(account.phoneNumberId, {
       phoneNumberStatus: info.displayPhoneNumber ? 'active' : account.phoneNumberStatus ?? 'unknown',
       displayName: info.verifiedName ?? account.displayName ?? undefined,
-      webhookStatus: 'verified',
       phoneNumber: info.displayPhoneNumber ?? account.phoneNumber,
     });
 

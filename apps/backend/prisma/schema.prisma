@@ -494,6 +494,9 @@ model WhatsAppAccount {
   webhookStatus     String?  @default("pending")
   lastWebhookReceivedAt DateTime?
   lastSyncAt        DateTime?
+  lastGraphApiResponse Json?
+  lastGraphApiError    Json?
+  lastOutgoingAt       DateTime?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

@@ -9,6 +9,7 @@ import {
   useWhatsAppWebhookInfo,
   useWhatsAppHealth,
   useWhatsAppWebhookHealth,
+  useWhatsAppDebug,
 } from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
@@ -48,6 +49,7 @@ export function WhatsAppSettings() {
     isLoading: healthLoading,
     refetch: refetchHealth,
   } = useWhatsAppHealth();
+  const { data: debugInfo, refetch: refetchDebug } = useWhatsAppDebug();
   const connectWhatsApp = useConnectWhatsApp();
   const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
@@ -76,6 +78,7 @@ export function WhatsAppSettings() {
     refetchAccounts();
     refetchHealth();
     refetchWebhookHealth();
+    refetchDebug();
   };
 
   const webhookIsVerified =
@@ -134,6 +137,10 @@ export function WhatsAppSettings() {
         </CardContent>
         <CardContent className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Business Name</p>
+            <p className="text-sm font-medium">{health?.businessName ?? '—'}</p>
+          </div>
+          <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Connected Phone Number</p>
             <p className="font-mono text-sm">{health?.phoneNumber ?? '—'}</p>
           </div>
@@ -144,6 +151,30 @@ export function WhatsAppSettings() {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">WABA ID</p>
             <p className="font-mono text-sm break-all">{health?.wabaId ?? '—'}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Token Status</p>
+            <Badge variant={statusBadgeVariant(health?.tokenStatus ?? 'not_configured')} className="capitalize">
+              {formatStatusLabel(health?.tokenStatus ?? 'not_configured')}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Last Webhook Event</p>
+            <p className="text-sm">
+              {health?.lastWebhookReceived ? formatRelativeTime(health.lastWebhookReceived) : 'Never'}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Last Message Received</p>
+            <p className="text-sm truncate" title={health?.lastIncomingMessage ?? undefined}>
+              {health?.lastIncomingMessage ?? '—'}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Last Message Sent</p>
+            <p className="text-sm truncate" title={health?.lastOutgoingMessage ?? undefined}>
+              {health?.lastOutgoingMessage ?? '—'}
+            </p>
           </div>
         </CardContent>
         <CardContent className="flex flex-wrap gap-2 pt-0">
@@ -171,6 +202,35 @@ export function WhatsAppSettings() {
           </Button>
         </CardContent>
       </Card>
+
+      {debugInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Diagnostics</CardTitle>
+            <CardDescription>Live pipeline status for troubleshooting</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">AI Status: </span>
+              <Badge variant={statusBadgeVariant(debugInfo.ai_status)} className="capitalize">
+                {debugInfo.ai_status}
+              </Badge>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Graph API Error: </span>
+              <span className="font-mono text-xs">{debugInfo.last_graph_api_error ?? 'None'}</span>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-muted-foreground">Last Incoming: </span>
+              <span>{debugInfo.last_incoming_message ?? '—'}</span>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-muted-foreground">Last Outgoing: </span>
+              <span>{debugInfo.last_outgoing_message ?? '—'}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

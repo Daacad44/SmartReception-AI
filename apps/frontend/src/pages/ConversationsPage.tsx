@@ -305,8 +305,13 @@ export function ConversationsPage() {
                           <CheckCheck
                             className={cn(
                               'h-3 w-3',
-                              msg.status === 'read' ? 'text-success' : 'text-muted-foreground'
+                              msg.status === 'read'
+                                ? 'text-success'
+                                : msg.status === 'delivered'
+                                  ? 'text-muted-foreground'
+                                  : 'text-muted-foreground/60'
                             )}
+                            title={msg.status}
                           />
                         )}
                       </div>
