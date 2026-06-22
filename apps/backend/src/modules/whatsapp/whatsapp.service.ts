@@ -1,24 +1,20 @@
 import crypto from 'crypto';
 import { whatsappRepository } from './whatsapp.repository';
-import {
-  whatsappService,
+import { whatsappService,
   parseWebhookBody,
   extractMessageContent,
   resolveContactName,
 } from '../../infrastructure/whatsapp/whatsapp.service';
-import { whatsappMediaService } from '../../infrastructure/whatsapp/whatsapp-media.service';
 import { getAiQueue, getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { config } from '../../config';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
 import { ConnectWhatsAppInput } from '@smartreception/shared';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
-import { notifyNewMessage } from '../../infrastructure/notifications/notification-helper';
-import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
-import { sendWelcomeMessage } from '../ai/welcome-message.service';
 import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
-import { getPipelineState, recordInboundMessage } from './whatsapp-pipeline-state';
+import { getPipelineState } from './whatsapp-pipeline-state';
+import { handleIncomingMessage } from './incoming-message.service';
+import { ensureAiConfiguration } from '../ai/ai-config.service';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -223,10 +219,7 @@ export class WhatsAppModuleService {
       webhookStatus: 'verified',
     });
 
-    const aiConfig = await prisma.aIConfiguration.findUnique({
-      where: { businessId: account.businessId },
-      select: { enableAutoReply: true },
-    });
+    await ensureAiConfiguration(account.businessId);
 
     for (const status of parsed.statuses) {
       const recorded = await whatsappRepository.tryRecordWebhookEvent(
@@ -253,129 +246,15 @@ export class WhatsAppModuleService {
       const extracted = extractMessageContent(msg);
       console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
 
-      const customer = await whatsappRepository.findOrCreateCustomer(
-        account.businessId,
-        msg.from,
-        contactName ?? msg.from
-      );
-      console.log('[WhatsApp] Customer found');
-
-      const { conversation, isNew } = await whatsappRepository.findOrCreateConversation(
-        account.businessId,
-        customer.id,
-        account.id
-      );
-      console.log('[WhatsApp] Conversation found', isNew ? '(new)' : '(existing)');
-
-      recordInboundMessage(account.businessId, extracted.content);
-
-      let mediaUrl: string | undefined;
-      let metadata = extracted.metadata ?? {};
-
-      const message = await whatsappRepository.createInboundMessage({
-        conversationId: conversation.id,
-        customerId: customer.id,
-        content: extracted.content,
-        whatsappMsgId: msg.id,
-        type: extracted.type,
-        mediaUrl: undefined,
-        metadata: {
-          ...metadata,
-          senderName: contactName,
-          whatsappTimestamp: msg.timestamp,
-        },
+      await handleIncomingMessage({
+        businessId: account.businessId,
+        whatsappAccountId: account.id,
+        phoneNumberId: account.phoneNumberId,
+        accessToken: account.accessToken || config.whatsapp.accessToken || undefined,
+        msg,
+        contactName: contactName ?? undefined,
+        extracted,
       });
-
-      await broadcastConversationEvent(account.businessId, {
-        conversationId: conversation.id,
-        type: 'message',
-      });
-
-      if (extracted.mediaId) {
-        const token = account.accessToken || config.whatsapp.accessToken;
-        if (token) {
-          try {
-            const { buffer, mimeType } = await whatsappMediaService.downloadFromMeta(
-              extracted.mediaId,
-              token
-            );
-            const stored = await whatsappMediaService.storeInboundMedia(
-              buffer,
-              mimeType,
-              account.businessId,
-              conversation.id,
-              extracted.filename
-            );
-            mediaUrl = stored.url;
-            metadata = {
-              ...metadata,
-              mimeType,
-              fileSize: stored.fileSize,
-              storageKey: stored.key,
-              whatsappMediaId: extracted.mediaId,
-            };
-            await prisma.message.update({
-              where: { id: message.id },
-              data: { mediaUrl, metadata: metadata as object },
-            });
-            await broadcastConversationEvent(account.businessId, {
-              conversationId: conversation.id,
-              type: 'message',
-            });
-          } catch (error) {
-            logger.error('Failed to download/store WhatsApp media:', error);
-          }
-        }
-      }
-
-      const accessToken = account.accessToken || config.whatsapp.accessToken || undefined;
-      const aiText = extracted.content;
-
-      if (isNew && conversation.isAiEnabled && aiConfig?.enableAutoReply) {
-        await sendWelcomeMessage({
-          businessId: account.businessId,
-          conversationId: conversation.id,
-          phoneNumberId: account.phoneNumberId,
-          customerPhone: msg.from,
-          accessToken,
-          firstMessageContent: aiText,
-        });
-      }
-
-      if (conversation.isAiEnabled && aiConfig?.enableAutoReply && aiText) {
-        await processAndSendAiReply({
-          businessId: account.businessId,
-          conversationId: conversation.id,
-          inboundMessageId: message.id,
-          customerMessage: aiText,
-          phoneNumberId: account.phoneNumberId,
-          customerPhone: msg.from,
-          accessToken,
-        });
-      }
-
-      // Non-blocking post-processing for lower webhook latency
-      whatsappService.markAsRead(account.phoneNumberId, msg.id, accessToken).catch((error) => {
-        logger.warn('Failed to mark WhatsApp message as read', { error });
-      });
-
-      notifyNewMessage(account.businessId, customer.name, conversation.id).catch((error) => {
-        logger.warn('Failed to send new message notification', { error });
-      });
-
-      prisma.auditLog
-        .create({
-          data: {
-            businessId: account.businessId,
-            action: 'CREATE',
-            entity: 'WhatsAppMessage',
-            entityId: message.id,
-            newData: { direction: 'INBOUND', type: extracted.type, from: msg.from },
-          },
-        })
-        .catch((error) => {
-          logger.warn('Failed to write WhatsApp audit log', { error });
-        });
     }
 
     await whatsappRepository.markWebhookVerified(account.phoneNumberId);
@@ -752,6 +631,8 @@ export class WhatsAppModuleService {
         newData: { phoneNumberId: input.phoneNumberId },
       },
     });
+
+    await ensureAiConfiguration(businessId);
 
     return account;
   }

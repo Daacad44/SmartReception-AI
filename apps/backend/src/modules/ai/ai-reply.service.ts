@@ -57,8 +57,28 @@ async function persistLeadData(
       email: lead.email || customer.email,
       phone: lead.phone || customer.phone,
       notes: notesParts.length ? notesParts.join('\n') : customer.notes,
+      ...(lead.complete ? { leadScore: Math.max(customer.leadScore, 80) } : {}),
+      lastContactAt: new Date(),
     },
   });
+
+  if (lead.complete) {
+    const summary = [
+      'Lead captured via WhatsApp AI',
+      lead.fullName && `Name: ${lead.fullName}`,
+      lead.businessName && `Business: ${lead.businessName}`,
+      lead.phone && `Phone: ${lead.phone}`,
+      lead.email && `Email: ${lead.email}`,
+      lead.service && `Service: ${lead.service}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await prisma.customerNote.create({
+      data: { customerId, content: summary },
+    });
+    logger.info('Lead saved from WhatsApp AI', { customerId });
+  }
 }
 
 export async function processAndSendAiReply(params: ProcessAiReplyParams): Promise<void> {
@@ -94,7 +114,10 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   });
 
   const aiResponse = await aiService.generateResponse(businessId, conversationId, customerMessage);
-  console.log('[AI] Response generated (Gemini)');
+  console.log('[AI] Response generated (Gemini)', {
+    intent: aiResponse.intent,
+    preview: aiResponse.content.slice(0, 120),
+  });
 
   const collectLeadAction = aiResponse.actions.find((a) => a.type === 'collect_lead');
   const leadData = parseLeadData(collectLeadAction?.data);
@@ -144,7 +167,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   if (sendResult.success && sendResult.whatsappMsgId) {
     recordOutboundSuccess(businessId, replyContent);
     recordGraphApiResponse(businessId, sendResult.response);
-    console.log('[WhatsApp] Reply sent successfully');
+    console.log('[WhatsApp] Message sent', { whatsappMsgId: sendResult.whatsappMsgId });
   } else {
     recordGraphApiError(businessId, sendResult.error);
     console.error('[WhatsApp] Message failed:', sendResult.error);

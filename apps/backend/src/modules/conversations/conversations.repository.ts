@@ -105,11 +105,12 @@ export class ConversationsRepository {
   }
 
   async takeover(businessId: string, id: string, userId: string) {
+    // Hybrid mode: assign agent but keep AI enabled for automatic replies
     return prisma.conversation.update({
       where: { id, businessId },
       data: {
         assignedToId: userId,
-        isAiEnabled: false,
+        isAiEnabled: true,
         status: 'OPEN',
       },
       include: {
@@ -129,6 +130,22 @@ export class ConversationsRepository {
       },
       include: {
         customer: true,
+      },
+    });
+  }
+
+  /** Human-only mode: disable AI auto-replies for this conversation. */
+  async handoffToHuman(businessId: string, id: string, userId: string) {
+    return prisma.conversation.update({
+      where: { id, businessId },
+      data: {
+        assignedToId: userId,
+        isAiEnabled: false,
+        status: 'OPEN',
+      },
+      include: {
+        customer: true,
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
   }
