@@ -50,6 +50,18 @@ export class AppointmentsController {
     }
   }
 
+  async notifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await appointmentsService.getNotifications(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async performAction(req: Request, res: Response, next: NextFunction) {
     try {
       const { action, assignedToId, startTime, endTime, internalNote } =

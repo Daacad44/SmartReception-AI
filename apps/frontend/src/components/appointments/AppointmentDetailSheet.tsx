@@ -25,6 +25,7 @@ import {
   MessageSquare,
   FileText,
   Sparkles,
+  Bell,
 } from 'lucide-react';
 
 interface AppointmentDetailProps {
@@ -57,6 +58,32 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
       return extractData<Record<string, unknown>>(res);
     },
   });
+
+  const { data: notifications } = useQuery({
+    queryKey: ['appointment', appointmentId, 'notifications'],
+    enabled: Boolean(appointmentId && open),
+    queryFn: async () => {
+      const res = await api.get(`/appointments/${appointmentId}/notifications`);
+      return extractData<
+        Array<{
+          id: string;
+          channel: string;
+          notificationType: string;
+          status: string;
+          sentAt: string | null;
+          scheduledAt: string | null;
+          errorMessage?: string | null;
+        }>
+      >(res);
+    },
+  });
+
+  function formatNotificationType(type: string) {
+    return type
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 
   const actionMutation = useMutation({
     mutationFn: async ({ action, extra }: { action: string; extra?: Record<string, unknown> }) => {
@@ -198,6 +225,7 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
             <Tabs defaultValue="whatsapp">
               <TabsList className="w-full">
                 <TabsTrigger value="whatsapp" className="flex-1"><MessageSquare className="mr-1 h-3 w-3" />WhatsApp</TabsTrigger>
+                <TabsTrigger value="notifications" className="flex-1"><Bell className="mr-1 h-3 w-3" />Alerts</TabsTrigger>
                 <TabsTrigger value="history" className="flex-1"><Calendar className="mr-1 h-3 w-3" />History</TabsTrigger>
                 <TabsTrigger value="notes" className="flex-1"><FileText className="mr-1 h-3 w-3" />Notes</TabsTrigger>
               </TabsList>
@@ -209,6 +237,41 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
                     <div key={String(m.id)} className={cn('rounded-lg p-2.5 text-xs', m.direction === 'INBOUND' ? 'bg-muted' : 'bg-accent/10')}>
                       <p>{String(m.content)}</p>
                       <p className="mt-1 text-muted-foreground">{formatRelativeTime(String(m.createdAt))}</p>
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+              <TabsContent value="notifications" className="mt-3 space-y-2">
+                {!notifications?.length ? (
+                  <p className="text-sm text-muted-foreground">No notifications sent yet.</p>
+                ) : (
+                  notifications.map((n) => (
+                    <div key={n.id} className="rounded-lg border p-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium">{formatNotificationType(n.notificationType)}</p>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'text-[10px] capitalize',
+                            n.status === 'SENT' && 'border-emerald-500 text-emerald-700',
+                            n.status === 'FAILED' && 'border-destructive text-destructive',
+                            n.status === 'PENDING' && 'border-amber-500 text-amber-700'
+                          )}
+                        >
+                          {n.status.toLowerCase()}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        Channel: {n.channel} ·{' '}
+                        {n.sentAt
+                          ? `Sent ${formatRelativeTime(n.sentAt)}`
+                          : n.scheduledAt
+                            ? `Scheduled ${formatRelativeTime(n.scheduledAt)}`
+                            : 'Pending'}
+                      </p>
+                      {n.errorMessage && (
+                        <p className="mt-1 text-destructive">{n.errorMessage}</p>
+                      )}
                     </div>
                   ))
                 )}

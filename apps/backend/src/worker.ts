@@ -12,9 +12,8 @@ import { processDocumentById } from './infrastructure/documents/document-process
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
 import { resolveStoredToken } from './infrastructure/crypto/token-crypto';
 import {
-  sendAppointmentReminder,
-  sendMissedAppointmentNotification,
-  type ReminderInterval,
+  processReminderJob,
+  processMissedAppointments,
 } from './infrastructure/appointments/appointment-notification.service';
 import { processAndSendAiReply } from './modules/ai/ai-reply.service';
 import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
@@ -81,15 +80,9 @@ async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
   await processDocumentById(documentId, businessId);
 }
 
-async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
-  const { appointmentId, businessId, interval = '24h' } = job.data;
-
-  if (interval === 'missed') {
-    await sendMissedAppointmentNotification(appointmentId, businessId);
-    return;
-  }
-
-  await sendAppointmentReminder(appointmentId, businessId, interval as ReminderInterval);
+async function processReminderJobHandler(job: Job<ReminderJobData>): Promise<void> {
+  const { appointmentId, businessId, interval = '30m' } = job.data;
+  await processReminderJob(appointmentId, businessId, interval);
 }
 
 async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
@@ -104,7 +97,7 @@ async function startWorkers(): Promise<void> {
     createWorker<AIJobData>(QUEUE_NAMES.AI_PROCESSING, processAIJob, 3),
     createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5),
     createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2),
-    createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJob, 3),
+    createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJobHandler, 3),
     createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2),
   ].filter(Boolean);
 
@@ -133,6 +126,15 @@ async function startWorkers(): Promise<void> {
   }
 
   logger.info('BullMQ workers started', { count: workers.length });
+
+  // Fallback missed-appointment scan when delayed jobs were lost (every 5 minutes).
+  const MISSED_SCAN_MS = 5 * 60 * 1000;
+  setInterval(() => {
+    void processMissedAppointments().catch((error) => {
+      logger.warn('Periodic missed appointment scan failed', { error });
+    });
+  }, MISSED_SCAN_MS);
+  void processMissedAppointments().catch(() => undefined);
 }
 
 const shutdown = async (signal: string) => {

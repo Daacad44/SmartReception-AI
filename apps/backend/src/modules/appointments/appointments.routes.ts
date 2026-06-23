@@ -20,6 +20,9 @@ router.get('/availability', authorize(PERMISSIONS['appointments:read']), (req, r
 router.post('/', authorize(PERMISSIONS['appointments:write']), (req, res, next) =>
   appointmentsController.create(req, res, next)
 );
+router.get('/:id/notifications', authorize(PERMISSIONS['appointments:read']), (req, res, next) =>
+  appointmentsController.notifications(req, res, next)
+);
 router.get('/:id', authorize(PERMISSIONS['appointments:read']), (req, res, next) =>
   appointmentsController.get(req, res, next)
 );

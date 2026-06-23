@@ -224,7 +224,7 @@ export function appointmentConfirmationEmail(data: AppointmentEmailData): { subj
   const body = `
     <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Confirmation</h1>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Dear ${data.customerName}, your appointment has been successfully scheduled.
+      Hello ${data.customerName}, your appointment has been successfully scheduled.
     </p>
     <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
       <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
@@ -257,16 +257,12 @@ export function appointmentReminderEmail(
   const body = `
     <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Reminder</h1>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Hi ${data.customerName}, this is a reminder that your appointment is in <strong>${data.reminderLabel}</strong>.
+      Hello ${data.customerName}, this is a reminder that your appointment is scheduled in:
     </p>
-    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
-      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
-        <strong>Service:</strong> ${data.serviceName}<br />
-        <strong>Date:</strong> ${data.date}<br />
-        <strong>Time:</strong> ${data.time}
-        ${data.meetingLink ? `<br /><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:${BRAND.accentColor};">${data.meetingLink}</a>` : ''}
-      </td></tr>
-    </table>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      <strong>${data.reminderLabel}</strong>
+    </p>
+    <p style="margin:0 0 8px;font-size:14px;color:#475569;">Appointment Time: <strong>${data.time}</strong></p>
   `;
 
   return {
@@ -283,18 +279,82 @@ export function appointmentMissedEmail(data: { customerName: string }): { subjec
   const body = `
     <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Missed Appointment</h1>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Hi ${data.customerName}, we noticed that your appointment was missed.
+      Hello ${data.customerName},
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Your appointment time has passed.
     </p>
     <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
-      You may book a new appointment after 24 hours. Contact us on WhatsApp if you need assistance.
+      If you still need assistance, please contact us or schedule a new appointment.
     </p>
+    <p style="margin:16px 0 0;font-size:14px;color:#64748B;">Thank you.</p>
   `;
 
   return {
     subject: 'Missed Appointment – SmartReception',
     html: renderEmailLayout({
-      preheader: 'Your appointment was missed',
+      preheader: 'Your appointment time has passed',
       title: 'Missed Appointment',
+      body,
+    }),
+  };
+}
+
+export function appointmentApprovedEmail(data: {
+  customerName: string;
+  date: string;
+  time: string;
+}): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Approved</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hello ${data.customerName},
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Your appointment has been approved. Please be available at the scheduled time.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Date:</strong> ${data.date}<br />
+        <strong>Time:</strong> ${data.time}
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
+      We look forward to serving you.
+    </p>
+  `;
+
+  return {
+    subject: 'Appointment Approved – SmartReception',
+    html: renderEmailLayout({
+      preheader: `Your appointment on ${data.date} at ${data.time} is approved`,
+      title: 'Appointment Approved',
+      body,
+    }),
+  };
+}
+
+export function appointmentMissedFollowUpEmail(data: {
+  customerName: string;
+}): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Reschedule Your Appointment</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hello ${data.customerName},
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      We noticed that your appointment was missed.
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
+      Would you like to book a new appointment? Reply to this message or contact us to reschedule.
+    </p>
+  `;
+
+  return {
+    subject: 'Book a New Appointment – SmartReception',
+    html: renderEmailLayout({
+      preheader: 'Would you like to reschedule your missed appointment?',
+      title: 'Missed Appointment Follow-up',
       body,
     }),
   };

@@ -1,12 +1,39 @@
 import { getReminderQueue } from '../queue/queues';
-import type { ReminderInterval } from './appointment-notification.service';
+import type { ReminderInterval } from './appointment-dual-channel.service';
 import { logger } from '../../core/logger';
 
-const REMINDER_OFFSETS: Record<ReminderInterval, number> = {
-  '24h': 24 * 60 * 60 * 1000,
-  '1h': 60 * 60 * 1000,
-  '15m': 15 * 60 * 1000,
+const REMINDER_OFFSETS: Record<'30m' | '20m' | '10m', number> = {
+  '30m': 30 * 60 * 1000,
+  '20m': 20 * 60 * 1000,
+  '10m': 10 * 60 * 1000,
 };
+
+const JOB_OPTS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: 100,
+  removeOnFail: 200,
+};
+
+export async function cancelAppointmentReminderJobs(appointmentId: string): Promise<void> {
+  const queue = getReminderQueue();
+  if (!queue) return;
+
+  const jobIds = [
+    `${appointmentId}-30m`,
+    `${appointmentId}-20m`,
+    `${appointmentId}-10m`,
+    `${appointmentId}-missed`,
+    `${appointmentId}-followup-24h`,
+  ];
+
+  await Promise.all(
+    jobIds.map(async (jobId) => {
+      const job = await queue.getJob(jobId);
+      if (job) await job.remove();
+    })
+  );
+}
 
 export async function scheduleAppointmentReminders(params: {
   appointmentId: string;
@@ -20,7 +47,9 @@ export async function scheduleAppointmentReminders(params: {
     return;
   }
 
-  const intervals: ReminderInterval[] = ['24h', '1h', '15m'];
+  await cancelAppointmentReminderJobs(params.appointmentId);
+
+  const intervals: Array<'30m' | '20m' | '10m'> = ['30m', '20m', '10m'];
 
   for (const interval of intervals) {
     const fireAt = params.startTime.getTime() - REMINDER_OFFSETS[interval];
@@ -35,12 +64,11 @@ export async function scheduleAppointmentReminders(params: {
         customerPhone: params.customerPhone,
         interval,
       },
-      { delay, jobId: `${params.appointmentId}-${interval}` }
+      { delay, jobId: `${params.appointmentId}-${interval}`, ...JOB_OPTS }
     );
   }
 
-  const missedCheckAt = params.startTime.getTime() + 15 * 60 * 1000;
-  const missedDelay = missedCheckAt - Date.now();
+  const missedDelay = params.startTime.getTime() - Date.now();
   if (missedDelay > 0) {
     await queue.add(
       'missed-check',
@@ -48,9 +76,34 @@ export async function scheduleAppointmentReminders(params: {
         appointmentId: params.appointmentId,
         businessId: params.businessId,
         customerPhone: params.customerPhone,
-        interval: 'missed' as const,
+        interval: 'missed' as ReminderInterval,
       },
-      { delay: missedDelay, jobId: `${params.appointmentId}-missed` }
+      { delay: missedDelay, jobId: `${params.appointmentId}-missed`, ...JOB_OPTS }
     );
   }
+}
+
+export async function scheduleMissedFollowUp(params: {
+  appointmentId: string;
+  businessId: string;
+  customerPhone: string;
+  missedAt: Date;
+}): Promise<void> {
+  const queue = getReminderQueue();
+  if (!queue) return;
+
+  const fireAt = params.missedAt.getTime() + 24 * 60 * 60 * 1000;
+  const delay = fireAt - Date.now();
+  if (delay <= 0) return;
+
+  await queue.add(
+    'followup-24h',
+    {
+      appointmentId: params.appointmentId,
+      businessId: params.businessId,
+      customerPhone: params.customerPhone,
+      interval: 'followup-24h' as ReminderInterval,
+    },
+    { delay, jobId: `${params.appointmentId}-followup-24h`, ...JOB_OPTS }
+  );
 }
