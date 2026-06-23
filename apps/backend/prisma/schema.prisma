@@ -98,6 +98,30 @@ enum AppointmentStatus {
   MISSED
 }
 
+enum AppointmentNotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+  PUSH
+}
+
+enum AppointmentNotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_APPROVED
+  REMINDER_30_MIN
+  REMINDER_20_MIN
+  REMINDER_10_MIN
+  MISSED_APPOINTMENT
+  FOLLOW_UP_24H
+}
+
+enum AppointmentNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum DocumentType {
   PDF
   DOCX
@@ -278,6 +302,7 @@ model Business {
   customerTags      CustomerTag[]
   conversations     Conversation[]
   appointments      Appointment[]
+  appointmentNotifications AppointmentNotification[]
   services          Service[]
   knowledgeBases    KnowledgeBase[]
   whatsappAccounts  WhatsAppAccount[]
@@ -429,6 +454,7 @@ model Customer {
   tags          CustomerTagAssignment[]
   conversations Conversation[]
   appointments  Appointment[]
+  appointmentNotifications AppointmentNotification[]
   customerNotes CustomerNote[]
   segmentMembers CustomerSegmentMember[]
   campaignRecipients CampaignRecipient[]
@@ -590,6 +616,11 @@ model Appointment {
   reminder24hSent        Boolean             @default(false)
   reminder1hSent         Boolean             @default(false)
   reminder15mSent        Boolean             @default(false)
+  reminder30mSent        Boolean             @default(false)
+  reminder20mSent        Boolean             @default(false)
+  reminder10mSent        Boolean             @default(false)
+  followUp24hSent        Boolean             @default(false)
+  missedNotificationSent Boolean             @default(false)
   confirmationSentAt     DateTime?
   missedAt               DateTime?
   canRebookAfter         DateTime?
@@ -602,6 +633,7 @@ model Appointment {
   assignedTo    User?                     @relation("AssignedStaff", fields: [assignedToId], references: [id])
   createdBy     User?                     @relation("AppointmentCreator", fields: [createdById], references: [id])
   internalNotes AppointmentInternalNote[]
+  notifications AppointmentNotification[]
 
   @@index([businessId])
   @@index([businessId, startTime])
@@ -625,6 +657,30 @@ model AppointmentInternalNote {
 
   @@index([appointmentId])
   @@map("appointment_internal_notes")
+}
+
+model AppointmentNotification {
+  id               String                       @id @default(uuid())
+  appointmentId    String
+  businessId       String
+  customerId       String
+  channel          AppointmentNotificationChannel
+  notificationType AppointmentNotificationType
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  status           AppointmentNotificationStatus @default(PENDING)
+  errorMessage     String?
+  createdAt        DateTime                     @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId, notificationType, channel])
+  @@index([appointmentId])
+  @@index([businessId, status])
+  @@index([scheduledAt, status])
+  @@map("appointment_notifications")
 }
 
 // ─── CUSTOMER SEGMENTS & CAMPAIGNS ───────────────────────────────────────────

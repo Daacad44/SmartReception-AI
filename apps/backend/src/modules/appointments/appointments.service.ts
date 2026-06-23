@@ -12,14 +12,19 @@ import {
   isValidEmail,
   normalizeEmail,
 } from '../../infrastructure/appointments/email-validation';
-import { scheduleAppointmentReminders } from '../../infrastructure/appointments/appointment-scheduler.service';
+import {
+  scheduleAppointmentReminders,
+  cancelAppointmentReminderJobs,
+} from '../../infrastructure/appointments/appointment-scheduler.service';
 import {
   sendAppointmentConfirmation,
   sendAppointmentApproved,
   sendAppointmentRejected,
   sendAppointmentRescheduled,
   sendAppointmentCancelled,
+  resetAppointmentReminderFlags,
 } from '../../infrastructure/appointments/appointment-notification.service';
+import { appointmentNotificationRepository } from '../../infrastructure/appointments/appointment-notification.repository';
 import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
 
 export class AppointmentsService {
@@ -241,6 +246,8 @@ export class AppointmentsService {
     });
 
     if (input.startTime || input.endTime) {
+      await cancelAppointmentReminderJobs(id);
+      await resetAppointmentReminderFlags(id);
       await scheduleAppointmentReminders({
         appointmentId: id,
         businessId,
@@ -349,9 +356,12 @@ export class AppointmentsService {
         },
       });
     } else if (action === 'reject') {
+      await cancelAppointmentReminderJobs(id);
       void sendAppointmentRejected(id, businessId, data?.rejectionReason).catch(() => undefined);
       await notifyAppointment(businessId, 'Appointment rejected', `${appointment.title} was rejected`, id, userId);
     } else if (action === 'reschedule') {
+      await cancelAppointmentReminderJobs(id);
+      await resetAppointmentReminderFlags(id);
       void sendAppointmentRescheduled(id, businessId).catch(() => undefined);
       await scheduleAppointmentReminders({
         appointmentId: id,
@@ -361,6 +371,7 @@ export class AppointmentsService {
       });
       await notifyAppointment(businessId, 'Appointment rescheduled', `${appointment.title} was rescheduled`, id, userId);
     } else if (action === 'cancel') {
+      await cancelAppointmentReminderJobs(id);
       void sendAppointmentCancelled(id, businessId).catch(() => undefined);
       await prisma.notification.create({
         data: {
@@ -401,12 +412,19 @@ export class AppointmentsService {
     });
   }
 
+  async getNotifications(businessId: string, appointmentId: string) {
+    const existing = await appointmentsRepository.findById(businessId, appointmentId);
+    if (!existing) throw new NotFoundError('Appointment not found');
+    return appointmentNotificationRepository.findByAppointment(appointmentId, businessId);
+  }
+
   async delete(businessId: string, id: string, userId: string) {
     const existing = await appointmentsRepository.findById(businessId, id);
     if (!existing) {
       throw new NotFoundError('Appointment not found');
     }
 
+    await cancelAppointmentReminderJobs(id);
     await appointmentsRepository.delete(businessId, id);
 
     await prisma.auditLog.create({

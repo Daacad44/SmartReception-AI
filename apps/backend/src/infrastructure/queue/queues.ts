@@ -98,7 +98,7 @@ export interface ReminderJobData {
   appointmentId: string;
   businessId: string;
   customerPhone: string;
-  interval?: '24h' | '1h' | '15m' | 'missed';
+  interval?: '30m' | '20m' | '10m' | 'missed' | 'followup-24h';
 }
 
 export interface EmailJobData {
