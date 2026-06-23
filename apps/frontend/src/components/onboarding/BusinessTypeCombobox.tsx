@@ -1,18 +1,21 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react';
+import { useState, useEffect, useCallback, memo, useMemo, forwardRef } from 'react';
 import { ChevronsUpDown, Check, Search, Star, Clock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Command as CommandPrimitive } from 'cmdk';
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command, CommandEmpty, CommandGroup, CommandItem, CommandList,
 } from '@/components/ui/command';
 import {
+  ALL_BUSINESS_TYPES,
   BUSINESS_TYPE_CATEGORIES,
   CATEGORY_THEMES,
   findBusinessType,
   getPopularBusinessTypes,
   getRecentBusinessTypes,
   addRecentBusinessType,
+  searchBusinessTypes,
   type BusinessTypeOption,
 } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
@@ -31,6 +34,17 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+function matchesSearch(type: BusinessTypeOption, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    type.label.toLowerCase().includes(q) ||
+    type.category.toLowerCase().includes(q) ||
+    type.description.toLowerCase().includes(q) ||
+    type.keywords.some((k) => k.includes(q) || q.includes(k))
+  );
+}
+
 const BusinessTypeCard = memo(function BusinessTypeCard({
   type,
   selected,
@@ -43,7 +57,7 @@ const BusinessTypeCard = memo(function BusinessTypeCard({
   return (
     <div
       className={cn(
-        'flex w-full items-center gap-3 rounded-xl border p-3 transition-all duration-150',
+        'flex w-full items-center gap-3 rounded-xl border transition-all duration-150',
         compact ? 'p-2.5' : 'p-3',
         selected
           ? 'border-[#F59E0B] bg-[#FEF3C7] shadow-sm'
@@ -60,9 +74,7 @@ const BusinessTypeCard = memo(function BusinessTypeCard({
         {type.icon}
       </span>
       <div className="min-w-0 flex-1 text-left">
-        <p className={cn('truncate font-semibold text-[#0F172A]', compact ? 'text-sm' : 'text-sm')}>
-          {type.label}
-        </p>
+        <p className="truncate text-sm font-semibold text-[#0F172A]">{type.label}</p>
         <p className="truncate text-xs text-[#64748B]">{type.description}</p>
       </div>
       {selected ? (
@@ -95,26 +107,98 @@ const SectionHeader = memo(function SectionHeader({
   );
 });
 
+function TypeCommandItem({
+  itemKey,
+  type,
+  selected,
+  onPick,
+  compact,
+  showStar,
+}: {
+  itemKey: string;
+  type: BusinessTypeOption;
+  selected: boolean;
+  onPick: (type: BusinessTypeOption) => void;
+  compact?: boolean;
+  showStar?: boolean;
+}) {
+  return (
+    <CommandItem
+      key={itemKey}
+      value={itemKey}
+      onSelect={() => onPick(type)}
+      onPointerDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
+      className="group cursor-pointer rounded-xl p-0 aria-selected:bg-transparent data-[selected=true]:bg-transparent"
+    >
+      <div className="relative w-full">
+        <BusinessTypeCard type={type} selected={selected} compact={compact} />
+        {showStar && (
+          <Star className="absolute right-10 top-1/2 h-3 w-3 -translate-y-1/2 fill-[#F59E0B] text-[#F59E0B]" />
+        )}
+      </div>
+    </CommandItem>
+  );
+}
+
 const BusinessTypePalette = memo(function BusinessTypePalette({
   value,
   onSelect,
   onClose,
   isMobile,
+  isOpen,
 }: {
   value?: string;
   onSelect: (type: BusinessTypeOption) => void;
   onClose?: () => void;
   isMobile?: boolean;
+  isOpen?: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [recent, setRecent] = useState<BusinessTypeOption[]>([]);
 
   useEffect(() => {
     setRecent(getRecentBusinessTypes());
-  }, []);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) setSearch('');
+  }, [isOpen]);
 
   const popular = useMemo(() => getPopularBusinessTypes(), []);
   const isSearching = search.trim().length > 0;
+
+  const filteredBusinessTypes = useMemo(
+    () => (isSearching ? searchBusinessTypes(search) : ALL_BUSINESS_TYPES),
+    [search, isSearching]
+  );
+
+  const filteredCategories = useMemo(() => {
+    if (!isSearching) return BUSINESS_TYPE_CATEGORIES;
+    const ids = new Set(filteredBusinessTypes.map((t) => t.id));
+    return BUSINESS_TYPE_CATEGORIES.map(({ category, types }) => ({
+      category,
+      types: types.filter((t) => ids.has(t.id)),
+    })).filter((c) => c.types.length > 0);
+  }, [isSearching, filteredBusinessTypes]);
+
+  const filteredPopular = useMemo(
+    () => (isSearching ? popular.filter((t) => matchesSearch(t, search)) : popular),
+    [isSearching, search, popular]
+  );
+
+  const filteredRecent = useMemo(
+    () => (isSearching ? recent.filter((t) => matchesSearch(t, search)) : recent),
+    [isSearching, search, recent]
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Business Types:', ALL_BUSINESS_TYPES);
+      console.log('Filtered:', filteredBusinessTypes);
+      console.log('Categories:', filteredCategories.length, 'Popular:', filteredPopular.length);
+    }
+  }, [isOpen, filteredBusinessTypes, filteredCategories.length, filteredPopular.length]);
 
   const handlePick = useCallback(
     (type: BusinessTypeOption) => {
@@ -126,101 +210,86 @@ const BusinessTypePalette = memo(function BusinessTypePalette({
     [onSelect, onClose]
   );
 
-  const recentFiltered = recent.filter((t) => !value || t.id !== value || isSearching);
+  const hasResults =
+    filteredCategories.length > 0 || filteredPopular.length > 0 || filteredRecent.length > 0;
 
   return (
-    <Command
-      shouldFilter
-      value={search}
-      onValueChange={setSearch}
-      filter={(itemValue, searchTerm, keywords) => {
-        const haystack = [itemValue, ...(keywords ?? [])].join(' ').toLowerCase();
-        return haystack.includes(searchTerm.toLowerCase()) ? 1 : 0;
-      }}
-      className="flex h-full flex-col bg-white"
-    >
-      <div className="border-b border-[#E5E7EB] px-3 py-2">
+    <Command shouldFilter={false} className="flex min-h-[280px] flex-col bg-white">
+      <div className="shrink-0 border-b border-[#E5E7EB] px-3 py-2">
         <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 transition-colors focus-within:border-[#F59E0B]/50 focus-within:ring-2 focus-within:ring-[#F59E0B]/20">
           <Search className="h-4 w-4 shrink-0 text-[#94A3B8]" />
-          <CommandInput
+          <CommandPrimitive.Input
+            value={search}
+            onValueChange={setSearch}
             placeholder="Search business types…"
-            className="h-11 border-0 bg-transparent px-0 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus-visible:ring-0"
+            className="h-11 w-full border-0 bg-transparent text-sm text-[#0F172A] outline-none placeholder:text-[#94A3B8]"
           />
-          <kbd className="hidden shrink-0 rounded-md border border-[#E5E7EB] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#94A3B8] sm:inline">
-            ⌘K
-          </kbd>
         </div>
       </div>
 
       <CommandList
         className={cn(
-          'flex-1 overflow-y-auto overflow-x-hidden p-2 scrollbar-thin',
-          isMobile ? 'max-h-none' : 'max-h-[500px]'
+          'min-h-[240px] flex-1 overflow-y-auto overflow-x-hidden p-2 scrollbar-thin',
+          isMobile ? 'max-h-[calc(100dvh-140px)]' : 'max-h-[500px]'
         )}
       >
-        <CommandEmpty>
-          <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <Sparkles className="h-8 w-8 text-[#F59E0B]/60" />
-            <p className="text-sm font-medium text-[#0F172A]">No business types found</p>
-            <p className="text-xs text-[#64748B]">Try a different search term</p>
-          </div>
-        </CommandEmpty>
+        {!hasResults && (
+          <CommandEmpty>
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <Sparkles className="h-8 w-8 text-[#F59E0B]/60" />
+              <p className="text-sm font-medium text-[#0F172A]">No business types found</p>
+              <p className="text-xs text-[#64748B]">Try a different search term</p>
+            </div>
+          </CommandEmpty>
+        )}
 
-        {!isSearching && recentFiltered.length > 0 && (
+        {!isSearching && filteredRecent.length > 0 && (
           <CommandGroup className="p-0 [&_[cmdk-group-heading]]:hidden">
             <SectionHeader title="Recently Used" icon={Clock} />
             <div className="space-y-1.5 px-1 pb-3">
-              {recentFiltered.slice(0, 3).map((type) => (
-                <CommandItem
+              {filteredRecent.slice(0, 3).map((type) => (
+                <TypeCommandItem
                   key={`recent-${type.id}`}
-                  value={type.id}
-                  keywords={[type.label, type.category, type.description, ...type.keywords, 'recent']}
-                  onSelect={() => handlePick(type)}
-                  onPointerDown={(e) => e.preventDefault()}
-                  onMouseDown={(e) => e.preventDefault()}
-                  className="group cursor-pointer rounded-xl p-0 aria-selected:bg-transparent data-[selected=true]:bg-transparent"
-                >
-                  <BusinessTypeCard type={type} selected={value === type.id} compact />
-                </CommandItem>
+                  itemKey={`recent-${type.id}`}
+                  type={type}
+                  selected={value === type.id}
+                  onPick={handlePick}
+                  compact
+                />
               ))}
             </div>
           </CommandGroup>
         )}
 
-        {!isSearching && (
+        {!isSearching && filteredPopular.length > 0 && (
           <CommandGroup className="p-0 [&_[cmdk-group-heading]]:hidden">
             <SectionHeader title="Popular Business Types" icon={Star} accent />
             <div className="space-y-1.5 px-1 pb-4">
-              {popular.map((type) => (
-                <CommandItem
+              {filteredPopular.map((type) => (
+                <TypeCommandItem
                   key={`popular-${type.id}`}
-                  value={type.id}
-                  keywords={[type.label, type.category, type.description, ...type.keywords, 'popular']}
-                  onSelect={() => handlePick(type)}
-                  onPointerDown={(e) => e.preventDefault()}
-                  onMouseDown={(e) => e.preventDefault()}
-                  className="group cursor-pointer rounded-xl p-0 aria-selected:bg-transparent data-[selected=true]:bg-transparent"
-                >
-                  <div className="relative w-full">
-                    <BusinessTypeCard type={type} selected={value === type.id} compact />
-                    <Star className="absolute right-10 top-1/2 h-3 w-3 -translate-y-1/2 fill-[#F59E0B] text-[#F59E0B]" />
-                  </div>
-                </CommandItem>
+                  itemKey={`popular-${type.id}`}
+                  type={type}
+                  selected={value === type.id}
+                  onPick={handlePick}
+                  compact
+                  showStar
+                />
               ))}
             </div>
           </CommandGroup>
         )}
 
-        {BUSINESS_TYPE_CATEGORIES.map(({ category, types }) => {
+        {filteredCategories.map(({ category, types }) => {
           const theme = CATEGORY_THEMES[category] ?? { section: '#F8FAFC', header: '#F1F5F9' };
           return (
             <CommandGroup
               key={category}
               heading={category}
-              className="mb-2 overflow-hidden rounded-xl p-0 [&_[cmdk-group-heading]]:hidden"
+              className="mb-2 overflow-visible p-0 [&_[cmdk-group-heading]]:hidden"
             >
               <div
-                className="overflow-hidden rounded-xl border border-[#E5E7EB]"
+                className="overflow-visible rounded-xl border border-[#E5E7EB]"
                 style={{ backgroundColor: theme.section }}
               >
                 <div
@@ -233,19 +302,13 @@ const BusinessTypePalette = memo(function BusinessTypePalette({
                 </div>
                 <div className="space-y-1.5 p-2">
                   {types.map((type) => (
-                    <CommandItem
-                      key={type.id}
-                      value={type.id}
-                      keywords={[type.label, type.category, type.description, ...type.keywords]}
-                      onSelect={() => handlePick(type)}
-                      onPointerDown={(e) => e.preventDefault()}
-                      onMouseDown={(e) => e.preventDefault()}
-                      className="group cursor-pointer rounded-xl p-0 aria-selected:bg-transparent data-[selected=true]:bg-transparent [&:hover_.bt-card]:border-[#F59E0B]/30 [&:hover_.bt-card]:bg-white"
-                    >
-                      <div className="bt-card w-full transition-all duration-150">
-                        <BusinessTypeCard type={type} selected={value === type.id} />
-                      </div>
-                    </CommandItem>
+                    <TypeCommandItem
+                      key={`cat-${category}-${type.id}`}
+                      itemKey={`cat-${category}-${type.id}`}
+                      type={type}
+                      selected={value === type.id}
+                      onPick={handlePick}
+                    />
                   ))}
                 </div>
               </div>
@@ -265,21 +328,19 @@ interface BusinessTypeComboboxProps {
   className?: string;
 }
 
-function TriggerButton({
-  open,
-  selected,
-  disabled,
-  className,
-  onClick,
-}: {
-  open: boolean;
-  selected?: BusinessTypeOption;
-  disabled?: boolean;
-  className?: string;
-  onClick?: () => void;
-}) {
+const TriggerButton = forwardRef<
+  HTMLButtonElement,
+  {
+    open: boolean;
+    selected?: BusinessTypeOption;
+    disabled?: boolean;
+    className?: string;
+    onClick?: () => void;
+  }
+>(function TriggerButton({ open, selected, disabled, className, onClick }, ref) {
   return (
     <Button
+      ref={ref}
       type="button"
       variant="outline"
       role="combobox"
@@ -316,7 +377,7 @@ function TriggerButton({
       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-[#94A3B8]" />
     </Button>
   );
-}
+});
 
 export function BusinessTypeCombobox({
   value,
@@ -353,7 +414,7 @@ export function BusinessTypeCombobox({
             side="bottom"
             className="flex h-[100dvh] flex-col rounded-none border-0 p-0 data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom"
           >
-            <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] px-4 py-4">
               <div>
                 <p className="text-base font-semibold text-[#0F172A]">Business Type</p>
                 <p className="text-xs text-[#64748B]">Search and select your industry</p>
@@ -368,12 +429,13 @@ export function BusinessTypeCombobox({
                 Close
               </Button>
             </div>
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <BusinessTypePalette
                 value={value}
                 onSelect={handleSelect}
                 onClose={() => setOpen(false)}
                 isMobile
+                isOpen={open}
               />
             </div>
           </SheetContent>
@@ -388,19 +450,18 @@ export function BusinessTypeCombobox({
         <TriggerButton open={open} selected={selected} disabled={disabled} className={className} />
       </PopoverTrigger>
       <PopoverContent
-        className="z-[130] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl border-[#E5E7EB] p-0 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        className="z-[200] w-[var(--radix-popover-trigger-width)] min-h-[320px] overflow-visible rounded-xl border-[#E5E7EB] p-0 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         align="start"
         side="bottom"
         sideOffset={8}
-        collisionPadding={8}
-        avoidCollisions={false}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
+        collisionPadding={16}
+        avoidCollisions
       >
         <BusinessTypePalette
           value={value}
           onSelect={handleSelect}
           onClose={() => setOpen(false)}
+          isOpen={open}
         />
       </PopoverContent>
     </Popover>
