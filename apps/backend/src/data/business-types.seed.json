@@ -1,0 +1,2573 @@
+[
+  {
+    "id": "technology_company",
+    "label": "Technology Company",
+    "icon": "💻",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "tech",
+      "technology",
+      "it",
+      "technology company",
+      "technology",
+      "technology",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "software_company",
+    "label": "Software Company",
+    "icon": "💻",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "software",
+      "dev",
+      "tech",
+      "software company",
+      "technology",
+      "software",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "saas_company",
+    "label": "SaaS Company",
+    "icon": "☁️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "saas",
+      "software",
+      "tech",
+      "cloud",
+      "saas company",
+      "technology",
+      "saas",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "ai_company",
+    "label": "AI Company",
+    "icon": "🤖",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "ai",
+      "artificial intelligence",
+      "tech",
+      "machine learning",
+      "ai company",
+      "technology",
+      "ai",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "ai_startup",
+    "label": "AI Startup",
+    "icon": "🚀",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "ai",
+      "startup",
+      "tech",
+      "ai startup",
+      "technology",
+      "ai",
+      "startup"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "it_services",
+    "label": "IT Services",
+    "icon": "🖥️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "it",
+      "tech",
+      "support",
+      "services",
+      "it services",
+      "technology",
+      "it",
+      "services"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "web_development_agency",
+    "label": "Web Development Agency",
+    "icon": "🌐",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "web",
+      "dev",
+      "agency",
+      "tech",
+      "web development agency",
+      "technology",
+      "web",
+      "development",
+      "agency"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "mobile_app_development",
+    "label": "Mobile App Development",
+    "icon": "📱",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "mobile",
+      "app",
+      "tech",
+      "mobile app development",
+      "technology",
+      "mobile",
+      "app",
+      "development"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "cyber_security_company",
+    "label": "Cyber Security Company",
+    "icon": "🔒",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "security",
+      "cyber",
+      "tech",
+      "cyber security company",
+      "technology",
+      "cyber",
+      "security",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "cloud_services_provider",
+    "label": "Cloud Services Provider",
+    "icon": "☁️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "cloud",
+      "tech",
+      "hosting",
+      "cloud services provider",
+      "technology",
+      "cloud",
+      "services",
+      "provider"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "data_analytics_company",
+    "label": "Data Analytics Company",
+    "icon": "📊",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "data",
+      "analytics",
+      "tech",
+      "data analytics company",
+      "technology",
+      "data",
+      "analytics",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "digital_agency",
+    "label": "Digital Agency",
+    "icon": "🎨",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "digital",
+      "agency",
+      "marketing",
+      "tech",
+      "digital agency",
+      "technology",
+      "digital",
+      "agency"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "startup",
+    "label": "Startup",
+    "icon": "🚀",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "startup",
+      "tech",
+      "startup",
+      "technology",
+      "startup"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "fintech_company",
+    "label": "Fintech Company",
+    "icon": "💳",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "fintech",
+      "finance",
+      "tech",
+      "fintech company",
+      "technology",
+      "fintech",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "edtech_company",
+    "label": "EdTech Company",
+    "icon": "📚",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "edtech",
+      "education",
+      "tech",
+      "edtech company",
+      "technology",
+      "edtech",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "healthtech_company",
+    "label": "HealthTech Company",
+    "icon": "🏥",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "healthtech",
+      "health",
+      "tech",
+      "healthtech company",
+      "technology",
+      "healthtech",
+      "company"
+    ],
+    "description": "Software, AI, SaaS, IT Services",
+    "category": "Technology"
+  },
+  {
+    "id": "restaurant",
+    "label": "Restaurant",
+    "icon": "🍽️",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "food",
+      "dining",
+      "restaurant",
+      "restaurant",
+      "food & hospitality",
+      "restaurant"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "cafe",
+    "label": "Cafe",
+    "icon": "☕",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "cafe",
+      "coffee",
+      "food",
+      "cafe",
+      "food & hospitality",
+      "cafe"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "coffee_shop",
+    "label": "Coffee Shop",
+    "icon": "☕",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "coffee",
+      "cafe",
+      "coffee shop",
+      "food & hospitality",
+      "coffee",
+      "shop"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "hotel",
+    "label": "Hotel",
+    "icon": "🏨",
+    "industry": "HOTEL",
+    "keywords": [
+      "hotel",
+      "hospitality",
+      "lodging",
+      "hotel",
+      "food & hospitality",
+      "hotel"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "resort",
+    "label": "Resort",
+    "icon": "🏖️",
+    "industry": "HOTEL",
+    "keywords": [
+      "resort",
+      "hotel",
+      "vacation",
+      "resort",
+      "food & hospitality",
+      "resort"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "guest_house",
+    "label": "Guest House",
+    "icon": "🏠",
+    "industry": "HOTEL",
+    "keywords": [
+      "guest",
+      "lodging",
+      "bnb",
+      "guest house",
+      "food & hospitality",
+      "guest",
+      "house"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "catering_service",
+    "label": "Catering Service",
+    "icon": "🍱",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "catering",
+      "food",
+      "events",
+      "catering service",
+      "food & hospitality",
+      "catering",
+      "service"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "fast_food",
+    "label": "Fast Food",
+    "icon": "🍔",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "fast food",
+      "food",
+      "fast food",
+      "food & hospitality",
+      "fast",
+      "food"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "bakery",
+    "label": "Bakery",
+    "icon": "🥐",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "bakery",
+      "food",
+      "pastry",
+      "bakery",
+      "food & hospitality",
+      "bakery"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "event_venue",
+    "label": "Event Venue",
+    "icon": "🎪",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "event",
+      "venue",
+      "hospitality",
+      "event venue",
+      "food & hospitality",
+      "event",
+      "venue"
+    ],
+    "description": "Food, Dining, Hospitality",
+    "category": "Food & Hospitality"
+  },
+  {
+    "id": "hospital",
+    "label": "Hospital",
+    "icon": "🏥",
+    "industry": "HOSPITAL",
+    "keywords": [
+      "hospital",
+      "health",
+      "medical",
+      "hospital",
+      "healthcare",
+      "hospital"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "clinic",
+    "label": "Clinic",
+    "icon": "🏥",
+    "industry": "CLINIC",
+    "keywords": [
+      "clinic",
+      "health",
+      "medical",
+      "clinic",
+      "healthcare",
+      "clinic"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "pharmacy",
+    "label": "Pharmacy",
+    "icon": "💊",
+    "industry": "CLINIC",
+    "keywords": [
+      "pharmacy",
+      "drug",
+      "health",
+      "pharmacy",
+      "healthcare",
+      "pharmacy"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "medical_laboratory",
+    "label": "Medical Laboratory",
+    "icon": "🔬",
+    "industry": "CLINIC",
+    "keywords": [
+      "lab",
+      "medical",
+      "health",
+      "medical laboratory",
+      "healthcare",
+      "medical",
+      "laboratory"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "dental_clinic",
+    "label": "Dental Clinic",
+    "icon": "🦷",
+    "industry": "CLINIC",
+    "keywords": [
+      "dental",
+      "dentist",
+      "health",
+      "dental clinic",
+      "healthcare",
+      "dental",
+      "clinic"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "diagnostic_center",
+    "label": "Diagnostic Center",
+    "icon": "🩺",
+    "industry": "CLINIC",
+    "keywords": [
+      "diagnostic",
+      "health",
+      "medical",
+      "diagnostic center",
+      "healthcare",
+      "diagnostic",
+      "center"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "healthcare_provider",
+    "label": "Healthcare Provider",
+    "icon": "⚕️",
+    "industry": "HOSPITAL",
+    "keywords": [
+      "healthcare",
+      "health",
+      "medical",
+      "healthcare provider",
+      "healthcare",
+      "healthcare",
+      "provider"
+    ],
+    "description": "Healthcare, Clinics, Medical Services",
+    "category": "Healthcare"
+  },
+  {
+    "id": "school",
+    "label": "School",
+    "icon": "🏫",
+    "industry": "SCHOOL",
+    "keywords": [
+      "school",
+      "education",
+      "k12",
+      "school",
+      "education",
+      "school"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "university",
+    "label": "University",
+    "icon": "🎓",
+    "industry": "UNIVERSITY",
+    "keywords": [
+      "university",
+      "college",
+      "education",
+      "university",
+      "education",
+      "university"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "college",
+    "label": "College",
+    "icon": "🎓",
+    "industry": "UNIVERSITY",
+    "keywords": [
+      "college",
+      "education",
+      "college",
+      "education",
+      "college"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "training_center",
+    "label": "Training Center",
+    "icon": "📖",
+    "industry": "SCHOOL",
+    "keywords": [
+      "training",
+      "education",
+      "courses",
+      "training center",
+      "education",
+      "training",
+      "center"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "online_academy",
+    "label": "Online Academy",
+    "icon": "💻",
+    "industry": "UNIVERSITY",
+    "keywords": [
+      "online",
+      "academy",
+      "education",
+      "elearning",
+      "online academy",
+      "education",
+      "online",
+      "academy"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "coaching_institute",
+    "label": "Coaching Institute",
+    "icon": "📝",
+    "industry": "SCHOOL",
+    "keywords": [
+      "coaching",
+      "tutoring",
+      "education",
+      "coaching institute",
+      "education",
+      "coaching",
+      "institute"
+    ],
+    "description": "Education, Learning, Training",
+    "category": "Education"
+  },
+  {
+    "id": "real_estate_agency",
+    "label": "Real Estate Agency",
+    "icon": "🏢",
+    "industry": "REAL_ESTATE",
+    "keywords": [
+      "real estate",
+      "property",
+      "agency",
+      "real estate agency",
+      "real estate & construction",
+      "real",
+      "estate",
+      "agency"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "property_management",
+    "label": "Property Management",
+    "icon": "🏘️",
+    "industry": "REAL_ESTATE",
+    "keywords": [
+      "property",
+      "management",
+      "real estate",
+      "property management",
+      "real estate & construction",
+      "property",
+      "management"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "construction_company",
+    "label": "Construction Company",
+    "icon": "🏗️",
+    "industry": "CONSTRUCTION",
+    "keywords": [
+      "construction",
+      "building",
+      "construction company",
+      "real estate & construction",
+      "construction",
+      "company"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "engineering_firm",
+    "label": "Engineering Firm",
+    "icon": "📐",
+    "industry": "CONSTRUCTION",
+    "keywords": [
+      "engineering",
+      "construction",
+      "engineering firm",
+      "real estate & construction",
+      "engineering",
+      "firm"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "architecture_firm",
+    "label": "Architecture Firm",
+    "icon": "📏",
+    "industry": "CONSTRUCTION",
+    "keywords": [
+      "architecture",
+      "design",
+      "architecture firm",
+      "real estate & construction",
+      "architecture",
+      "firm"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "interior_design_company",
+    "label": "Interior Design Company",
+    "icon": "🛋️",
+    "industry": "CONSTRUCTION",
+    "keywords": [
+      "interior",
+      "design",
+      "interior design company",
+      "real estate & construction",
+      "interior",
+      "design",
+      "company"
+    ],
+    "description": "Property, Building & Design",
+    "category": "Real Estate & Construction"
+  },
+  {
+    "id": "retail_store",
+    "label": "Retail Store",
+    "icon": "🏪",
+    "industry": "RETAIL",
+    "keywords": [
+      "retail",
+      "store",
+      "shop",
+      "retail store",
+      "retail & e-commerce",
+      "retail",
+      "store"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "online_store",
+    "label": "Online Store",
+    "icon": "🛒",
+    "industry": "ECOMMERCE",
+    "keywords": [
+      "online",
+      "ecommerce",
+      "store",
+      "online store",
+      "retail & e-commerce",
+      "online",
+      "store"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "ecommerce_business",
+    "label": "E-Commerce Business",
+    "icon": "🛍️",
+    "industry": "ECOMMERCE",
+    "keywords": [
+      "ecommerce",
+      "online",
+      "shop",
+      "e-commerce business",
+      "retail & e-commerce",
+      "e-commerce",
+      "business"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "supermarket",
+    "label": "Supermarket",
+    "icon": "🛒",
+    "industry": "RETAIL",
+    "keywords": [
+      "supermarket",
+      "grocery",
+      "retail",
+      "supermarket",
+      "retail & e-commerce",
+      "supermarket"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "grocery_store",
+    "label": "Grocery Store",
+    "icon": "🥬",
+    "industry": "RETAIL",
+    "keywords": [
+      "grocery",
+      "supermarket",
+      "food",
+      "grocery store",
+      "retail & e-commerce",
+      "grocery",
+      "store"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "convenience_store",
+    "label": "Convenience Store",
+    "icon": "🏪",
+    "industry": "RETAIL",
+    "keywords": [
+      "convenience",
+      "store",
+      "retail",
+      "convenience store",
+      "retail & e-commerce",
+      "convenience",
+      "store"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "wholesale_business",
+    "label": "Wholesale Business",
+    "icon": "📦",
+    "industry": "RETAIL",
+    "keywords": [
+      "wholesale",
+      "distribution",
+      "wholesale business",
+      "retail & e-commerce",
+      "wholesale",
+      "business"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "fashion_brand",
+    "label": "Fashion Brand",
+    "icon": "👗",
+    "industry": "RETAIL",
+    "keywords": [
+      "fashion",
+      "clothing",
+      "brand",
+      "fashion brand",
+      "retail & e-commerce",
+      "fashion",
+      "brand"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "online_marketplace",
+    "label": "Online Marketplace",
+    "icon": "🛍️",
+    "industry": "ECOMMERCE",
+    "keywords": [
+      "marketplace",
+      "ecommerce",
+      "online",
+      "online marketplace",
+      "retail & e-commerce",
+      "online",
+      "marketplace"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "bar",
+    "label": "Bar",
+    "icon": "🍺",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "bar",
+      "nightlife",
+      "drinks",
+      "bar",
+      "retail & e-commerce",
+      "bar"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "nightclub",
+    "label": "Nightclub",
+    "icon": "🎵",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "nightclub",
+      "club",
+      "entertainment",
+      "nightclub",
+      "retail & e-commerce",
+      "nightclub"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "food_truck",
+    "label": "Food Truck",
+    "icon": "🚚",
+    "industry": "RESTAURANT",
+    "keywords": [
+      "food truck",
+      "street food",
+      "restaurant",
+      "food truck",
+      "retail & e-commerce",
+      "food",
+      "truck"
+    ],
+    "description": "Retail, Online Stores & Commerce",
+    "category": "Retail & E-Commerce"
+  },
+  {
+    "id": "logistics_company",
+    "label": "Logistics Company",
+    "icon": "🚚",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "logistics",
+      "supply chain",
+      "transport",
+      "logistics company",
+      "logistics & transportation",
+      "logistics",
+      "company"
+    ],
+    "description": "Shipping, Delivery & Transport",
+    "category": "Logistics & Transportation"
+  },
+  {
+    "id": "transport_company",
+    "label": "Transport Company",
+    "icon": "🚌",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "transport",
+      "logistics",
+      "transport company",
+      "logistics & transportation",
+      "transport",
+      "company"
+    ],
+    "description": "Shipping, Delivery & Transport",
+    "category": "Logistics & Transportation"
+  },
+  {
+    "id": "courier_service",
+    "label": "Courier Service",
+    "icon": "📦",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "courier",
+      "delivery",
+      "shipping",
+      "courier service",
+      "logistics & transportation",
+      "courier",
+      "service"
+    ],
+    "description": "Shipping, Delivery & Transport",
+    "category": "Logistics & Transportation"
+  },
+  {
+    "id": "delivery_service",
+    "label": "Delivery Service",
+    "icon": "🛵",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "delivery",
+      "courier",
+      "delivery service",
+      "logistics & transportation",
+      "delivery",
+      "service"
+    ],
+    "description": "Shipping, Delivery & Transport",
+    "category": "Logistics & Transportation"
+  },
+  {
+    "id": "shipping_company",
+    "label": "Shipping Company",
+    "icon": "🚢",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "shipping",
+      "freight",
+      "logistics",
+      "shipping company",
+      "logistics & transportation",
+      "shipping",
+      "company"
+    ],
+    "description": "Shipping, Delivery & Transport",
+    "category": "Logistics & Transportation"
+  },
+  {
+    "id": "law_firm",
+    "label": "Law Firm",
+    "icon": "⚖️",
+    "industry": "CONSULTING",
+    "keywords": [
+      "law",
+      "legal",
+      "attorney",
+      "law firm",
+      "professional services",
+      "law",
+      "firm"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "accounting_firm",
+    "label": "Accounting Firm",
+    "icon": "🧮",
+    "industry": "CONSULTING",
+    "keywords": [
+      "accounting",
+      "finance",
+      "tax",
+      "accounting firm",
+      "professional services",
+      "accounting",
+      "firm"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "consulting_company",
+    "label": "Consulting Company",
+    "icon": "💼",
+    "industry": "CONSULTING",
+    "keywords": [
+      "consulting",
+      "advisory",
+      "consulting company",
+      "professional services",
+      "consulting",
+      "company"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "marketing_agency",
+    "label": "Marketing Agency",
+    "icon": "📣",
+    "industry": "CONSULTING",
+    "keywords": [
+      "marketing",
+      "agency",
+      "advertising",
+      "marketing agency",
+      "professional services",
+      "marketing",
+      "agency"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "advertising_agency",
+    "label": "Advertising Agency",
+    "icon": "📺",
+    "industry": "CONSULTING",
+    "keywords": [
+      "advertising",
+      "marketing",
+      "agency",
+      "advertising agency",
+      "professional services",
+      "advertising",
+      "agency"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "recruitment_agency",
+    "label": "Recruitment Agency",
+    "icon": "👔",
+    "industry": "CONSULTING",
+    "keywords": [
+      "recruitment",
+      "hiring",
+      "hr",
+      "recruitment agency",
+      "professional services",
+      "recruitment",
+      "agency"
+    ],
+    "description": "Legal, Finance & Consulting",
+    "category": "Professional Services"
+  },
+  {
+    "id": "bank",
+    "label": "Bank",
+    "icon": "🏦",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "bank",
+      "finance",
+      "financial",
+      "bank",
+      "financial services",
+      "bank"
+    ],
+    "description": "Banking, Insurance & Investments",
+    "category": "Financial Services"
+  },
+  {
+    "id": "microfinance",
+    "label": "Microfinance",
+    "icon": "💰",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "microfinance",
+      "finance",
+      "loans",
+      "microfinance",
+      "financial services",
+      "microfinance"
+    ],
+    "description": "Banking, Insurance & Investments",
+    "category": "Financial Services"
+  },
+  {
+    "id": "insurance_company",
+    "label": "Insurance Company",
+    "icon": "🛡️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "insurance",
+      "finance",
+      "insurance company",
+      "financial services",
+      "insurance",
+      "company"
+    ],
+    "description": "Banking, Insurance & Investments",
+    "category": "Financial Services"
+  },
+  {
+    "id": "investment_firm",
+    "label": "Investment Firm",
+    "icon": "📈",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "investment",
+      "finance",
+      "trading",
+      "investment firm",
+      "financial services",
+      "investment",
+      "firm"
+    ],
+    "description": "Banking, Insurance & Investments",
+    "category": "Financial Services"
+  },
+  {
+    "id": "forex_business",
+    "label": "Forex Business",
+    "icon": "💱",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "forex",
+      "trading",
+      "finance",
+      "forex business",
+      "financial services",
+      "forex",
+      "business"
+    ],
+    "description": "Banking, Insurance & Investments",
+    "category": "Financial Services"
+  },
+  {
+    "id": "travel_agency",
+    "label": "Travel Agency",
+    "icon": "✈️",
+    "industry": "TRAVEL_AGENCY",
+    "keywords": [
+      "travel",
+      "tourism",
+      "agency",
+      "travel agency",
+      "tourism & travel",
+      "travel",
+      "agency"
+    ],
+    "description": "Travel, Tours & Tourism",
+    "category": "Tourism & Travel"
+  },
+  {
+    "id": "tour_operator",
+    "label": "Tour Operator",
+    "icon": "🗺️",
+    "industry": "TRAVEL_AGENCY",
+    "keywords": [
+      "tour",
+      "travel",
+      "tourism",
+      "tour operator",
+      "tourism & travel",
+      "tour",
+      "operator"
+    ],
+    "description": "Travel, Tours & Tourism",
+    "category": "Tourism & Travel"
+  },
+  {
+    "id": "visa_service",
+    "label": "Visa Service",
+    "icon": "🛂",
+    "industry": "TRAVEL_AGENCY",
+    "keywords": [
+      "visa",
+      "travel",
+      "immigration",
+      "visa service",
+      "tourism & travel",
+      "visa",
+      "service"
+    ],
+    "description": "Travel, Tours & Tourism",
+    "category": "Tourism & Travel"
+  },
+  {
+    "id": "car_rental_company",
+    "label": "Car Rental Company",
+    "icon": "🚗",
+    "industry": "TRAVEL_AGENCY",
+    "keywords": [
+      "car rental",
+      "travel",
+      "transport",
+      "car rental company",
+      "tourism & travel",
+      "car",
+      "rental",
+      "company"
+    ],
+    "description": "Travel, Tours & Tourism",
+    "category": "Tourism & Travel"
+  },
+  {
+    "id": "media_company",
+    "label": "Media Company",
+    "icon": "📰",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "media",
+      "news",
+      "entertainment",
+      "media company",
+      "media & entertainment",
+      "media",
+      "company"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "radio_station",
+    "label": "Radio Station",
+    "icon": "📻",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "radio",
+      "media",
+      "broadcast",
+      "radio station",
+      "media & entertainment",
+      "radio",
+      "station"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "tv_station",
+    "label": "TV Station",
+    "icon": "📺",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "tv",
+      "television",
+      "media",
+      "tv station",
+      "media & entertainment",
+      "tv",
+      "station"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "podcast_business",
+    "label": "Podcast Business",
+    "icon": "🎙️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "podcast",
+      "media",
+      "content",
+      "podcast business",
+      "media & entertainment",
+      "podcast",
+      "business"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "production_company",
+    "label": "Production Company",
+    "icon": "🎬",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "production",
+      "film",
+      "media",
+      "production company",
+      "media & entertainment",
+      "production",
+      "company"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "content_creator",
+    "label": "Content Creator",
+    "icon": "📸",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "content",
+      "creator",
+      "influencer",
+      "content creator",
+      "media & entertainment",
+      "content",
+      "creator"
+    ],
+    "description": "Media, Content & Production",
+    "category": "Media & Entertainment"
+  },
+  {
+    "id": "ngo",
+    "label": "NGO",
+    "icon": "🤝",
+    "industry": "NGO",
+    "keywords": [
+      "ngo",
+      "nonprofit",
+      "charity",
+      "ngo",
+      "ngo & government",
+      "ngo"
+    ],
+    "description": "Nonprofits, NGOs & Public Sector",
+    "category": "NGO & Government"
+  },
+  {
+    "id": "charity_organization",
+    "label": "Charity Organization",
+    "icon": "❤️",
+    "industry": "NGO",
+    "keywords": [
+      "charity",
+      "nonprofit",
+      "ngo",
+      "charity organization",
+      "ngo & government",
+      "charity",
+      "organization"
+    ],
+    "description": "Nonprofits, NGOs & Public Sector",
+    "category": "NGO & Government"
+  },
+  {
+    "id": "government_agency",
+    "label": "Government Agency",
+    "icon": "🏛️",
+    "industry": "GOVERNMENT",
+    "keywords": [
+      "government",
+      "public",
+      "agency",
+      "government agency",
+      "ngo & government",
+      "government",
+      "agency"
+    ],
+    "description": "Nonprofits, NGOs & Public Sector",
+    "category": "NGO & Government"
+  },
+  {
+    "id": "non_profit_organization",
+    "label": "Non-Profit Organization",
+    "icon": "💚",
+    "industry": "NGO",
+    "keywords": [
+      "nonprofit",
+      "ngo",
+      "charity",
+      "non-profit organization",
+      "ngo & government",
+      "non-profit",
+      "organization"
+    ],
+    "description": "Nonprofits, NGOs & Public Sector",
+    "category": "NGO & Government"
+  },
+  {
+    "id": "farm",
+    "label": "Farm",
+    "icon": "🌾",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "farm",
+      "agriculture",
+      "farming",
+      "farm",
+      "agriculture",
+      "farm"
+    ],
+    "description": "Farming, Livestock & Fisheries",
+    "category": "Agriculture"
+  },
+  {
+    "id": "agricultural_company",
+    "label": "Agricultural Company",
+    "icon": "🚜",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "agriculture",
+      "farming",
+      "agri",
+      "agricultural company",
+      "agriculture",
+      "agricultural",
+      "company"
+    ],
+    "description": "Farming, Livestock & Fisheries",
+    "category": "Agriculture"
+  },
+  {
+    "id": "livestock_business",
+    "label": "Livestock Business",
+    "icon": "🐄",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "livestock",
+      "agriculture",
+      "farming",
+      "livestock business",
+      "agriculture",
+      "livestock",
+      "business"
+    ],
+    "description": "Farming, Livestock & Fisheries",
+    "category": "Agriculture"
+  },
+  {
+    "id": "fisheries_business",
+    "label": "Fisheries Business",
+    "icon": "🐟",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "fisheries",
+      "fishing",
+      "agriculture",
+      "fisheries business",
+      "agriculture",
+      "fisheries",
+      "business"
+    ],
+    "description": "Farming, Livestock & Fisheries",
+    "category": "Agriculture"
+  },
+  {
+    "id": "factory",
+    "label": "Factory",
+    "icon": "🏭",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "factory",
+      "manufacturing",
+      "industrial",
+      "factory",
+      "manufacturing",
+      "factory"
+    ],
+    "description": "Factories & Industrial Production",
+    "category": "Manufacturing"
+  },
+  {
+    "id": "manufacturing_company",
+    "label": "Manufacturing Company",
+    "icon": "⚙️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "manufacturing",
+      "industrial",
+      "factory",
+      "manufacturing company",
+      "manufacturing",
+      "manufacturing",
+      "company"
+    ],
+    "description": "Factories & Industrial Production",
+    "category": "Manufacturing"
+  },
+  {
+    "id": "industrial_business",
+    "label": "Industrial Business",
+    "icon": "🏗️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "industrial",
+      "manufacturing",
+      "industrial business",
+      "manufacturing",
+      "industrial",
+      "business"
+    ],
+    "description": "Factories & Industrial Production",
+    "category": "Manufacturing"
+  },
+  {
+    "id": "textile_manufacturer",
+    "label": "Textile Manufacturer",
+    "icon": "🧵",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "textile",
+      "manufacturing",
+      "fabric",
+      "textile manufacturer",
+      "manufacturing",
+      "textile",
+      "manufacturer"
+    ],
+    "description": "Factories & Industrial Production",
+    "category": "Manufacturing"
+  },
+  {
+    "id": "food_processing",
+    "label": "Food Processing Company",
+    "icon": "🥫",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "food processing",
+      "manufacturing",
+      "food processing company",
+      "manufacturing",
+      "food",
+      "processing",
+      "company"
+    ],
+    "description": "Factories & Industrial Production",
+    "category": "Manufacturing"
+  },
+  {
+    "id": "telecom_company",
+    "label": "Telecommunications Company",
+    "icon": "📡",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "telecom",
+      "telecommunications",
+      "mobile",
+      "telecommunications company",
+      "telecommunications",
+      "telecommunications",
+      "company"
+    ],
+    "description": "Telecom, Internet & Mobile Services",
+    "category": "Telecommunications"
+  },
+  {
+    "id": "internet_service_provider",
+    "label": "Internet Service Provider",
+    "icon": "🌐",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "isp",
+      "internet",
+      "broadband",
+      "internet service provider",
+      "telecommunications",
+      "internet",
+      "service",
+      "provider"
+    ],
+    "description": "Telecom, Internet & Mobile Services",
+    "category": "Telecommunications"
+  },
+  {
+    "id": "mobile_operator",
+    "label": "Mobile Network Operator",
+    "icon": "📱",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "mobile",
+      "cellular",
+      "telecom",
+      "mobile network operator",
+      "telecommunications",
+      "mobile",
+      "network",
+      "operator"
+    ],
+    "description": "Telecom, Internet & Mobile Services",
+    "category": "Telecommunications"
+  },
+  {
+    "id": "call_center",
+    "label": "Call Center",
+    "icon": "☎️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "call center",
+      "bpo",
+      "support",
+      "call center",
+      "telecommunications",
+      "call",
+      "center"
+    ],
+    "description": "Telecom, Internet & Mobile Services",
+    "category": "Telecommunications"
+  },
+  {
+    "id": "solar_company",
+    "label": "Solar Energy Company",
+    "icon": "☀️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "solar",
+      "energy",
+      "renewable",
+      "solar energy company",
+      "energy & utilities",
+      "solar",
+      "energy",
+      "company"
+    ],
+    "description": "Power, Solar & Utility Services",
+    "category": "Energy & Utilities"
+  },
+  {
+    "id": "power_utility",
+    "label": "Power Utility",
+    "icon": "⚡",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "power",
+      "electricity",
+      "utility",
+      "power utility",
+      "energy & utilities",
+      "power",
+      "utility"
+    ],
+    "description": "Power, Solar & Utility Services",
+    "category": "Energy & Utilities"
+  },
+  {
+    "id": "oil_gas_company",
+    "label": "Oil & Gas Company",
+    "icon": "🛢️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "oil",
+      "gas",
+      "energy",
+      "oil & gas company",
+      "energy & utilities",
+      "oil",
+      "&",
+      "gas",
+      "company"
+    ],
+    "description": "Power, Solar & Utility Services",
+    "category": "Energy & Utilities"
+  },
+  {
+    "id": "water_utility",
+    "label": "Water Utility",
+    "icon": "💧",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "water",
+      "utility",
+      "services",
+      "water utility",
+      "energy & utilities",
+      "water",
+      "utility"
+    ],
+    "description": "Power, Solar & Utility Services",
+    "category": "Energy & Utilities"
+  },
+  {
+    "id": "mining_company",
+    "label": "Mining Company",
+    "icon": "⛏️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "mining",
+      "minerals",
+      "resources",
+      "mining company",
+      "mining & resources",
+      "mining",
+      "company"
+    ],
+    "description": "Mining, Oil & Gas & Extraction",
+    "category": "Mining & Resources"
+  },
+  {
+    "id": "quarry_business",
+    "label": "Quarry Business",
+    "icon": "🪨",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "quarry",
+      "stone",
+      "mining",
+      "quarry business",
+      "mining & resources",
+      "quarry",
+      "business"
+    ],
+    "description": "Mining, Oil & Gas & Extraction",
+    "category": "Mining & Resources"
+  },
+  {
+    "id": "car_dealership",
+    "label": "Car Dealership",
+    "icon": "🚗",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "car",
+      "dealership",
+      "automotive",
+      "car dealership",
+      "automotive",
+      "car",
+      "dealership"
+    ],
+    "description": "Cars, Auto Repair & Dealerships",
+    "category": "Automotive"
+  },
+  {
+    "id": "auto_repair_shop",
+    "label": "Auto Repair Shop",
+    "icon": "🔧",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "auto repair",
+      "mechanic",
+      "garage",
+      "auto repair shop",
+      "automotive",
+      "auto",
+      "repair",
+      "shop"
+    ],
+    "description": "Cars, Auto Repair & Dealerships",
+    "category": "Automotive"
+  },
+  {
+    "id": "car_rental",
+    "label": "Car Rental",
+    "icon": "🚙",
+    "industry": "TRAVEL_AGENCY",
+    "keywords": [
+      "car rental",
+      "transport",
+      "automotive",
+      "car rental",
+      "automotive",
+      "car",
+      "rental"
+    ],
+    "description": "Cars, Auto Repair & Dealerships",
+    "category": "Automotive"
+  },
+  {
+    "id": "auto_parts_store",
+    "label": "Auto Parts Store",
+    "icon": "⚙️",
+    "industry": "RETAIL",
+    "keywords": [
+      "auto parts",
+      "automotive",
+      "retail",
+      "auto parts store",
+      "automotive",
+      "auto",
+      "parts",
+      "store"
+    ],
+    "description": "Cars, Auto Repair & Dealerships",
+    "category": "Automotive"
+  },
+  {
+    "id": "car_wash",
+    "label": "Car Wash",
+    "icon": "🧽",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "car wash",
+      "automotive",
+      "cleaning",
+      "car wash",
+      "automotive",
+      "car",
+      "wash"
+    ],
+    "description": "Cars, Auto Repair & Dealerships",
+    "category": "Automotive"
+  },
+  {
+    "id": "beauty_salon",
+    "label": "Beauty Salon",
+    "icon": "💇",
+    "industry": "SALON",
+    "keywords": [
+      "beauty",
+      "salon",
+      "hair",
+      "beauty salon",
+      "beauty & wellness",
+      "beauty",
+      "salon"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "barber_shop",
+    "label": "Barber Shop",
+    "icon": "💈",
+    "industry": "SALON",
+    "keywords": [
+      "barber",
+      "hair",
+      "grooming",
+      "barber shop",
+      "beauty & wellness",
+      "barber",
+      "shop"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "spa",
+    "label": "Spa & Wellness",
+    "icon": "🧖",
+    "industry": "SALON",
+    "keywords": [
+      "spa",
+      "wellness",
+      "massage",
+      "spa & wellness",
+      "beauty & wellness",
+      "spa",
+      "&",
+      "wellness"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "nail_salon",
+    "label": "Nail Salon",
+    "icon": "💅",
+    "industry": "SALON",
+    "keywords": [
+      "nail",
+      "salon",
+      "beauty",
+      "nail salon",
+      "beauty & wellness",
+      "nail",
+      "salon"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "gym",
+    "label": "Gym & Fitness Center",
+    "icon": "🏋️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "gym",
+      "fitness",
+      "workout",
+      "gym & fitness center",
+      "beauty & wellness",
+      "gym",
+      "&",
+      "fitness",
+      "center"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "yoga_studio",
+    "label": "Yoga Studio",
+    "icon": "🧘",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "yoga",
+      "fitness",
+      "wellness",
+      "yoga studio",
+      "beauty & wellness",
+      "yoga",
+      "studio"
+    ],
+    "description": "Salon, Spa, Fitness & Wellness",
+    "category": "Beauty & Wellness"
+  },
+  {
+    "id": "sports_club",
+    "label": "Sports Club",
+    "icon": "⚽",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "sports",
+      "club",
+      "recreation",
+      "sports club",
+      "sports & recreation",
+      "sports",
+      "club"
+    ],
+    "description": "Sports Clubs, Gyms & Recreation",
+    "category": "Sports & Recreation"
+  },
+  {
+    "id": "fitness_studio",
+    "label": "Fitness Studio",
+    "icon": "🤸",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "fitness",
+      "studio",
+      "training",
+      "fitness studio",
+      "sports & recreation",
+      "fitness",
+      "studio"
+    ],
+    "description": "Sports Clubs, Gyms & Recreation",
+    "category": "Sports & Recreation"
+  },
+  {
+    "id": "stadium_venue",
+    "label": "Stadium & Arena",
+    "icon": "🏟️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "stadium",
+      "sports",
+      "venue",
+      "stadium & arena",
+      "sports & recreation",
+      "stadium",
+      "&",
+      "arena"
+    ],
+    "description": "Sports Clubs, Gyms & Recreation",
+    "category": "Sports & Recreation"
+  },
+  {
+    "id": "swimming_pool",
+    "label": "Swimming Pool",
+    "icon": "🏊",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "swimming",
+      "pool",
+      "sports",
+      "swimming pool",
+      "sports & recreation",
+      "swimming",
+      "pool"
+    ],
+    "description": "Sports Clubs, Gyms & Recreation",
+    "category": "Sports & Recreation"
+  },
+  {
+    "id": "cleaning_service",
+    "label": "Cleaning Service",
+    "icon": "🧹",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "cleaning",
+      "home",
+      "services",
+      "cleaning service",
+      "home services",
+      "cleaning",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "plumbing_service",
+    "label": "Plumbing Service",
+    "icon": "🔧",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "plumbing",
+      "home",
+      "repair",
+      "plumbing service",
+      "home services",
+      "plumbing",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "electrical_service",
+    "label": "Electrical Service",
+    "icon": "💡",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "electrical",
+      "electrician",
+      "home",
+      "electrical service",
+      "home services",
+      "electrical",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "hvac_service",
+    "label": "HVAC Service",
+    "icon": "❄️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "hvac",
+      "air conditioning",
+      "heating",
+      "hvac service",
+      "home services",
+      "hvac",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "landscaping_service",
+    "label": "Landscaping Service",
+    "icon": "🌿",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "landscaping",
+      "garden",
+      "lawn",
+      "landscaping service",
+      "home services",
+      "landscaping",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "pest_control",
+    "label": "Pest Control",
+    "icon": "🐜",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "pest control",
+      "home",
+      "services",
+      "pest control",
+      "home services",
+      "pest",
+      "control"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "security_service",
+    "label": "Security Service",
+    "icon": "🛡️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "security",
+      "guards",
+      "protection",
+      "security service",
+      "home services",
+      "security",
+      "service"
+    ],
+    "description": "Cleaning, Plumbing & Maintenance",
+    "category": "Home Services"
+  },
+  {
+    "id": "electronics_store",
+    "label": "Electronics Store",
+    "icon": "📺",
+    "industry": "RETAIL",
+    "keywords": [
+      "electronics",
+      "store",
+      "retail",
+      "electronics store",
+      "retail & shopping",
+      "electronics",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "furniture_store",
+    "label": "Furniture Store",
+    "icon": "🛋️",
+    "industry": "RETAIL",
+    "keywords": [
+      "furniture",
+      "home",
+      "retail",
+      "furniture store",
+      "retail & shopping",
+      "furniture",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "jewelry_store",
+    "label": "Jewelry Store",
+    "icon": "💎",
+    "industry": "RETAIL",
+    "keywords": [
+      "jewelry",
+      "store",
+      "retail",
+      "jewelry store",
+      "retail & shopping",
+      "jewelry",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "bookstore",
+    "label": "Bookstore",
+    "icon": "📚",
+    "industry": "RETAIL",
+    "keywords": [
+      "bookstore",
+      "books",
+      "retail",
+      "bookstore",
+      "retail & shopping",
+      "bookstore"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "liquor_store",
+    "label": "Liquor Store",
+    "icon": "🍷",
+    "industry": "RETAIL",
+    "keywords": [
+      "liquor",
+      "alcohol",
+      "retail",
+      "liquor store",
+      "retail & shopping",
+      "liquor",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "pharmacy_retail",
+    "label": "Pharmacy Retail",
+    "icon": "💊",
+    "industry": "RETAIL",
+    "keywords": [
+      "pharmacy",
+      "drugstore",
+      "retail",
+      "pharmacy retail",
+      "retail & shopping",
+      "pharmacy",
+      "retail"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "pet_store",
+    "label": "Pet Store",
+    "icon": "🐾",
+    "industry": "RETAIL",
+    "keywords": [
+      "pet",
+      "store",
+      "animals",
+      "pet store",
+      "retail & shopping",
+      "pet",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "florist",
+    "label": "Florist",
+    "icon": "💐",
+    "industry": "RETAIL",
+    "keywords": [
+      "florist",
+      "flowers",
+      "retail",
+      "florist",
+      "retail & shopping",
+      "florist"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "hardware_store",
+    "label": "Hardware Store",
+    "icon": "🔨",
+    "industry": "RETAIL",
+    "keywords": [
+      "hardware",
+      "tools",
+      "retail",
+      "hardware store",
+      "retail & shopping",
+      "hardware",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "toy_store",
+    "label": "Toy Store",
+    "icon": "🧸",
+    "industry": "RETAIL",
+    "keywords": [
+      "toys",
+      "store",
+      "retail",
+      "toy store",
+      "retail & shopping",
+      "toy",
+      "store"
+    ],
+    "description": "Shops, Stores & Specialty Retail",
+    "category": "Retail & Shopping"
+  },
+  {
+    "id": "freelancer",
+    "label": "Freelancer",
+    "icon": "👤",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "freelancer",
+      "solo",
+      "independent",
+      "freelancer",
+      "other",
+      "freelancer"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "personal_brand",
+    "label": "Personal Brand",
+    "icon": "⭐",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "personal",
+      "brand",
+      "influencer",
+      "personal brand",
+      "other",
+      "personal",
+      "brand"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "community_organization",
+    "label": "Community Organization",
+    "icon": "👥",
+    "industry": "NGO",
+    "keywords": [
+      "community",
+      "organization",
+      "community organization",
+      "other",
+      "community",
+      "organization"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "religious_organization",
+    "label": "Religious Organization",
+    "icon": "🕌",
+    "industry": "NGO",
+    "keywords": [
+      "religious",
+      "church",
+      "mosque",
+      "faith",
+      "religious organization",
+      "other",
+      "religious",
+      "organization"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "salon",
+    "label": "Salon",
+    "icon": "💇",
+    "industry": "SALON",
+    "keywords": [
+      "salon",
+      "beauty",
+      "hair",
+      "salon",
+      "other",
+      "salon"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "veterinary_clinic",
+    "label": "Veterinary Clinic",
+    "icon": "🐕",
+    "industry": "CLINIC",
+    "keywords": [
+      "veterinary",
+      "vet",
+      "animals",
+      "veterinary clinic",
+      "other",
+      "veterinary",
+      "clinic"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "coworking_space",
+    "label": "Coworking Space",
+    "icon": "🏢",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "coworking",
+      "office",
+      "workspace",
+      "coworking space",
+      "other",
+      "coworking",
+      "space"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "printing_shop",
+    "label": "Printing Shop",
+    "icon": "🖨️",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "printing",
+      "copy",
+      "design",
+      "printing shop",
+      "other",
+      "printing",
+      "shop"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "photography_studio",
+    "label": "Photography Studio",
+    "icon": "📷",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "photography",
+      "photo",
+      "studio",
+      "photography studio",
+      "other",
+      "photography",
+      "studio"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "event_planning",
+    "label": "Event Planning",
+    "icon": "🎉",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "event",
+      "planning",
+      "wedding",
+      "event planning",
+      "other",
+      "event",
+      "planning"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "import_export",
+    "label": "Import & Export",
+    "icon": "🌍",
+    "industry": "LOGISTICS",
+    "keywords": [
+      "import",
+      "export",
+      "trade",
+      "import & export",
+      "other",
+      "import",
+      "&",
+      "export"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "laundry_service",
+    "label": "Laundry Service",
+    "icon": "👕",
+    "industry": "SERVICE_BUSINESS",
+    "keywords": [
+      "laundry",
+      "dry cleaning",
+      "cleaning",
+      "laundry service",
+      "other",
+      "laundry",
+      "service"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "daycare",
+    "label": "Daycare Center",
+    "icon": "👶",
+    "industry": "SCHOOL",
+    "keywords": [
+      "daycare",
+      "childcare",
+      "education",
+      "daycare center",
+      "other",
+      "daycare",
+      "center"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  },
+  {
+    "id": "other",
+    "label": "Other",
+    "icon": "📋",
+    "industry": "OTHER",
+    "keywords": [
+      "other",
+      "misc",
+      "general",
+      "other",
+      "other",
+      "other"
+    ],
+    "description": "Freelance, Community & More",
+    "category": "Other"
+  }
+]

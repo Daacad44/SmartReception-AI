@@ -219,6 +219,24 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
+model BusinessTypeDefinition {
+  id          String   @id
+  label       String
+  icon        String   @default("📋")
+  category    String
+  industry    String
+  description String
+  keywords    String[] @default([])
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@map("business_type_definitions")
+}
+
 // ─── BUSINESS (TENANT) ───────────────────────────────────────────────────────
 
 model Business {
@@ -244,6 +262,7 @@ model Business {
   customerVolume String?
   mainGoal    String?
   businessType String?
+  businessCategory String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

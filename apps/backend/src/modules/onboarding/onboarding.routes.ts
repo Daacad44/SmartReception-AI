@@ -4,6 +4,8 @@ import { authenticate } from '../../core/middleware/auth.middleware';
 
 const router = Router();
 
+router.get('/business-types', (req, res, next) => onboardingController.businessTypes(req, res, next));
+
 router.use(authenticate);
 
 router.get('/status', (req, res, next) => onboardingController.status(req, res, next));

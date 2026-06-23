@@ -11,6 +11,7 @@ import type {
   OnboardingWhatsAppInput,
 } from '@smartreception/shared';
 import type { Industry, SubscriptionPlan } from '@prisma/client';
+import { businessTypesService } from './business-types.service';
 
 function slugify(text: string): string {
   return text
@@ -20,6 +21,10 @@ function slugify(text: string): string {
 }
 
 export class OnboardingService {
+  async listBusinessTypes() {
+    return businessTypesService.listGrouped();
+  }
+
   async getStatus(userId: string) {
     const memberships = await authRepository.getUserBusinesses(userId);
     const membership = memberships[0];
@@ -57,6 +62,7 @@ export class OnboardingService {
         name: business.name,
         industry: business.industry,
         businessType: business.businessType,
+        businessCategory: business.businessCategory,
         phone: business.phone,
         whatsappNumber: business.whatsappNumber,
         country: business.country,
@@ -83,6 +89,7 @@ export class OnboardingService {
           name: input.name,
           industry: input.industry as Industry,
           businessType: input.businessType,
+          businessCategory: input.businessCategory,
           phone: input.phone,
           whatsappNumber: input.whatsappNumber,
           country: input.country,
@@ -112,6 +119,7 @@ export class OnboardingService {
       where: { id: business.id },
       data: {
         businessType: input.businessType,
+        businessCategory: input.businessCategory,
         whatsappNumber: input.whatsappNumber,
         country: input.country,
         city: input.city,

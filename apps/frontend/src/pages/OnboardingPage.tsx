@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BusinessTypeCombobox } from '@/components/onboarding/BusinessTypeCombobox';
+import type { BusinessTypeOption } from '@/lib/business-types';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -58,9 +59,11 @@ export function OnboardingPage() {
   const [step, setStep] = useState(0);
 
   const [business, setBusiness] = useState({
-    name: '', industry: '', businessType: '', businessTypeId: '',
+    name: '', industry: '', businessType: '', businessTypeId: '', businessCategory: '',
     phone: '', whatsappNumber: '', country: '', city: '', address: '', website: '',
   });
+  const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessTypeOption | null>(null);
+  const [businessTypeError, setBusinessTypeError] = useState('');
   const [profile, setProfile] = useState({
     employeeRange: '', customerVolume: '', mainGoal: '',
   });
@@ -146,15 +149,21 @@ export function OnboardingPage() {
   const isPending = saveBusiness.isPending || saveProfile.isPending || saveDiscovery.isPending || savePlan.isPending || saveWhatsapp.isPending;
 
   const handleNext = () => {
-    if (step === 0) saveBusiness.mutate();
-    else if (step === 1) saveProfile.mutate();
+    if (step === 0) {
+      if (!selectedBusinessType) {
+        setBusinessTypeError('Please select a business type');
+        toast.error('Please select a business type');
+        return;
+      }
+      saveBusiness.mutate();
+    } else if (step === 1) saveProfile.mutate();
     else if (step === 2) saveDiscovery.mutate();
     else if (step === 3) savePlan.mutate();
     else if (step === 4) saveWhatsapp.mutate();
   };
 
   const canProceed = () => {
-    if (step === 0) return business.name && business.industry && business.businessType && business.phone && business.whatsappNumber && business.country && business.city && business.address;
+    if (step === 0) return Boolean(selectedBusinessType) && business.name && business.phone && business.whatsappNumber && business.country && business.city && business.address;
     if (step === 1) return profile.employeeRange && profile.customerVolume && profile.mainGoal;
     if (step === 2) return discovery.referralSource && discovery.problemToSolve.length >= 10 && discovery.biggestChallenge.length >= 10;
     if (step === 3) return Boolean(selectedPlan);
@@ -195,8 +204,8 @@ export function OnboardingPage() {
           <Progress value={progress} className="h-2" />
         </div>
 
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6 md:p-8">
+        <Card className="overflow-visible border-0 shadow-lg">
+          <CardContent className="overflow-visible p-6 md:p-8">
             {step === 0 && (
               <div className="space-y-4">
                 <div className="mb-2 flex items-center gap-2">
@@ -208,19 +217,24 @@ export function OnboardingPage() {
                     <Label>Business Name *</Label>
                     <Input value={business.name} onChange={(e) => setBusiness({ ...business, name: e.target.value })} />
                   </div>
-                  <div className="space-y-2 sm:col-span-2">
+                  <div className="relative z-20 space-y-2 overflow-visible sm:col-span-2">
                     <Label>Business Type *</Label>
                     <BusinessTypeCombobox
-                      value={business.businessTypeId}
-                      onChange={(type) =>
+                      value={selectedBusinessType?.id}
+                      selectedType={selectedBusinessType}
+                      onChange={(type) => {
+                        setSelectedBusinessType(type);
+                        setBusinessTypeError('');
                         setBusiness((prev) => ({
                           ...prev,
                           businessTypeId: type.id,
                           businessType: type.label,
+                          businessCategory: type.category,
                           industry: type.industry,
-                        }))
-                      }
+                        }));
+                      }}
                       onAfterSelect={() => phoneInputRef.current?.focus()}
+                      error={businessTypeError}
                     />
                   </div>
                   <div className="space-y-2">

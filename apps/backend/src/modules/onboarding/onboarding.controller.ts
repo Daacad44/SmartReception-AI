@@ -9,6 +9,15 @@ import {
 } from '@smartreception/shared';
 
 export class OnboardingController {
+  async businessTypes(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await onboardingService.listBusinessTypes();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async status(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await onboardingService.getStatus(req.user!.userId);
