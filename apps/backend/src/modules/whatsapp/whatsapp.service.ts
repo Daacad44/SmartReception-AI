@@ -296,7 +296,11 @@ export class WhatsAppModuleService {
     })().catch((error) => logger.warn('Deferred webhook maintenance failed', { error }));
   }
 
-  async getWebhookHealth(businessId: string): Promise<WhatsAppWebhookHealth> {
+  async getWebhookHealth(
+    businessId: string,
+    options?: { persist?: boolean }
+  ): Promise<WhatsAppWebhookHealth> {
+    const persist = options?.persist ?? false;
     const account = await whatsappRepository.findAccountByBusiness(businessId);
     const infrastructureReady = this.isWebhookInfrastructureReady();
     const lastWebhookReceivedAt = await whatsappRepository.getLastWebhookReceived(businessId);
@@ -311,12 +315,14 @@ export class WhatsAppModuleService {
       infrastructureReady,
     });
 
-    if (account?.isActive && webhookVerified) {
-      await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
-        webhookStatus: 'verified',
-        webhookVerified: true,
-        ...(lastWebhookReceivedAt ? { lastWebhookReceivedAt } : {}),
-      });
+    if (persist && account?.isActive && webhookVerified) {
+      void whatsappRepository
+        .syncAccountHealth(account.phoneNumberId, {
+          webhookStatus: 'verified',
+          webhookVerified: true,
+          ...(lastWebhookReceivedAt ? { lastWebhookReceivedAt } : {}),
+        })
+        .catch((error) => logger.warn('Deferred webhook health sync failed', { error }));
     }
 
     return {
@@ -456,7 +462,8 @@ export class WhatsAppModuleService {
     };
   }
 
-  async getHealth(businessId: string): Promise<WhatsAppHealth> {
+  async getHealth(businessId: string, options?: { live?: boolean }): Promise<WhatsAppHealth> {
+    const live = options?.live ?? false;
     const account = await whatsappRepository.findAccountByBusiness(businessId);
     const verifyTokenConfigured = Boolean(config.whatsapp.verifyToken);
     const webhookEndpointConfigured = Boolean(config.whatsapp.webhookUrl);
@@ -489,9 +496,9 @@ export class WhatsAppModuleService {
       account.phoneNumberStatus === 'active' ? 'active' : 'unknown';
     let wabaId = account.wabaId ?? config.whatsapp.businessAccountId ?? null;
     let businessName = account.displayName ?? null;
-    let tokenStatus: WhatsAppHealth['tokenStatus'] = token ? 'invalid' : 'not_configured';
+    let tokenStatus: WhatsAppHealth['tokenStatus'] = token ? 'valid' : 'not_configured';
 
-    if (token) {
+    if (token && live) {
       const tokenValid = await whatsappRepository.validateAccessToken(account.phoneNumberId, token);
       tokenStatus = tokenValid ? 'valid' : 'invalid';
 
@@ -515,7 +522,7 @@ export class WhatsAppModuleService {
       }
     }
 
-    const webhookHealth = await this.getWebhookHealth(businessId);
+    const webhookHealth = await this.getWebhookHealth(businessId, { persist: live });
     const webhook = webhookHealth.verified ? 'verified' : webhookHealth.status;
 
     const [lastInbound, lastOutbound] = await Promise.all([
@@ -531,18 +538,22 @@ export class WhatsAppModuleService {
       }),
     ]);
 
-    const synced = await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
-      webhookStatus: webhook,
-      webhookVerified: webhook === 'verified',
-      phoneNumberStatus: phoneStatus,
-      phoneNumber,
-      wabaId: wabaId ?? undefined,
-      ...(webhookHealth.lastWebhookReceived
-        ? { lastWebhookReceivedAt: new Date(webhookHealth.lastWebhookReceived) }
-        : {}),
-    });
+    const synced = live
+      ? await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
+          webhookStatus: webhook,
+          webhookVerified: webhook === 'verified',
+          phoneNumberStatus: phoneStatus,
+          phoneNumber,
+          wabaId: wabaId ?? undefined,
+          ...(webhookHealth.lastWebhookReceived
+            ? { lastWebhookReceivedAt: new Date(webhookHealth.lastWebhookReceived) }
+            : {}),
+        })
+      : account;
 
-    console.log('[WhatsApp] Health check successful');
+    if (live) {
+      console.log('[WhatsApp] Health check successful');
+    }
 
     return {
       connection: 'connected',

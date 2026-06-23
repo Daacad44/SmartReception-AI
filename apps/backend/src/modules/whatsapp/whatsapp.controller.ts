@@ -132,7 +132,8 @@ export class WhatsAppController {
 
   async getHealth(req: Request, res: Response, next: NextFunction) {
     try {
-      const health = await whatsappModuleService.getHealth(req.user!.businessId!);
+      const live = req.query.live === '1' || req.query.live === 'true';
+      const health = await whatsappModuleService.getHealth(req.user!.businessId!, { live });
       res.json({ success: true, data: health });
     } catch (error) {
       next(error);

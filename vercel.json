@@ -12,13 +12,19 @@
     "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "apps/backend/{dist,prisma}/**"
+    },
+    "api/webhook.js": {
+      "maxDuration": 30,
+      "includeFiles": "apps/backend/{dist,prisma}/**"
     }
   },
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api" },
-    { "source": "/webhook", "destination": "/api" },
-    { "source": "/webhook/(.*)", "destination": "/api" },
-    { "source": "/api/webhook", "destination": "/api" },
+    { "source": "/webhook", "destination": "/api/webhook" },
+    { "source": "/webhook/(.*)", "destination": "/api/webhook" },
+    { "source": "/api/webhook", "destination": "/api/webhook" },
+    { "source": "/api/v1/whatsapp/webhook", "destination": "/api/webhook" },
+    { "source": "/api/v1/webhooks/whatsapp", "destination": "/api/webhook" },
     { "source": "/health", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

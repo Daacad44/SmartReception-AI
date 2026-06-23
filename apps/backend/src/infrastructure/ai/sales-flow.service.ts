@@ -21,21 +21,37 @@ import { sendAppointmentConfirmation } from '../appointments/appointment-notific
 
 const FLOW_META_TYPE = 'sales_flow';
 
+const SALES_FLOW_CACHE_TTL_MS = 120_000;
+const salesFlowCache = new Map<string, { state: SalesFlowState | null; loadedAt: number }>();
+
+export function invalidateSalesFlowCache(conversationId: string): void {
+  salesFlowCache.delete(conversationId);
+}
+
 /** Load active sales flow from latest outbound message metadata. */
 export async function getActiveSalesFlow(conversationId: string): Promise<SalesFlowState | null> {
+  const cached = salesFlowCache.get(conversationId);
+  const now = Date.now();
+  if (cached && now - cached.loadedAt < SALES_FLOW_CACHE_TTL_MS) {
+    return cached.state;
+  }
+
   const messages = await prisma.message.findMany({
     where: { conversationId, direction: 'OUTBOUND', isAiGenerated: true },
     orderBy: { createdAt: 'desc' },
-    take: 15,
+    take: 3,
     select: { metadata: true },
   });
 
   for (const msg of messages) {
     const meta = msg.metadata as { type?: string; salesFlow?: SalesFlowState } | null;
     if (meta?.type === FLOW_META_TYPE && meta.salesFlow && meta.salesFlow.phase !== 'completed') {
+      salesFlowCache.set(conversationId, { state: meta.salesFlow, loadedAt: now });
       return meta.salesFlow;
     }
   }
+
+  salesFlowCache.set(conversationId, { state: null, loadedAt: now });
   return null;
 }
 

@@ -75,7 +75,6 @@ export async function searchKnowledgeContext(businessId: string, query: string):
   if (!documents.length) return '';
 
   const queryLower = query.toLowerCase();
-  const queryEmbedding = await generateEmbedding(query);
 
   type Scored = { text: string; score: number; source: string };
   const scored: Scored[] = [];
@@ -89,6 +88,27 @@ export async function searchKnowledgeContext(businessId: string, query: string):
       scored.push({ text, score, source: doc.title });
       continue;
     }
+
+    if (doc.content) {
+      const content = doc.content.slice(0, 900);
+      const score = 0.3 + keywordBoost(query, content);
+      if (content.toLowerCase().includes(queryLower)) {
+        scored.push({ text: content, score: Math.max(score, 0.6), source: doc.title });
+      } else if (score > 0.35) {
+        scored.push({ text: content, score, source: doc.title });
+      }
+    }
+  }
+
+  const keywordTop = scored.sort((a, b) => b.score - a.score).slice(0, 8);
+  if (keywordTop.length > 0 && keywordTop[0]!.score >= 0.65) {
+    return keywordTop.map((s) => `[${s.source}]\n${s.text}`).join('\n\n');
+  }
+
+  const queryEmbedding = await generateEmbedding(query);
+
+  for (const doc of documents) {
+    if (doc.type === 'FAQ' && doc.question) continue;
 
     if (doc.embedding) {
       try {

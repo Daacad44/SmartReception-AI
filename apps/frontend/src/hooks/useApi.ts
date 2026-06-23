@@ -257,8 +257,10 @@ export function transformFaq(raw: any): Faq {
 
 const ANALYTICS_TIMEOUT = 30_000;
 const CONVERSATIONS_TIMEOUT = 15_000;
-const REALTIME_POLL_INTERVAL = 60_000;
 const FALLBACK_POLL_INTERVAL = 12_000;
+
+/** Supabase realtime invalidates queries — polling is redundant when configured. */
+const conversationPollInterval = isSupabaseConfigured ? false : FALLBACK_POLL_INTERVAL;
 
 export function useDashboardBundle() {
   return useAuthQuery<DashboardBundle>({
@@ -358,7 +360,21 @@ export function useConversations(params?: { status?: string; search?: string }) 
       return conversations;
     },
     staleTime: 5_000,
-    refetchInterval: isSupabaseConfigured ? REALTIME_POLL_INTERVAL : FALLBACK_POLL_INTERVAL,
+    refetchInterval: conversationPollInterval,
+  });
+}
+
+export function useConversationSummary() {
+  return useAuthQuery<{ unreadTotal: number; aiHandlingCount: number }>({
+    queryKey: ['conversations', 'summary'],
+    queryFn: async () => {
+      const response = await api.get('/conversations/summary', {
+        timeout: CONVERSATIONS_TIMEOUT,
+      });
+      return extractData(response);
+    },
+    staleTime: 10_000,
+    refetchInterval: conversationPollInterval,
   });
 }
 
@@ -375,7 +391,7 @@ export function useMessages(conversationId: string | null) {
     },
     enabled: !!conversationId,
     staleTime: 2_000,
-    refetchInterval: isSupabaseConfigured ? REALTIME_POLL_INTERVAL : FALLBACK_POLL_INTERVAL,
+    refetchInterval: conversationPollInterval,
   });
 }
 
@@ -725,15 +741,17 @@ export function useWhatsAppWebhookHealth() {
         status: 'verified' | 'pending' | 'not_configured';
       }>(response);
     },
-    refetchInterval: 30_000,
+    refetchInterval: false,
   });
 }
 
-export function useWhatsAppHealth() {
+export function useWhatsAppHealth(options?: { live?: boolean }) {
   return useAuthQuery({
-    queryKey: ['whatsapp-health'],
+    queryKey: ['whatsapp-health', options?.live ?? false],
     queryFn: async () => {
-      const response = await api.get('/whatsapp/health');
+      const response = await api.get('/whatsapp/health', {
+        params: options?.live ? { live: '1' } : undefined,
+      });
       return extractData<{
         connection: 'connected' | 'disconnected';
         webhook: 'verified' | 'pending' | 'not_configured';
@@ -750,11 +768,11 @@ export function useWhatsAppHealth() {
         envConfigured: boolean;
       }>(response);
     },
-    refetchInterval: 30_000,
+    refetchInterval: false,
   });
 }
 
-export function useWhatsAppDebug() {
+export function useWhatsAppDebug(enabled = false) {
   return useAuthQuery({
     queryKey: ['whatsapp-debug'],
     queryFn: async () => {
@@ -772,7 +790,8 @@ export function useWhatsAppDebug() {
         totalMessages: number;
       }>(response);
     },
-    refetchInterval: 15_000,
+    enabled,
+    refetchInterval: false,
   });
 }
 

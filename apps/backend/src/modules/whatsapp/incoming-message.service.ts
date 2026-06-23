@@ -13,6 +13,7 @@ import {
 import {
   createSalesFlow,
   getActiveSalesFlow,
+  invalidateSalesFlowCache,
   processSalesFlowMessage,
   salesFlowMetadata,
 } from '../../infrastructure/ai/sales-flow.service';
@@ -273,6 +274,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
         content: result.reply,
         metadata: salesFlowMetadata(result.nextState ?? null),
       });
+      invalidateSalesFlowCache(params.conversationId);
       logPipelineStep(params.pipelineKey, 'sales_flow_handled', {
         service: activeFlow.serviceOption,
         phase: activeFlow.phase,
@@ -291,6 +293,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
         content: start.reply,
         metadata: salesFlowMetadata(start.nextState ?? null),
       });
+      invalidateSalesFlowCache(params.conversationId);
       logPipelineStep(params.pipelineKey, 'sales_flow_handled', { option: menuOption });
       return;
     }
