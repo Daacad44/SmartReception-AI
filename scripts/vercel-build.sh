@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> Building shared package..."
+echo "==> SmartReception build (sync-webhook-v2)"
 npm run build -w @smartreception/shared
 
 echo "==> Generating Prisma client..."
