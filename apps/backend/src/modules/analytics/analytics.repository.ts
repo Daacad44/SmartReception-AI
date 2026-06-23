@@ -531,43 +531,54 @@ export class AnalyticsRepository {
   }
 
   async getTeamPerformance(businessId: string) {
-    const members = await prisma.businessMember.findMany({
-      where: { businessId, isActive: true },
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+    const [members, assignedCounts, resolvedCounts] = await Promise.all([
+      prisma.businessMember.findMany({
+        where: { businessId, isActive: true },
+        include: {
+          user: {
+            select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+          },
         },
-      },
-    });
+      }),
+      prisma.conversation.groupBy({
+        by: ['assignedToId'],
+        where: { businessId, assignedToId: { not: null } },
+        _count: { id: true },
+      }),
+      prisma.conversation.groupBy({
+        by: ['assignedToId'],
+        where: {
+          businessId,
+          assignedToId: { not: null },
+          status: { in: ['RESOLVED', 'CLOSED'] },
+        },
+        _count: { id: true },
+      }),
+    ]);
 
-    const performance = await Promise.all(
-      members.map(async (member) => {
-        const [conversationCount, resolvedCount] = await Promise.all([
-          prisma.conversation.count({
-            where: { businessId, assignedToId: member.userId },
-          }),
-          prisma.conversation.count({
-            where: {
-              businessId,
-              assignedToId: member.userId,
-              status: { in: ['RESOLVED', 'CLOSED'] },
-            },
-          }),
-        ]);
-
-        return {
-          userId: member.userId,
-          name: `${member.user.firstName} ${member.user.lastName}`,
-          avatar: member.user.avatarUrl || undefined,
-          role: member.role,
-          conversationCount,
-          resolutionRate:
-            conversationCount > 0
-              ? Math.round((resolvedCount / conversationCount) * 1000) / 10
-              : 0,
-        };
-      })
+    const totalByAgent = new Map(
+      assignedCounts.map((row) => [row.assignedToId!, row._count.id])
     );
+    const resolvedByAgent = new Map(
+      resolvedCounts.map((row) => [row.assignedToId!, row._count.id])
+    );
+
+    const performance = members.map((member) => {
+      const conversationCount = totalByAgent.get(member.userId) ?? 0;
+      const resolvedCount = resolvedByAgent.get(member.userId) ?? 0;
+
+      return {
+        userId: member.userId,
+        name: `${member.user.firstName} ${member.user.lastName}`,
+        avatar: member.user.avatarUrl || undefined,
+        role: member.role,
+        conversationCount,
+        resolutionRate:
+          conversationCount > 0
+            ? Math.round((resolvedCount / conversationCount) * 1000) / 10
+            : 0,
+      };
+    });
 
     return performance.sort((a, b) => b.conversationCount - a.conversationCount);
   }

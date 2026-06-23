@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { UnauthorizedError, AppError } from '../errors';
-import { JwtPayload } from '@smartreception/shared';
+import { JwtPayload, ROLE_PERMISSIONS } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
 import { getAccessTokenFromCookies } from '../auth-cookies';
 
@@ -82,7 +82,6 @@ export async function authenticate(
       throw new UnauthorizedError('Your account has been deactivated for this business');
     }
 
-    const { ROLE_PERMISSIONS } = await import('@smartreception/shared');
     const role = membership?.role || 'VIEWER';
     let permissions = [...(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [])];
 

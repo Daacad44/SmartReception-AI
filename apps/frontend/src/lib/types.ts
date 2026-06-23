@@ -37,6 +37,10 @@ export interface DashboardBundle {
   trends: ConversationTrend[];
   topServices: TopService[];
   teamPerformance: TeamPerformance[];
+  conversationSummary?: {
+    unreadTotal: number;
+    aiHandlingCount: number;
+  };
 }
 
 export interface ConversationTrend {

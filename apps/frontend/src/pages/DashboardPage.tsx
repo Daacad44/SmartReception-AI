@@ -112,8 +112,7 @@ export function DashboardPage() {
   const trends = bundle?.trends;
   const topServices = bundle?.topServices;
   const teamPerf = bundle?.teamPerformance;
-
-  const aiHandlingCount = conversations?.filter((c) => c.status === 'ai_handling').length ?? 0;
+  const aiHandlingCount = bundle?.conversationSummary?.aiHandlingCount ?? 0;
   const maxBookings = topServices?.[0]?.bookingCount ?? 1;
 
   if (isError && !bundle) {

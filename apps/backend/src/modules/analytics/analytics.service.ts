@@ -1,4 +1,5 @@
 import { analyticsRepository } from './analytics.repository';
+import { conversationsRepository } from '../conversations/conversations.repository';
 
 export class AnalyticsService {
   async getDashboardStats(businessId: string) {
@@ -34,7 +35,7 @@ export class AnalyticsService {
   }
 
   async getDashboardBundle(businessId: string) {
-    const [stats, revenue, customerGrowth, trends, topServices, teamPerformance] =
+    const [stats, revenue, customerGrowth, trends, topServices, teamPerformance, conversationSummary] =
       await Promise.all([
         analyticsRepository.getDashboardStats(businessId),
         analyticsRepository.getRevenueOverview(businessId),
@@ -42,9 +43,18 @@ export class AnalyticsService {
         analyticsRepository.getConversationTrends(businessId, 30),
         analyticsRepository.getTopServices(businessId),
         analyticsRepository.getTeamPerformance(businessId),
+        conversationsRepository.getSummary(businessId),
       ]);
 
-    return { stats, revenue, customerGrowth, trends, topServices, teamPerformance };
+    return {
+      stats,
+      revenue,
+      customerGrowth,
+      trends,
+      topServices,
+      teamPerformance,
+      conversationSummary,
+    };
   }
 }
 

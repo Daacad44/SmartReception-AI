@@ -21,7 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useConversations, useBilling, useAppointments } from '@/hooks/useApi';
+import { useConversationSummary, useBilling, useAppointments } from '@/hooks/useApi';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 
@@ -52,11 +52,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { data: conversations } = useConversations();
+  const { data: summary } = useConversationSummary();
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
   const { hasPermission } = usePermissions();
-  const unreadCount = conversations?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
+  const unreadCount = summary?.unreadTotal ?? 0;
   const upcomingAppointments =
     appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
 

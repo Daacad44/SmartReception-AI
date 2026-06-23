@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import api, { extractData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +40,8 @@ function formatStatusLabel(status: string): string {
 }
 
 export function WhatsAppSettings() {
+  const queryClient = useQueryClient();
+  const [debugEnabled, setDebugEnabled] = useState(false);
   const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } =
     useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
@@ -48,9 +52,8 @@ export function WhatsAppSettings() {
   const {
     data: health,
     isLoading: healthLoading,
-    refetch: refetchHealth,
   } = useWhatsAppHealth();
-  const { data: debugInfo, refetch: refetchDebug } = useWhatsAppDebug();
+  const { data: debugInfo, refetch: refetchDebug } = useWhatsAppDebug(debugEnabled);
   const { data: connectionStatus, refetch: refetchStatus } = useWhatsAppStatus();
   const connectWhatsApp = useConnectWhatsApp();
   const connectFromEnv = useConnectWhatsAppFromEnv();
@@ -76,12 +79,20 @@ export function WhatsAppSettings() {
     setForm({ phoneNumberId: '', phoneNumber: '', displayName: '', wabaId: '', accessToken: '' });
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    setDebugEnabled(true);
     refetchAccounts();
-    refetchHealth();
     refetchWebhookHealth();
-    refetchDebug();
     refetchStatus();
+    await queryClient.fetchQuery({
+      queryKey: ['whatsapp-health', true],
+      queryFn: async () => {
+        const response = await api.get('/whatsapp/health', { params: { live: '1' } });
+        return extractData(response);
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: ['whatsapp-health', false] });
+    void refetchDebug();
   };
 
   const workspaceStatus = connectionStatus?.whatsappStatus ?? 'NOT_CONNECTED';

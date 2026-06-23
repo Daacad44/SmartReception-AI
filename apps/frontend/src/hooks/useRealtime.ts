@@ -21,6 +21,8 @@ export function useBusinessRealtime(userId?: string | null) {
       .on('broadcast', { event: 'conversation_update' }, (payload) => {
         const convId = (payload.payload as { conversationId?: string })?.conversationId;
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         if (convId) {
           queryClient.invalidateQueries({ queryKey: ['messages', convId] });
@@ -49,6 +51,8 @@ export function useBusinessRealtime(userId?: string | null) {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
         }
       )
       .on(
@@ -125,6 +129,8 @@ export function useConversationRealtime(conversationId: string | null) {
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
     };
 
     const messageChannel = supabase

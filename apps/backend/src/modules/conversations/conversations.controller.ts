@@ -20,6 +20,15 @@ export class ConversationsController {
     }
   }
 
+  async summary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await conversationsService.getSummary(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async get(req: Request, res: Response, next: NextFunction) {
     try {
       const conversation = await conversationsService.get(

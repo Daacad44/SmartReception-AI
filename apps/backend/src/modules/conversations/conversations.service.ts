@@ -24,6 +24,10 @@ export class ConversationsService {
     };
   }
 
+  async getSummary(businessId: string) {
+    return conversationsRepository.getSummary(businessId);
+  }
+
   async get(businessId: string, id: string) {
     const conversation = await conversationsRepository.findById(businessId, id);
     if (!conversation) {

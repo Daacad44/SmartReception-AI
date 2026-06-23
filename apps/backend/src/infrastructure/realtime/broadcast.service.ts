@@ -1,8 +1,9 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 
 let supabaseAdmin: SupabaseClient | null = null;
+const channelPool = new Map<string, Promise<RealtimeChannel>>();
 
 function getAdminClient(): SupabaseClient | null {
   if (!config.supabase.url || !config.supabase.serviceRoleKey) {
@@ -16,23 +17,44 @@ function getAdminClient(): SupabaseClient | null {
   return supabaseAdmin;
 }
 
+async function getBusinessChannel(businessId: string): Promise<RealtimeChannel | null> {
+  const client = getAdminClient();
+  if (!client) return null;
+
+  const key = `business-${businessId}`;
+  let pending = channelPool.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const channel = client.channel(key);
+      await channel.subscribe();
+      return channel;
+    })();
+    channelPool.set(key, pending);
+  }
+
+  try {
+    return await pending;
+  } catch (error) {
+    channelPool.delete(key);
+    logger.debug('Realtime channel subscribe failed', { error, businessId });
+    return null;
+  }
+}
+
 /** Push instant UI updates via Supabase broadcast (complements postgres_changes). */
 export async function broadcastConversationEvent(
   businessId: string,
   payload: { conversationId: string; type: 'message' | 'conversation' }
 ): Promise<void> {
-  const client = getAdminClient();
-  if (!client) return;
+  const channel = await getBusinessChannel(businessId);
+  if (!channel) return;
 
   try {
-    const channel = client.channel(`business-${businessId}`);
-    await channel.subscribe();
     await channel.send({
       type: 'broadcast',
       event: 'conversation_update',
       payload,
     });
-    await client.removeChannel(channel);
   } catch (error) {
     logger.debug('Realtime broadcast failed (non-fatal)', { error, businessId });
   }
@@ -48,18 +70,15 @@ export async function broadcastBusinessEvent(
     action?: string;
   }
 ): Promise<void> {
-  const client = getAdminClient();
-  if (!client) return;
+  const channel = await getBusinessChannel(businessId);
+  if (!channel) return;
 
   try {
-    const channel = client.channel(`business-${businessId}`);
-    await channel.subscribe();
     await channel.send({
       type: 'broadcast',
       event: 'business_update',
       payload,
     });
-    await client.removeChannel(channel);
   } catch (error) {
     logger.debug('Business broadcast failed (non-fatal)', { error, businessId });
   }

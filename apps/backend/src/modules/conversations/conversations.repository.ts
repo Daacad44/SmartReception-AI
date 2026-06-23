@@ -56,6 +56,28 @@ export class ConversationsRepository {
     return { conversations, total, page, limit };
   }
 
+  async getSummary(businessId: string) {
+    const [unreadAgg, aiHandlingCount] = await Promise.all([
+      prisma.conversation.aggregate({
+        where: { businessId },
+        _sum: { unreadCount: true },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          status: 'OPEN',
+          isAiEnabled: true,
+          assignedToId: null,
+        },
+      }),
+    ]);
+
+    return {
+      unreadTotal: unreadAgg._sum.unreadCount ?? 0,
+      aiHandlingCount,
+    };
+  }
+
   async exists(businessId: string, id: string) {
     return prisma.conversation.findFirst({
       where: { id, businessId },
