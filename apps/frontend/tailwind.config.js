@@ -34,6 +34,10 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
         success: 'hsl(var(--success))',
         warning: 'hsl(var(--warning))',
         danger: 'hsl(var(--destructive))',
@@ -44,9 +48,10 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
-        lg: '0.625rem',
+        lg: '0.75rem',
         md: '0.5rem',
         sm: '0.375rem',
+        xl: '1rem',
       },
       keyframes: {
         'accordion-down': {

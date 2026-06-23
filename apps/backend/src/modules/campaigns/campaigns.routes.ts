@@ -14,6 +14,9 @@ router.get('/', authorize(PERMISSIONS['campaigns:read']), (req, res, next) =>
 router.get('/analytics', authorize(PERMISSIONS['campaigns:read']), (req, res, next) =>
   campaignsController.analytics(req, res, next)
 );
+router.get('/deliveries', authorize(PERMISSIONS['campaigns:read']), (req, res, next) =>
+  campaignsController.deliveries(req, res, next)
+);
 router.post('/', authorize(PERMISSIONS['campaigns:write']), (req, res, next) =>
   campaignsController.create(req, res, next)
 );

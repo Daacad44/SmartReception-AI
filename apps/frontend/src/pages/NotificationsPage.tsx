@@ -34,7 +34,7 @@ export function NotificationsPage() {
   const unread = notifications?.filter((n) => !n.read).length ?? 0;
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto w-full">
+    <div className="space-y-6 max-w-4xl mx-auto w-full">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Notification Center</h1>

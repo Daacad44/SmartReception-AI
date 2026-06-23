@@ -187,6 +187,7 @@ enum CampaignStatus {
 
 enum CampaignRecipientStatus {
   PENDING
+  SENDING
   SENT
   DELIVERED
   READ
@@ -388,6 +389,7 @@ model Customer {
   customerNotes CustomerNote[]
   segmentMembers CustomerSegmentMember[]
   campaignRecipients CampaignRecipient[]
+  targetedCampaigns Campaign[] @relation("CampaignTargetCustomer")
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -626,11 +628,14 @@ model Campaign {
   segmentId      String?
   templateId     String?
   customerTypes  CustomerType[]
-  sendToAll      Boolean          @default(false)
-  scheduledAt    DateTime?
-  nextRunAt      DateTime?
-  lastRunAt      DateTime?
-  createdById    String?
+  sendToAll        Boolean          @default(false)
+  targetCustomerId String?
+  isSent           Boolean          @default(false)
+  runVersion       Int              @default(0)
+  scheduledAt      DateTime?
+  nextRunAt        DateTime?
+  lastRunAt        DateTime?
+  createdById      String?
   sentCount      Int              @default(0)
   deliveredCount Int              @default(0)
   failedCount    Int              @default(0)
@@ -640,17 +645,19 @@ model Campaign {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  segment    CustomerSegment?    @relation(fields: [segmentId], references: [id])
-  template   MessageTemplate?    @relation(fields: [templateId], references: [id])
-  createdBy  User?               @relation("CampaignCreator", fields: [createdById], references: [id])
-  recipients CampaignRecipient[]
+  business       Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  segment        CustomerSegment?    @relation(fields: [segmentId], references: [id])
+  template       MessageTemplate?    @relation(fields: [templateId], references: [id])
+  targetCustomer Customer?           @relation("CampaignTargetCustomer", fields: [targetCustomerId], references: [id])
+  createdBy      User?               @relation("CampaignCreator", fields: [createdById], references: [id])
+  recipients     CampaignRecipient[]
 
   @@index([businessId])
   @@index([businessId, status])
   @@index([scheduledAt])
   @@index([nextRunAt])
   @@index([templateId])
+  @@index([targetCustomerId])
   @@map("campaigns")
 }
 
@@ -660,6 +667,8 @@ model CampaignRecipient {
   customerId    String
   phone         String
   status        CampaignRecipientStatus @default(PENDING)
+  isSent        Boolean                 @default(false)
+  runVersion    Int                     @default(0)
   whatsappMsgId String?
   sentAt        DateTime?
   deliveredAt   DateTime?
