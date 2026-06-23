@@ -20,7 +20,7 @@ export function AuditLogsPage() {
   if (isLoading) return <LoadingState rows={5} />;
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-5xl mx-auto w-full">
+    <div className="space-y-6 max-w-5xl mx-auto w-full">
       <div>
         <h1 className="text-2xl font-bold">Audit Logs</h1>
         <p className="text-sm text-muted-foreground">Track login, appointments, settings, and team activity.</p>

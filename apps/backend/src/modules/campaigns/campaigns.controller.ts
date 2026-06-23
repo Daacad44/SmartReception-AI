@@ -75,6 +75,23 @@ export class CampaignsController {
       next(error);
     }
   }
+
+  async deliveries(req: Request, res: Response, next: NextFunction) {
+    try {
+      const params = paginationSchema.parse(req.query);
+      const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+      const deliveryTab =
+        typeof req.query.deliveryTab === 'string' ? req.query.deliveryTab : undefined;
+      const result = await campaignsService.listDeliveries(req.user!.businessId!, {
+        ...params,
+        status,
+        deliveryTab,
+      });
+      res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const campaignsController = new CampaignsController();

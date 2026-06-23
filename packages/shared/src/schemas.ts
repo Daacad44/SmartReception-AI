@@ -234,6 +234,7 @@ export const createCampaignSchema = z.object({
   templateId: z.string().uuid().optional(),
   customerTypes: z.array(customerTypeSchema).optional(),
   sendToAll: z.boolean().optional(),
+  targetCustomerId: z.string().uuid().optional(),
   scheduledAt: z.string().datetime().optional(),
   sendNow: z.boolean().optional(),
 });

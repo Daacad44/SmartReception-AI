@@ -3,9 +3,9 @@ import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateCampaignInput, UpdateCampaignInput, PaginationInput } from '@smartreception/shared';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
-import { getCampaignQueue } from '../../infrastructure/queue/queues';
 import type { CustomerType, Prisma } from '@prisma/client';
 import { logger } from '../../core/logger';
+import { enqueueCampaignSend, removeCampaignQueueJobs } from './campaign-queue.utils';
 
 function computeNextRun(schedule: string, from: Date): Date | null {
   const next = new Date(from);
@@ -30,9 +30,18 @@ async function resolveRecipients(
     segmentId?: string | null;
     customerTypes?: CustomerType[];
     sendToAll?: boolean;
+    targetCustomerId?: string | null;
   }
 ) {
-  const { segmentId, customerTypes, sendToAll } = options;
+  const { segmentId, customerTypes, sendToAll, targetCustomerId } = options;
+
+  if (targetCustomerId) {
+    const customer = await prisma.customer.findFirst({
+      where: { id: targetCustomerId, businessId, isActive: true },
+    });
+    if (!customer) throw new NotFoundError('Customer not found');
+    return [customer];
+  }
 
   if (sendToAll) {
     return prisma.customer.findMany({ where: { businessId, isActive: true } });
@@ -69,6 +78,33 @@ export async function executeCampaignSend(campaignId: string, businessId: string
   });
   if (!campaign) return;
 
+  if (campaign.status === 'CANCELLED' || campaign.status === 'COMPLETED') return;
+
+  if (campaign.schedule === 'ONE_TIME' && campaign.isSent) {
+    logger.info('Campaign already delivered — skipping duplicate send', { campaignId });
+    return;
+  }
+
+  if (
+    campaign.schedule === 'ONE_TIME' &&
+    campaign.scheduledAt &&
+    campaign.scheduledAt.getTime() > Date.now() + 5000
+  ) {
+    logger.info('Campaign scheduled for future — skipping early execution', { campaignId });
+    return;
+  }
+
+  const locked = await prisma.campaign.updateMany({
+    where: {
+      id: campaignId,
+      businessId,
+      status: { in: ['SCHEDULED', 'DRAFT', 'SENDING'] },
+      isSent: false,
+    },
+    data: { status: 'SENDING' },
+  });
+  if (locked.count === 0) return;
+
   const whatsappAccount = campaign.business.whatsappAccounts[0];
   if (!whatsappAccount) {
     await prisma.campaign.update({
@@ -78,18 +114,32 @@ export async function executeCampaignSend(campaignId: string, businessId: string
     return;
   }
 
-  await prisma.campaign.update({ where: { id: campaignId }, data: { status: 'SENDING' } });
-
+  const runVersion = campaign.runVersion;
   const recipients = await prisma.campaignRecipient.findMany({
-    where: { campaignId, status: 'PENDING' },
+    where: {
+      campaignId,
+      isSent: false,
+      status: 'PENDING',
+      runVersion,
+    },
     include: { customer: true },
   });
 
   let sent = 0;
-  let delivered = 0;
   let failed = 0;
 
   for (const recipient of recipients) {
+    const claimed = await prisma.campaignRecipient.updateMany({
+      where: {
+        id: recipient.id,
+        isSent: false,
+        status: 'PENDING',
+        runVersion,
+      },
+      data: { status: 'SENDING' },
+    });
+    if (claimed.count === 0) continue;
+
     const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
     const result = await whatsappService.sendOutbound({
       phoneNumberId: whatsappAccount.phoneNumberId,
@@ -101,14 +151,13 @@ export async function executeCampaignSend(campaignId: string, businessId: string
 
     if (result.success) {
       sent++;
-      delivered++;
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
         data: {
           status: 'SENT',
+          isSent: true,
           whatsappMsgId: result.whatsappMsgId,
           sentAt: new Date(),
-          deliveredAt: new Date(),
         },
       });
     } else {
@@ -117,6 +166,7 @@ export async function executeCampaignSend(campaignId: string, businessId: string
         where: { id: recipient.id },
         data: {
           status: 'FAILED',
+          isSent: true,
           failedReason: result.error?.message || 'Send failed',
         },
       });
@@ -125,39 +175,48 @@ export async function executeCampaignSend(campaignId: string, businessId: string
 
   const isRecurring = campaign.schedule !== 'ONE_TIME';
   const nextRunAt = isRecurring ? computeNextRun(campaign.schedule, new Date()) : null;
+  const allFailed = failed === recipients.length && recipients.length > 0;
+  const oneTimeComplete = !isRecurring;
+  const nextRunVersion = runVersion + 1;
 
   await prisma.campaign.update({
     where: { id: campaignId },
     data: {
-      status: failed === recipients.length && recipients.length > 0 ? 'FAILED' : isRecurring ? 'SCHEDULED' : 'COMPLETED',
+      status: allFailed ? 'FAILED' : oneTimeComplete ? 'COMPLETED' : 'SCHEDULED',
+      isSent: oneTimeComplete,
       sentCount: { increment: sent },
-      deliveredCount: { increment: delivered },
+      deliveredCount: { increment: sent },
       failedCount: { increment: failed },
       lastRunAt: new Date(),
-      nextRunAt,
+      nextRunAt: oneTimeComplete ? null : nextRunAt,
+      runVersion: isRecurring ? nextRunVersion : undefined,
     },
   });
-
-  await prisma.notification.create({
-    data: {
-      businessId,
-      type: failed > 0 ? 'CAMPAIGN_FAILED' : 'CAMPAIGN_DELIVERED',
-      title: failed > 0 ? 'Campaign partially failed' : 'Campaign delivered',
-      message: `${campaign.name}: ${sent} sent, ${failed} failed`,
-      data: { campaignId },
-    },
-  });
-
-  void broadcastBusinessEvent(businessId, { type: 'campaign', campaignId, action: 'sent' });
 
   if (isRecurring && nextRunAt) {
-    const queue = getCampaignQueue();
-    if (queue) {
-      const delay = nextRunAt.getTime() - Date.now();
-      if (delay > 0) {
-        await queue.add('campaign-send', { campaignId, businessId }, { delay, jobId: `${campaignId}-${nextRunAt.getTime()}` });
-      }
-    }
+    await prisma.campaignRecipient.updateMany({
+      where: { campaignId },
+      data: { isSent: false, status: 'PENDING', runVersion: nextRunVersion },
+    });
+    await enqueueCampaignSend(
+      campaignId,
+      businessId,
+      nextRunAt,
+      `${campaignId}-${nextRunAt.getTime()}`
+    );
+  }
+
+  if (sent > 0 || failed > 0) {
+    await prisma.notification.create({
+      data: {
+        businessId,
+        type: failed > 0 ? 'CAMPAIGN_FAILED' : 'CAMPAIGN_DELIVERED',
+        title: failed > 0 ? 'Campaign partially failed' : 'Campaign delivered',
+        message: `${campaign.name}: ${sent} sent, ${failed} failed`,
+        data: { campaignId },
+      },
+    });
+    void broadcastBusinessEvent(businessId, { type: 'campaign', campaignId, action: 'sent' });
   }
 }
 
@@ -178,6 +237,7 @@ export class CampaignsService {
         orderBy: { createdAt: 'desc' },
         include: {
           segment: { select: { id: true, name: true } },
+          targetCustomer: { select: { id: true, name: true, phone: true } },
           createdBy: { select: { id: true, firstName: true, lastName: true } },
           _count: { select: { recipients: true } },
         },
@@ -191,11 +251,79 @@ export class CampaignsService {
     };
   }
 
+  async listDeliveries(
+    businessId: string,
+    params: PaginationInput & { status?: string; deliveryTab?: string }
+  ) {
+    const { page, limit, status, deliveryTab } = params;
+    const skip = (page - 1) * limit;
+
+    const tabStatusMap: Record<string, Prisma.CampaignRecipientWhereInput> = {
+      scheduled: { status: 'PENDING', campaign: { businessId, status: { in: ['SCHEDULED', 'DRAFT'] } } },
+      processing: { status: 'SENDING', campaign: { businessId } },
+      sent: { status: { in: ['SENT', 'DELIVERED', 'READ'] }, campaign: { businessId } },
+      failed: { status: 'FAILED', campaign: { businessId } },
+      cancelled: { campaign: { businessId, status: 'CANCELLED' } },
+    };
+
+    const where: Prisma.CampaignRecipientWhereInput =
+      deliveryTab && tabStatusMap[deliveryTab]
+        ? tabStatusMap[deliveryTab]
+        : {
+            campaign: { businessId },
+            ...(status && { status: status as Prisma.EnumCampaignRecipientStatusFilter['equals'] }),
+          };
+
+    const [data, total] = await Promise.all([
+      prisma.campaignRecipient.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: { select: { id: true, name: true, phone: true, whatsappNumber: true } },
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              schedule: true,
+              status: true,
+              scheduledAt: true,
+              lastRunAt: true,
+            },
+          },
+        },
+      }),
+      prisma.campaignRecipient.count({ where }),
+    ]);
+
+    return {
+      data: data.map((r) => ({
+        id: r.id,
+        customerName: r.customer.name,
+        phone: r.phone,
+        campaignId: r.campaign.id,
+        campaignName: r.campaign.name,
+        campaignType: r.campaign.type,
+        campaignStatus: r.campaign.status,
+        scheduledAt: r.campaign.scheduledAt,
+        sentAt: r.sentAt,
+        deliveredAt: r.deliveredAt,
+        status: r.status,
+        isSent: r.isSent,
+        failedReason: r.failedReason,
+      })),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   async get(businessId: string, id: string) {
     const campaign = await prisma.campaign.findFirst({
       where: { id, businessId },
       include: {
         segment: true,
+        targetCustomer: { select: { id: true, name: true, phone: true } },
         createdBy: { select: { id: true, firstName: true, lastName: true } },
         recipients: {
           include: { customer: { select: { id: true, name: true, phone: true } } },
@@ -222,9 +350,10 @@ export class CampaignsService {
       segmentId: input.segmentId,
       customerTypes: input.customerTypes,
       sendToAll: input.sendToAll,
+      targetCustomerId: input.targetCustomerId,
     });
     if (customers.length === 0) {
-      throw new ValidationError('No customers match the selected segment or filters');
+      throw new ValidationError('No customers match the selected audience');
     }
 
     const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
@@ -241,8 +370,10 @@ export class CampaignsService {
         status,
         segmentId: input.segmentId,
         templateId: input.templateId,
+        targetCustomerId: input.targetCustomerId,
         customerTypes: input.customerTypes ?? [],
         sendToAll: input.sendToAll ?? false,
+        isSent: false,
         scheduledAt: sendNow ? new Date() : scheduledAt,
         nextRunAt: sendNow ? null : scheduledAt,
         createdById: userId,
@@ -250,6 +381,8 @@ export class CampaignsService {
           create: customers.map((c) => ({
             customerId: c.id,
             phone: c.whatsappNumber || c.phone,
+            isSent: false,
+            runVersion: 0,
           })),
         },
       },
@@ -265,13 +398,7 @@ export class CampaignsService {
         logger.error('Campaign send failed', err)
       );
     } else if (scheduledAt) {
-      const queue = getCampaignQueue();
-      const delay = scheduledAt.getTime() - Date.now();
-      if (queue && delay > 0) {
-        await queue.add('campaign-send', { campaignId: campaign.id, businessId }, { delay, jobId: campaign.id });
-      } else {
-        void executeCampaignSend(campaign.id, businessId).catch(() => undefined);
-      }
+      await enqueueCampaignSend(campaign.id, businessId, scheduledAt, campaign.id);
     }
 
     return campaign;
@@ -280,9 +407,11 @@ export class CampaignsService {
   async update(businessId: string, id: string, input: UpdateCampaignInput, userId: string) {
     const existing = await prisma.campaign.findFirst({ where: { id, businessId } });
     if (!existing) throw new NotFoundError('Campaign not found');
-    if (['SENDING', 'COMPLETED'].includes(existing.status)) {
+    if (['SENDING', 'COMPLETED'].includes(existing.status) || existing.isSent) {
       throw new ValidationError('Cannot update a campaign that has already been sent');
     }
+
+    await removeCampaignQueueJobs(id);
 
     const campaign = await prisma.campaign.update({
       where: { id },
@@ -292,12 +421,17 @@ export class CampaignsService {
         type: input.type,
         schedule: input.schedule,
         segmentId: input.segmentId,
+        targetCustomerId: input.targetCustomerId,
         customerTypes: input.customerTypes,
         scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
         status: input.scheduledAt ? 'SCHEDULED' : undefined,
         nextRunAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
       },
     });
+
+    if (input.scheduledAt) {
+      await enqueueCampaignSend(id, businessId, new Date(input.scheduledAt), id);
+    }
 
     await prisma.auditLog.create({
       data: { businessId, userId, action: 'UPDATE', entity: 'Campaign', entityId: id, newData: input as object },
@@ -310,6 +444,7 @@ export class CampaignsService {
     const existing = await prisma.campaign.findFirst({ where: { id, businessId } });
     if (!existing) throw new NotFoundError('Campaign not found');
 
+    await removeCampaignQueueJobs(id);
     await prisma.campaign.update({ where: { id }, data: { status: 'CANCELLED' } });
 
     await prisma.auditLog.create({
@@ -320,8 +455,9 @@ export class CampaignsService {
   async sendNow(businessId: string, id: string, userId: string) {
     const existing = await prisma.campaign.findFirst({ where: { id, businessId } });
     if (!existing) throw new NotFoundError('Campaign not found');
+    if (existing.isSent) throw new ValidationError('Campaign has already been delivered');
 
-    await prisma.campaign.update({ where: { id }, data: { status: 'SENDING' } });
+    await removeCampaignQueueJobs(id);
     void executeCampaignSend(id, businessId).catch((err) => logger.error('Campaign send failed', err));
 
     await prisma.auditLog.create({
