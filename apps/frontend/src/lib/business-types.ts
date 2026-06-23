@@ -5,18 +5,69 @@ export interface BusinessTypeOption {
   category: string;
   industry: string;
   keywords: string[];
+  description: string;
 }
 
-type TypeDef = Omit<BusinessTypeOption, 'category' | 'keywords'> & { keywords?: string[] };
+type TypeDef = Omit<BusinessTypeOption, 'category' | 'keywords' | 'description'> & {
+  keywords?: string[];
+  description?: string;
+};
+
+export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  Technology: 'Software, AI, SaaS, IT Services',
+  'Food & Hospitality': 'Food, Dining, Hospitality',
+  Healthcare: 'Healthcare, Clinics, Medical Services',
+  Education: 'Education, Learning, Training',
+  'Real Estate & Construction': 'Property, Building & Design',
+  'Retail & E-Commerce': 'Retail, Online Stores & Commerce',
+  'Logistics & Transportation': 'Shipping, Delivery & Transport',
+  'Professional Services': 'Legal, Finance & Consulting',
+  'Financial Services': 'Banking, Insurance & Investments',
+  'Tourism & Travel': 'Travel, Tours & Tourism',
+  'Media & Entertainment': 'Media, Content & Production',
+  'NGO & Government': 'Nonprofits, NGOs & Public Sector',
+  Agriculture: 'Farming, Livestock & Fisheries',
+  Manufacturing: 'Factories & Industrial Production',
+  Other: 'Freelance, Community & More',
+};
+
+export const CATEGORY_THEMES: Record<string, { section: string; header: string }> = {
+  Technology: { section: '#F8FAFC', header: '#F1F5F9' },
+  'Food & Hospitality': { section: '#FFFBEB', header: '#FEF3C7' },
+  Healthcare: { section: '#F0FDF4', header: '#DCFCE7' },
+  Education: { section: '#EFF6FF', header: '#DBEAFE' },
+  'Real Estate & Construction': { section: '#F8FAFC', header: '#F1F5F9' },
+  'Retail & E-Commerce': { section: '#FDF4FF', header: '#FAE8FF' },
+  'Logistics & Transportation': { section: '#F8FAFC', header: '#F1F5F9' },
+  'Professional Services': { section: '#F8FAFC', header: '#F1F5F9' },
+  'Financial Services': { section: '#FFFBEB', header: '#FEF3C7' },
+  'Tourism & Travel': { section: '#EFF6FF', header: '#DBEAFE' },
+  'Media & Entertainment': { section: '#FDF4FF', header: '#FAE8FF' },
+  'NGO & Government': { section: '#F0FDF4', header: '#DCFCE7' },
+  Agriculture: { section: '#F0FDF4', header: '#DCFCE7' },
+  Manufacturing: { section: '#F8FAFC', header: '#F1F5F9' },
+  Other: { section: '#F8FAFC', header: '#F1F5F9' },
+};
+
+export const POPULAR_BUSINESS_TYPE_IDS = [
+  'technology_company',
+  'restaurant',
+  'hospital',
+  'school',
+  'ecommerce_business',
+] as const;
+
+export const RECENT_BUSINESS_TYPES_KEY = 'sr_recent_business_types';
 
 function type(
   id: string,
   label: string,
   icon: string,
   industry: string,
-  keywords: string[] = []
+  keywords: string[] = [],
+  description?: string
 ): TypeDef {
-  return { id, label, icon, industry, keywords };
+  return { id, label, icon, industry, keywords, description };
 }
 
 const CATALOG: Record<string, TypeDef[]> = {
@@ -151,6 +202,7 @@ export const BUSINESS_TYPE_CATEGORIES = Object.entries(CATALOG).map(([category, 
   types: types.map((t) => ({
     ...t,
     category,
+    description: t.description ?? CATEGORY_DESCRIPTIONS[category] ?? category,
     keywords: [
       ...(t.keywords ?? []),
       t.label.toLowerCase(),
@@ -173,6 +225,36 @@ export function searchBusinessTypes(query: string): BusinessTypeOption[] {
     (t) =>
       t.label.toLowerCase().includes(q) ||
       t.category.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
       t.keywords.some((k) => k.includes(q) || q.includes(k))
   );
+}
+
+export function getPopularBusinessTypes(): BusinessTypeOption[] {
+  return POPULAR_BUSINESS_TYPE_IDS.map((id) => findBusinessType(id)).filter(
+    (t): t is BusinessTypeOption => Boolean(t)
+  );
+}
+
+export function getRecentBusinessTypeIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(RECENT_BUSINESS_TYPES_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getRecentBusinessTypes(): BusinessTypeOption[] {
+  return getRecentBusinessTypeIds()
+    .map((id) => findBusinessType(id))
+    .filter((t): t is BusinessTypeOption => Boolean(t));
+}
+
+export function addRecentBusinessType(id: string): void {
+  if (typeof window === 'undefined') return;
+  const next = [id, ...getRecentBusinessTypeIds().filter((item) => item !== id)].slice(0, 5);
+  localStorage.setItem(RECENT_BUSINESS_TYPES_KEY, JSON.stringify(next));
 }

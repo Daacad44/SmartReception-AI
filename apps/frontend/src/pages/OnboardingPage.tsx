@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -72,6 +72,7 @@ export function OnboardingPage() {
     wabaId: '', phoneNumberId: '', accessToken: '', skipConnection: false,
   });
   const [testing, setTesting] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   const saveBusiness = useMutation({
     mutationFn: async () => {
@@ -219,11 +220,12 @@ export function OnboardingPage() {
                           industry: type.industry,
                         }))
                       }
+                      onAfterSelect={() => phoneInputRef.current?.focus()}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Business Phone *</Label>
-                    <Input value={business.phone} onChange={(e) => setBusiness({ ...business, phone: e.target.value })} />
+                    <Input ref={phoneInputRef} value={business.phone} onChange={(e) => setBusiness({ ...business, phone: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>WhatsApp Number *</Label>
