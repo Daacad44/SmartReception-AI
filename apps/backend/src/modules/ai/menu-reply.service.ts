@@ -36,25 +36,6 @@ export async function sendAutomatedReply(params: SendAutomatedReplyParams): Prom
     metadata = {},
   } = params;
 
-  const outboundMessage = await prisma.message.create({
-    data: {
-      conversationId,
-      direction: 'OUTBOUND',
-      content,
-      type: 'TEXT',
-      isAiGenerated: true,
-      status: 'PENDING',
-      metadata: metadata as object,
-    },
-  });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { lastMessageAt: new Date() },
-  });
-
-  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
-
   recordOutboundAttempt(businessId, content);
 
   const sendResult = await whatsappService.sendOutbound({
@@ -74,16 +55,13 @@ export async function sendAutomatedReply(params: SendAutomatedReplyParams): Prom
     logger.warn('Automated WhatsApp send failed', { conversationId, error: sendResult.error });
   }
 
-  await whatsappRepository
-    .recordGraphApiResult(phoneNumberId, {
-      response: sendResult.response,
-      error: sendResult.error,
-    })
-    .catch(() => {});
-
-  await prisma.message.update({
-    where: { id: outboundMessage.id },
+  const outboundMessage = await prisma.message.create({
     data: {
+      conversationId,
+      direction: 'OUTBOUND',
+      content,
+      type: 'TEXT',
+      isAiGenerated: true,
       status: sendResult.success ? 'SENT' : 'FAILED',
       whatsappMsgId: sendResult.whatsappMsgId,
       metadata: {
@@ -93,7 +71,23 @@ export async function sendAutomatedReply(params: SendAutomatedReplyParams): Prom
     },
   });
 
-  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
+  void prisma.conversation
+    .update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date() },
+    })
+    .catch((error) => logger.warn('Failed to update conversation lastMessageAt', { error }));
+
+  void broadcastConversationEvent(businessId, { conversationId, type: 'message' }).catch(
+    (error) => logger.warn('Failed to broadcast automated reply', { error })
+  );
+
+  void whatsappRepository
+    .recordGraphApiResult(phoneNumberId, {
+      response: sendResult.response,
+      error: sendResult.error,
+    })
+    .catch(() => {});
 
   return sendResult.success;
 }

@@ -107,14 +107,16 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   console.log('[AI] Processing started (Gemini)');
 
-  whatsappService
+  void whatsappService
     .sendTypingIndicator(phoneNumberId, customerPhone, accessToken)
     .catch((error) => logger.debug('Typing indicator failed:', error));
 
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { isTyping: true },
-  });
+  void prisma.conversation
+    .update({
+      where: { id: conversationId },
+      data: { isTyping: true },
+    })
+    .catch(() => {});
 
   const aiResponse = await aiService.generateResponse(
     businessId,
@@ -132,32 +134,11 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   const collectLeadAction = aiResponse.actions.find((a) => a.type === 'collect_lead');
   const leadData = parseLeadData(collectLeadAction?.data);
-  if (leadData) {
-    await persistLeadData(businessId, conversation.customerId, leadData);
-  }
 
   let replyContent = aiResponse.content;
   if (leadData?.complete) {
     replyContent = `${replyContent}\n\n${LEAD_THANK_YOU_SO}`;
   }
-
-  const outboundMessage = await prisma.message.create({
-    data: {
-      conversationId,
-      direction: 'OUTBOUND',
-      content: replyContent,
-      type: 'TEXT',
-      isAiGenerated: true,
-      status: 'PENDING',
-    },
-  });
-
-  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { lastMessageAt: new Date() },
-  });
 
   recordOutboundAttempt(businessId, replyContent);
   console.log('[WhatsApp] Sending reply');
@@ -168,11 +149,6 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     accessToken,
     type: 'TEXT',
     content: replyContent,
-  });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { isTyping: false },
   });
 
   if (sendResult.success && sendResult.whatsappMsgId) {
@@ -187,16 +163,13 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     }
   }
 
-  await whatsappRepository
-    .recordGraphApiResult(phoneNumberId, {
-      response: sendResult.response,
-      error: sendResult.error,
-    })
-    .catch((error) => logger.warn('Failed to record Graph API result', { error }));
-
-  await prisma.message.update({
-    where: { id: outboundMessage.id },
+  await prisma.message.create({
     data: {
+      conversationId,
+      direction: 'OUTBOUND',
+      content: replyContent,
+      type: 'TEXT',
+      isAiGenerated: true,
       status: sendResult.success ? 'SENT' : 'FAILED',
       whatsappMsgId: sendResult.whatsappMsgId,
       metadata: sendResult.error
@@ -207,7 +180,27 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     },
   });
 
-  await broadcastConversationEvent(businessId, { conversationId, type: 'message' });
+  void prisma.conversation.update({
+    where: { id: conversationId },
+    data: { isTyping: false, lastMessageAt: new Date() },
+  });
+
+  void broadcastConversationEvent(businessId, { conversationId, type: 'message' }).catch(
+    () => {}
+  );
+
+  void whatsappRepository
+    .recordGraphApiResult(phoneNumberId, {
+      response: sendResult.response,
+      error: sendResult.error,
+    })
+    .catch((error) => logger.warn('Failed to record Graph API result', { error }));
+
+  if (leadData) {
+    void persistLeadData(businessId, conversation.customerId, leadData).catch((error) =>
+      logger.warn('Failed to persist lead data', { error })
+    );
+  }
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {
     await prisma.conversation.update({

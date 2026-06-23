@@ -57,21 +57,22 @@ export class WhatsAppController {
         return;
       }
 
-      // Acknowledge Meta immediately — processing AI/DB work in background prevents
-      // 30s Vercel timeouts that exhaust serverless concurrency and block API routes.
-      res.status(200).send('EVENT_RECEIVED');
-
-      const processWebhook = () =>
-        whatsappModuleService.handleWebhook(req.body).catch((error) => {
-          logger.error('WhatsApp webhook background processing error:', error);
-        });
+      const startedAt = Date.now();
+      console.log('[Webhook] Processing started (sync — reply before HTTP 200)');
 
       try {
-        const { waitUntil } = await import('@vercel/functions');
-        waitUntil(processWebhook());
-      } catch {
-        void processWebhook();
+        await whatsappModuleService.handleWebhook(req.body);
+        console.log('[Webhook] Processing complete', {
+          durationMs: Date.now() - startedAt,
+        });
+      } catch (error) {
+        logger.error('WhatsApp webhook processing error:', error);
       }
+
+      // Meta allows up to ~20s; we process synchronously so waitUntil cannot
+      // starve replies behind dashboard API traffic on the same serverless instance.
+      res.status(200).send('EVENT_RECEIVED');
+      console.log('[Webhook] HTTP 200 sent', { totalMs: Date.now() - startedAt });
     } catch (error) {
       if (!res.headersSent) {
         next(error);

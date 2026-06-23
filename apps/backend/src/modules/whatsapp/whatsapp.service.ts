@@ -219,38 +219,11 @@ export class WhatsAppModuleService {
       return;
     }
 
-    try {
-      await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
-    } catch (error) {
-      logger.warn('Failed to record webhook receipt timestamp', { error });
-    }
-
-    if (!account.webhookVerified) {
-      await whatsappRepository.markWebhookVerified(account.phoneNumberId);
-    }
-
-    await whatsappRepository.updateAccountSync(account.phoneNumberId, {
-      webhookStatus: 'verified',
-    });
-
-    // Ensure AI config exists in background — must not block message processing.
     void ensureAiConfiguration(account.businessId).catch((error) => {
       logger.warn('Failed to ensure AI configuration', { error, businessId: account.businessId });
     });
 
-    for (const status of parsed.statuses) {
-      const recorded = await whatsappRepository.tryRecordWebhookEvent(
-        status.id,
-        `status:${status.status}`,
-        account.businessId
-      );
-      if (!recorded) continue;
-
-      await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
-      console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
-      logger.info(`WhatsApp status ${status.status} for message ${status.id}`);
-    }
-
+    // Inbound messages first — customer is waiting for a WhatsApp reply.
     for (const msg of parsed.messages) {
       const recorded = await whatsappRepository.tryRecordWebhookEvent(
         msg.id,
@@ -280,17 +253,47 @@ export class WhatsAppModuleService {
       });
     }
 
-    // Health sync after messages — non-blocking for response latency.
-    void whatsappRepository
-      .markWebhookVerified(account.phoneNumberId)
-      .then(() =>
-        whatsappRepository.syncAccountHealth(account.phoneNumberId, {
-          webhookStatus: 'verified',
-          webhookVerified: true,
-          lastWebhookReceivedAt: new Date(),
-        })
-      )
-      .catch((error) => logger.warn('Failed to sync webhook health', { error }));
+    void this.deferWebhookMaintenance(account, parsed);
+  }
+
+  private deferWebhookMaintenance(
+    account: NonNullable<Awaited<ReturnType<typeof whatsappRepository.resolveAccountForWebhook>>>,
+    parsed: ReturnType<typeof parseWebhookBody>
+  ): void {
+    void (async () => {
+      try {
+        await whatsappRepository.recordWebhookReceipt(account.phoneNumberId);
+      } catch (error) {
+        logger.warn('Failed to record webhook receipt timestamp', { error });
+      }
+
+      if (!account.webhookVerified) {
+        await whatsappRepository.markWebhookVerified(account.phoneNumberId);
+      }
+
+      await whatsappRepository.updateAccountSync(account.phoneNumberId, {
+        webhookStatus: 'verified',
+      });
+
+      for (const status of parsed.statuses) {
+        const recorded = await whatsappRepository.tryRecordWebhookEvent(
+          status.id,
+          `status:${status.status}`,
+          account.businessId
+        );
+        if (!recorded) continue;
+
+        await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
+        console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
+      }
+
+      await whatsappRepository.markWebhookVerified(account.phoneNumberId);
+      await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
+        webhookStatus: 'verified',
+        webhookVerified: true,
+        lastWebhookReceivedAt: new Date(),
+      });
+    })().catch((error) => logger.warn('Deferred webhook maintenance failed', { error }));
   }
 
   async getWebhookHealth(businessId: string): Promise<WhatsAppWebhookHealth> {
