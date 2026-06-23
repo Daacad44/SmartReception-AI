@@ -8,6 +8,7 @@ import {
   resetPasswordSchema,
   verifyOtpSchema,
   resendOtpSchema,
+  checkEmailSchema,
   twoFactorVerifySchema,
 } from '@smartreception/shared';
 import { setAuthCookies, clearAuthCookies, getRefreshTokenFromCookies } from '../../core/auth-cookies';
@@ -56,6 +57,19 @@ export class AuthController {
     try {
       const { email, code } = verifyOtpSchema.parse(req.body);
       const result = await authService.verifyOtp(email, code);
+      if ('accessToken' in result && result.accessToken && result.refreshToken) {
+        setAuthCookies(res, result.accessToken, result.refreshToken);
+      }
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = checkEmailSchema.parse({ email: req.query.email });
+      const result = await authService.checkEmailAvailability(email);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

@@ -11,6 +11,7 @@ const authLimiter = createRateLimiter({
 });
 
 router.post('/register', authLimiter, (req, res, next) => authController.register(req, res, next));
+router.get('/check-email', authLimiter, (req, res, next) => authController.checkEmail(req, res, next));
 router.post('/login', authLimiter, (req, res, next) => authController.login(req, res, next));
 router.post('/verify-2fa', authLimiter, (req, res, next) => authController.verifyTwoFactor(req, res, next));
 router.post('/verify-otp', authLimiter, (req, res, next) => authController.verifyOtp(req, res, next));

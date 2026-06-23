@@ -27,6 +27,7 @@ interface LoginResponse {
   refreshToken?: string;
   requiresTwoFactor?: boolean;
   tempToken?: string;
+  requiresOnboarding?: boolean;
 }
 
 function completeAuthLogin(
@@ -80,6 +81,15 @@ function mapProfileToUserProfile(data: ProfileResponse): UserProfile {
   };
 }
 
+interface VerifyOtpResponse {
+  message: string;
+  requiresOnboarding?: boolean;
+  user?: LoginResponse['user'];
+  businesses?: LoginResponse['businesses'];
+  accessToken?: string;
+  refreshToken?: string;
+}
+
 interface RegisterResponse {
   message: string;
   email: string;
@@ -94,6 +104,9 @@ interface ProfileResponse {
   avatarUrl?: string | null;
   isEmailVerified?: boolean;
   isSuperAdmin?: boolean;
+  needsOnboarding?: boolean;
+  onboardingCompleted?: boolean;
+  welcomeSeen?: boolean;
   businesses?: Array<{
     id: string;
     name: string;
@@ -126,9 +139,11 @@ export function useAuth() {
       const destination =
         data.isSuperAdmin && !(data.businesses?.length)
           ? '/super-admin'
-          : redirect && redirect.startsWith('/')
-            ? redirect
-            : '/dashboard';
+          : data.requiresOnboarding
+            ? '/onboarding'
+            : redirect && redirect.startsWith('/')
+              ? redirect
+              : '/dashboard';
       navigate(destination);
     },
     onError: (error, variables) => {
@@ -149,7 +164,11 @@ export function useAuth() {
       completeAuthLogin(data, login);
       toast.success('Welcome back!');
       const destination =
-        data.isSuperAdmin && !(data.businesses?.length) ? '/super-admin' : '/dashboard';
+        data.isSuperAdmin && !(data.businesses?.length)
+          ? '/super-admin'
+          : data.requiresOnboarding
+            ? '/onboarding'
+            : '/dashboard';
       navigate(destination);
     },
     onError: (error) => {
@@ -163,8 +182,8 @@ export function useAuth() {
       return extractData<RegisterResponse>(response);
     },
     onSuccess: (data) => {
-      toast.success('Account created! Enter the code sent to your email.');
-      navigate(`/verify-otp?email=${encodeURIComponent(data.email)}`);
+      toast.success('Account created! Check your email for the verification code.');
+      navigate(`/check-email?email=${encodeURIComponent(data.email)}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -174,13 +193,7 @@ export function useAuth() {
   const verifyOtpMutation = useMutation({
     mutationFn: async ({ email, code }: { email: string; code: string }) => {
       const response = await api.post('/auth/verify-otp', { email, code });
-      return extractData<{ message: string }>(response);
-    },
-    onSuccess: () => {
-      toast.success('Email verified successfully!');
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
+      return extractData<VerifyOtpResponse>(response);
     },
   });
 

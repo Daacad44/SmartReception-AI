@@ -74,8 +74,6 @@ export interface RegisterData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  businessName: string;
-  industry: string;
 }
 
 export interface UserProfile {
