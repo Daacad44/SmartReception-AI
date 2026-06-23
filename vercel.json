@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "github": {
+    "autoJobCancelation": false
+  },
   "installCommand": "npm install --include=dev",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "apps/frontend/dist",
