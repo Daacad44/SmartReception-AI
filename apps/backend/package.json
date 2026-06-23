@@ -13,7 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/infrastructure/whatsapp/whatsapp.test.ts"
+    "test": "tsx --test src/infrastructure/whatsapp/whatsapp.test.ts src/core/utils/appointment-datetime.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
