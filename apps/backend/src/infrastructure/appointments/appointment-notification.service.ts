@@ -7,6 +7,7 @@ import {
   appointmentReminderEmail,
 } from '../email/templates';
 import { logger } from '../../core/logger';
+import { resolveStoredToken } from '../crypto/token-crypto';
 
 export type ReminderInterval = '24h' | '1h' | '15m';
 
@@ -65,7 +66,7 @@ We look forward to speaking with you.`;
     await whatsappService.sendOutbound({
       phoneNumberId: whatsappAccount.phoneNumberId,
       to: appointment.customer.phone,
-      accessToken: whatsappAccount.accessToken || undefined,
+      accessToken: resolveStoredToken(whatsappAccount.accessToken),
       type: 'TEXT',
       content: waMessage,
     });
@@ -118,7 +119,7 @@ ${appointment.meetingLink ? `Meeting: ${appointment.meetingLink}` : ''}`;
     await whatsappService.sendOutbound({
       phoneNumberId: whatsappAccount.phoneNumberId,
       to: appointment.customer.phone,
-      accessToken: whatsappAccount.accessToken || undefined,
+      accessToken: resolveStoredToken(whatsappAccount.accessToken),
       type: 'TEXT',
       content: waMessage,
     });
@@ -160,7 +161,7 @@ export async function sendMissedAppointmentNotification(
     await whatsappService.sendOutbound({
       phoneNumberId: whatsappAccount.phoneNumberId,
       to: appointment.customer.phone,
-      accessToken: whatsappAccount.accessToken || undefined,
+      accessToken: resolveStoredToken(whatsappAccount.accessToken),
       type: 'TEXT',
       content: `We noticed that your appointment was missed.\n\nYou may book a new appointment after 24 hours.`,
     });
@@ -195,7 +196,7 @@ async function sendWhatsAppToCustomer(
   const result = await whatsappService.sendOutbound({
     phoneNumberId: whatsappAccount.phoneNumberId,
     to: phone,
-    accessToken: whatsappAccount.accessToken || undefined,
+    accessToken: resolveStoredToken(whatsappAccount.accessToken),
     type: 'TEXT',
     content,
   });

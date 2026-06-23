@@ -9,6 +9,7 @@ import {
   Plus,
   ArrowRight,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -28,7 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { useDashboardBundle, useConversations, isInitialLoading } from '@/hooks/useApi';
+import { useDashboardBundle, useConversations, useWhatsAppStatus, isInitialLoading } from '@/hooks/useApi';
 import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativeTime } from '@/lib/utils';
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,6 +101,7 @@ export function DashboardPage() {
     isError: convsError,
     refetch: refetchConversations,
   } = useConversations();
+  const { data: whatsappStatus } = useWhatsAppStatus();
 
   const bundleLoading = isInitialLoading(isPending, isFetching, bundle);
   const convsLoading = isInitialLoading(convsPending, convsFetching, conversations);
@@ -145,6 +147,20 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {whatsappStatus?.whatsappStatus === 'NOT_CONNECTED' && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/50 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              WhatsApp is not connected. Connect your Meta Cloud API to start sending and receiving messages.
+            </p>
+          </div>
+          <Button size="sm" className="shrink-0 bg-accent hover:bg-accent/90" asChild>
+            <Link to="/settings?tab=whatsapp">Connect WhatsApp</Link>
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {bundleLoading ? (

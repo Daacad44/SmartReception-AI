@@ -15,6 +15,7 @@ import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState } from './whatsapp-pipeline-state';
 import { handleIncomingMessage } from './incoming-message.service';
 import { ensureAiConfiguration } from '../ai/ai-config.service';
+import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -65,6 +66,19 @@ export interface WhatsAppSendStatus {
 }
 
 export class WhatsAppModuleService {
+  private getAccountToken(accessToken?: string | null): string | undefined {
+    return resolveStoredToken(accessToken) || config.whatsapp.accessToken || undefined;
+  }
+
+  private async setBusinessWhatsAppStatus(
+    businessId: string,
+    status: 'CONNECTED' | 'NOT_CONNECTED'
+  ): Promise<void> {
+    await prisma.business.update({
+      where: { id: businessId },
+      data: { whatsappStatus: status },
+    });
+  }
   private logWebhookPayload(body: Record<string, unknown>, parsed: ReturnType<typeof parseWebhookBody>) {
     console.log('[WhatsApp] Webhook payload:', JSON.stringify(body));
 
@@ -250,7 +264,7 @@ export class WhatsAppModuleService {
         businessId: account.businessId,
         whatsappAccountId: account.id,
         phoneNumberId: account.phoneNumberId,
-        accessToken: account.accessToken || config.whatsapp.accessToken || undefined,
+        accessToken: this.getAccountToken(account.accessToken),
         msg,
         contactName: contactName ?? undefined,
         extracted,
@@ -390,7 +404,7 @@ export class WhatsAppModuleService {
       account?.accessToken || config.whatsapp.accessToken ?
         await whatsappRepository.validateAccessToken(
           account?.phoneNumberId ?? config.whatsapp.phoneNumberId,
-          account?.accessToken || config.whatsapp.accessToken
+          this.getAccountToken(account?.accessToken)
         )
       : false;
 
@@ -452,7 +466,7 @@ export class WhatsAppModuleService {
       };
     }
 
-    const token = account.accessToken || config.whatsapp.accessToken;
+    const token = this.getAccountToken(account.accessToken);
     let phoneNumber = account.phoneNumber;
     let phoneStatus: WhatsAppHealth['phoneStatus'] =
       account.phoneNumberStatus === 'active' ? 'active' : 'unknown';
@@ -563,14 +577,37 @@ export class WhatsAppModuleService {
   }
 
   async getConnectionStatus(businessId: string) {
-    const account = await whatsappRepository.findAccountByBusiness(businessId);
+    const [account, business] = await Promise.all([
+      whatsappRepository.findAccountByBusiness(businessId),
+      prisma.business.findUnique({
+        where: { id: businessId },
+        select: { whatsappStatus: true },
+      }),
+    ]);
     const envConfigured = Boolean(
       config.whatsapp.accessToken && config.whatsapp.phoneNumberId
     );
+    const whatsappStatus =
+      business?.whatsappStatus ?? (account?.isActive ? 'CONNECTED' : 'NOT_CONNECTED');
 
     return {
-      connected: Boolean(account?.isActive),
-      account: account ?? null,
+      connected: whatsappStatus === 'CONNECTED',
+      whatsappStatus,
+      account: account
+        ? {
+            id: account.id,
+            phoneNumberId: account.phoneNumberId,
+            phoneNumber: account.phoneNumber,
+            displayName: account.displayName,
+            wabaId: account.wabaId,
+            webhookVerified: account.webhookVerified,
+            phoneNumberStatus: account.phoneNumberStatus,
+            webhookStatus: account.webhookStatus,
+            lastSyncAt: account.lastSyncAt,
+            isActive: account.isActive,
+            createdAt: account.createdAt,
+          }
+        : null,
       envConfigured,
       webhookUrl: this.getWebhookUrl(),
       verifyTokenConfigured: Boolean(config.whatsapp.verifyToken),
@@ -587,6 +624,8 @@ export class WhatsAppModuleService {
       throw new ConflictError('This phone number is already connected to another business');
     }
 
+    const encryptedToken = encryptToken(input.accessToken);
+
     const account = await prisma.whatsAppAccount.upsert({
       where: { phoneNumberId: input.phoneNumberId },
       create: {
@@ -595,7 +634,7 @@ export class WhatsAppModuleService {
         phoneNumber: input.phoneNumber,
         displayName: input.displayName,
         wabaId: input.wabaId ?? config.whatsapp.businessAccountId,
-        accessToken: input.accessToken,
+        accessToken: encryptedToken,
         isActive: true,
         phoneNumberStatus: 'active',
         webhookStatus: 'pending',
@@ -604,7 +643,7 @@ export class WhatsAppModuleService {
         phoneNumber: input.phoneNumber,
         displayName: input.displayName,
         wabaId: input.wabaId ?? config.whatsapp.businessAccountId,
-        accessToken: input.accessToken,
+        accessToken: encryptedToken,
         isActive: true,
         phoneNumberStatus: 'active',
         lastSyncAt: new Date(),
@@ -633,6 +672,7 @@ export class WhatsAppModuleService {
     });
 
     await ensureAiConfiguration(businessId);
+    await this.setBusinessWhatsAppStatus(businessId, 'CONNECTED');
 
     return account;
   }
@@ -669,7 +709,7 @@ export class WhatsAppModuleService {
       throw new NotFoundError('No active WhatsApp account found');
     }
 
-    const token = account.accessToken || config.whatsapp.accessToken;
+    const token = this.getAccountToken(account.accessToken);
     if (!token) {
       throw new ValidationError('WhatsApp access token is not configured');
     }
@@ -710,6 +750,8 @@ export class WhatsAppModuleService {
       where: { id: accountId },
       data: { isActive: false, phoneNumberStatus: 'disconnected' },
     });
+
+    await this.setBusinessWhatsAppStatus(businessId, 'NOT_CONNECTED');
 
     await prisma.auditLog.create({
       data: {

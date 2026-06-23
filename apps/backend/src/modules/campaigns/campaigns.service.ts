@@ -6,6 +6,7 @@ import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.
 import type { CustomerType, Prisma } from '@prisma/client';
 import { logger } from '../../core/logger';
 import { enqueueCampaignSend, removeCampaignQueueJobs } from './campaign-queue.utils';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
 function computeNextRun(schedule: string, from: Date): Date | null {
   const next = new Date(from);
@@ -144,7 +145,7 @@ export async function executeCampaignSend(campaignId: string, businessId: string
     const result = await whatsappService.sendOutbound({
       phoneNumberId: whatsappAccount.phoneNumberId,
       to: phone,
-      accessToken: whatsappAccount.accessToken || undefined,
+      accessToken: resolveStoredToken(whatsappAccount.accessToken),
       type: 'TEXT',
       content: campaign.message,
     });

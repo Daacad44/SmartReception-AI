@@ -72,10 +72,37 @@ export function OnboardingPage() {
   });
   const [selectedPlan, setSelectedPlan] = useState('FREE');
   const [whatsapp, setWhatsapp] = useState({
-    wabaId: '', phoneNumberId: '', accessToken: '', skipConnection: false,
+    wabaId: '', phoneNumberId: '', accessToken: '',
   });
   const [testing, setTesting] = useState(false);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  const finishOnboarding = useMutation({
+    mutationFn: async (skip: boolean) => {
+      const hasCredentials =
+        Boolean(whatsapp.wabaId && whatsapp.phoneNumberId && whatsapp.accessToken);
+
+      const whatsappPayload = skip || !hasCredentials
+        ? { skipConnection: true }
+        : { ...whatsapp, skipConnection: false };
+
+      const whatsappResponse = await api.post('/onboarding/whatsapp', whatsappPayload);
+      const business = extractData<{ whatsappStatus?: string }>(whatsappResponse);
+      await api.post('/onboarding/complete');
+      return { skipped: skip || !hasCredentials, whatsappStatus: business?.whatsappStatus };
+    },
+    onSuccess: ({ skipped, whatsappStatus }) => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      if (skipped || whatsappStatus === 'NOT_CONNECTED') {
+        toast.success('Workspace created successfully. You can connect WhatsApp later from Settings.');
+      } else {
+        toast.success('Workspace created successfully!');
+      }
+      navigate('/dashboard');
+    },
+    onError: () => toast.error('Failed to create workspace. Please try again.'),
+  });
 
   const saveBusiness = useMutation({
     mutationFn: async () => {
@@ -121,32 +148,27 @@ export function OnboardingPage() {
     onError: () => toast.error('Failed to select plan'),
   });
 
-  const saveWhatsapp = useMutation({
-    mutationFn: async () => api.post('/onboarding/whatsapp', whatsapp),
-    onSuccess: async () => {
-      await api.post('/onboarding/complete');
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
-      toast.success('Workspace created successfully!');
-      navigate('/welcome');
-    },
-    onError: () => toast.error('Failed to complete setup. Check credentials or skip for now.'),
-  });
-
   const testWhatsapp = useCallback(async () => {
+    if (!whatsapp.wabaId || !whatsapp.phoneNumberId || !whatsapp.accessToken) {
+      toast.error('Fill in all WhatsApp credentials to test the connection');
+      return;
+    }
     setTesting(true);
     try {
       await api.post('/onboarding/whatsapp', { ...whatsapp, skipConnection: false });
       await api.post('/whatsapp/test');
       toast.success('Connection successful!');
     } catch {
-      toast.error('Connection test failed');
+      toast.error('Connection test failed. You can still create your workspace and connect later.');
     } finally {
       setTesting(false);
     }
   }, [whatsapp]);
 
+  const handleSkipWhatsapp = () => finishOnboarding.mutate(true);
+
   const progress = ((step + 1) / STEPS.length) * 100;
-  const isPending = saveBusiness.isPending || saveProfile.isPending || saveDiscovery.isPending || savePlan.isPending || saveWhatsapp.isPending;
+  const isPending = saveBusiness.isPending || saveProfile.isPending || saveDiscovery.isPending || savePlan.isPending || finishOnboarding.isPending;
 
   const handleNext = () => {
     if (step === 0) {
@@ -159,7 +181,7 @@ export function OnboardingPage() {
     } else if (step === 1) saveProfile.mutate();
     else if (step === 2) saveDiscovery.mutate();
     else if (step === 3) savePlan.mutate();
-    else if (step === 4) saveWhatsapp.mutate();
+    else if (step === 4) finishOnboarding.mutate(false);
   };
 
   const canProceed = () => {
@@ -167,7 +189,7 @@ export function OnboardingPage() {
     if (step === 1) return profile.employeeRange && profile.customerVolume && profile.mainGoal;
     if (step === 2) return discovery.referralSource && discovery.problemToSolve.length >= 10 && discovery.biggestChallenge.length >= 10;
     if (step === 3) return Boolean(selectedPlan);
-    if (step === 4) return whatsapp.skipConnection || (whatsapp.wabaId && whatsapp.phoneNumberId && whatsapp.accessToken);
+    if (step === 4) return true;
     return false;
   };
 
@@ -373,9 +395,13 @@ export function OnboardingPage() {
                 <div className="mb-2 flex items-center gap-2">
                   <Phone className="h-5 w-5 text-accent" />
                   <h2 className="text-xl font-semibold">Connect WhatsApp Business</h2>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    Optional
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Connect your Meta WhatsApp Cloud API to send and receive messages using your business number.
+                  Connect your Meta WhatsApp Cloud API now, or skip and set it up later from Settings.
+                  Your workspace will be created either way.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" asChild>
@@ -386,24 +412,35 @@ export function OnboardingPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
-                    <Label>WhatsApp Business Account ID *</Label>
-                    <Input value={whatsapp.wabaId} onChange={(e) => setWhatsapp({ ...whatsapp, wabaId: e.target.value })} />
+                    <Label>WhatsApp Business Account ID</Label>
+                    <Input value={whatsapp.wabaId} onChange={(e) => setWhatsapp({ ...whatsapp, wabaId: e.target.value })} placeholder="Optional — connect later in Settings" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone Number ID *</Label>
-                    <Input value={whatsapp.phoneNumberId} onChange={(e) => setWhatsapp({ ...whatsapp, phoneNumberId: e.target.value })} />
+                    <Label>Phone Number ID</Label>
+                    <Input value={whatsapp.phoneNumberId} onChange={(e) => setWhatsapp({ ...whatsapp, phoneNumberId: e.target.value })} placeholder="From Meta Developer Console" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Permanent Access Token *</Label>
-                    <Input type="password" value={whatsapp.accessToken} onChange={(e) => setWhatsapp({ ...whatsapp, accessToken: e.target.value })} />
+                    <Label>Permanent Access Token</Label>
+                    <Input type="password" value={whatsapp.accessToken} onChange={(e) => setWhatsapp({ ...whatsapp, accessToken: e.target.value })} placeholder="Stored securely per workspace" />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={testWhatsapp} disabled={testing || whatsapp.skipConnection}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={testWhatsapp}
+                    disabled={testing || finishOnboarding.isPending || !whatsapp.wabaId || !whatsapp.phoneNumberId || !whatsapp.accessToken}
+                  >
                     {testing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
                     Test Connection
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setWhatsapp({ ...whatsapp, skipConnection: true })}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSkipWhatsapp}
+                    disabled={finishOnboarding.isPending}
+                  >
+                    {finishOnboarding.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
                     Skip for now
                   </Button>
                 </div>

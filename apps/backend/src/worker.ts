@@ -10,6 +10,7 @@ import {
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
+import { resolveStoredToken } from './infrastructure/crypto/token-crypto';
 import {
   sendAppointmentReminder,
   sendMissedAppointmentNotification,
@@ -40,7 +41,7 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
     customerMessage,
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
     customerPhone: conversation.customer.phone,
-    accessToken: conversation.whatsappAccount.accessToken || undefined,
+    accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
   });
 }
 
@@ -71,7 +72,7 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     type,
     mediaUrl,
     mediaFilename,
-    accessToken: conversation.whatsappAccount.accessToken || undefined,
+    accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
   });
 }
 

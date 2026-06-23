@@ -72,14 +72,35 @@ export const onboardingPlanSchema = z.object({
   plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
 });
 
-export const onboardingWhatsAppSchema = z.object({
-  wabaId: z.string().min(1),
-  phoneNumberId: z.string().min(1),
-  accessToken: z.string().min(1),
-  phoneNumber: z.string().optional(),
-  displayName: z.string().optional(),
-  skipConnection: z.boolean().optional(),
-});
+export const onboardingWhatsAppSchema = z
+  .object({
+    wabaId: z.string().optional(),
+    phoneNumberId: z.string().optional(),
+    accessToken: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    displayName: z.string().optional(),
+    skipConnection: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.skipConnection) return;
+    if (!data.wabaId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'WABA ID is required', path: ['wabaId'] });
+    }
+    if (!data.phoneNumberId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone Number ID is required',
+        path: ['phoneNumberId'],
+      });
+    }
+    if (!data.accessToken?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Access token is required',
+        path: ['accessToken'],
+      });
+    }
+  });
 
 export const loginSchema = z.object({
   email: z.string().email(),

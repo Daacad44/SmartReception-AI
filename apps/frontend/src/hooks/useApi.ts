@@ -777,6 +777,7 @@ export function useWhatsAppStatus() {
       const response = await api.get('/whatsapp/status');
       return extractData<{
         connected: boolean;
+        whatsappStatus: 'CONNECTED' | 'NOT_CONNECTED';
         envConfigured: boolean;
         webhookUrl: string;
         verifyTokenConfigured: boolean;

@@ -10,6 +10,7 @@ import {
   useWhatsAppHealth,
   useWhatsAppWebhookHealth,
   useWhatsAppDebug,
+  useWhatsAppStatus,
 } from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
@@ -50,6 +51,7 @@ export function WhatsAppSettings() {
     refetch: refetchHealth,
   } = useWhatsAppHealth();
   const { data: debugInfo, refetch: refetchDebug } = useWhatsAppDebug();
+  const { data: connectionStatus, refetch: refetchStatus } = useWhatsAppStatus();
   const connectWhatsApp = useConnectWhatsApp();
   const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
@@ -79,7 +81,10 @@ export function WhatsAppSettings() {
     refetchHealth();
     refetchWebhookHealth();
     refetchDebug();
+    refetchStatus();
   };
+
+  const workspaceStatus = connectionStatus?.whatsappStatus ?? 'NOT_CONNECTED';
 
   const webhookIsVerified =
     webhookHealth?.verified === true ||
@@ -95,6 +100,21 @@ export function WhatsAppSettings() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">WhatsApp Integration</h2>
+          <p className="text-sm text-muted-foreground">
+            Connect, update, test, or disconnect your Meta WhatsApp Cloud API credentials.
+          </p>
+        </div>
+        <Badge
+          variant={workspaceStatus === 'CONNECTED' ? 'success' : 'destructive'}
+          className="capitalize"
+        >
+          {workspaceStatus === 'CONNECTED' ? 'Connected' : 'Not Connected'}
+        </Badge>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Connection Status</CardTitle>
@@ -348,7 +368,7 @@ export function WhatsAppSettings() {
         <CardHeader>
           <CardTitle>Connect Manually</CardTitle>
           <CardDescription>
-            Or use &quot;Connect from Environment&quot; if credentials are set in server .env
+            Enter your Meta Cloud API credentials. Tokens are encrypted and stored per workspace.
           </CardDescription>
         </CardHeader>
         <CardContent>

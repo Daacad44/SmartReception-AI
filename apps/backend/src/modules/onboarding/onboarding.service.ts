@@ -10,7 +10,7 @@ import type {
   OnboardingPlanInput,
   OnboardingWhatsAppInput,
 } from '@smartreception/shared';
-import type { Industry, SubscriptionPlan } from '@prisma/client';
+import type { Industry, SubscriptionPlan, WhatsAppStatus } from '@prisma/client';
 import { businessTypesService } from './business-types.service';
 
 function slugify(text: string): string {
@@ -42,6 +42,7 @@ export class OnboardingService {
         welcomeSeen: Boolean(user?.welcomeSeenAt),
         business: null,
         whatsappConnected: false,
+        whatsappStatus: 'NOT_CONNECTED' as WhatsAppStatus,
       };
     }
 
@@ -50,6 +51,9 @@ export class OnboardingService {
     const whatsappAccount = await prisma.whatsAppAccount.findFirst({
       where: { businessId: business.id, isActive: true },
     });
+    const whatsappStatus: WhatsAppStatus =
+      business.whatsappStatus ??
+      (whatsappAccount ? 'CONNECTED' : 'NOT_CONNECTED');
 
     return {
       completed,
@@ -74,8 +78,10 @@ export class OnboardingService {
         mainGoal: business.mainGoal,
         plan: business.subscription?.plan ?? 'FREE',
         onboardingData: business.onboardingData,
+        whatsappStatus,
       },
-      whatsappConnected: Boolean(whatsappAccount),
+      whatsappConnected: whatsappStatus === 'CONNECTED',
+      whatsappStatus,
     };
   }
 
@@ -190,21 +196,43 @@ export class OnboardingService {
   async connectWhatsApp(userId: string, businessId: string, input: OnboardingWhatsAppInput) {
     await this.assertOwner(userId, businessId);
 
-    if (!input.skipConnection) {
-      await whatsappModuleService.connectAccount(businessId, {
-        phoneNumberId: input.phoneNumberId,
-        phoneNumber: input.phoneNumber || input.phoneNumberId,
-        displayName: input.displayName || 'WhatsApp Business',
-        wabaId: input.wabaId,
-        accessToken: input.accessToken,
-      });
+    let whatsappStatus: WhatsAppStatus = 'NOT_CONNECTED';
+    let connectionError: string | undefined;
 
-      await whatsappModuleService.testConnection(businessId);
+    if (!input.skipConnection && input.phoneNumberId && input.accessToken) {
+      try {
+        await whatsappModuleService.connectAccount(businessId, {
+          phoneNumberId: input.phoneNumberId,
+          phoneNumber: input.phoneNumber || input.phoneNumberId,
+          displayName: input.displayName || 'WhatsApp Business',
+          wabaId: input.wabaId,
+          accessToken: input.accessToken,
+        });
+        await whatsappModuleService.testConnection(businessId);
+        whatsappStatus = 'CONNECTED';
+      } catch (error) {
+        connectionError =
+          error instanceof Error ? error.message : 'WhatsApp connection failed';
+      }
     }
+
+    const business = await prisma.business.findUnique({ where: { id: businessId } });
+    const existingData =
+      business?.onboardingData && typeof business.onboardingData === 'object'
+        ? (business.onboardingData as Record<string, unknown>)
+        : {};
 
     return prisma.business.update({
       where: { id: businessId },
-      data: { onboardingStep: 5 },
+      data: {
+        onboardingStep: 5,
+        whatsappStatus,
+        onboardingData: {
+          ...existingData,
+          whatsappSkipped: Boolean(input.skipConnection),
+          whatsappConnectionError: connectionError ?? null,
+        },
+      },
     });
   }
 

@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,6 +47,9 @@ type BusinessForm = z.infer<typeof businessSchema>;
 type AiForm = z.infer<typeof aiSchema>;
 
 export function SettingsPage() {
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'whatsapp' ? 'whatsapp' : 'business';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = useBusinessSettings();
   const { data: aiConfig, isLoading: aiLoading } = useAiConfig();
   const updateSettings = useUpdateBusinessSettings();
@@ -132,7 +136,7 @@ export function SettingsPage() {
         <p className="text-muted-foreground">Manage your business and platform preferences</p>
       </div>
 
-      <Tabs defaultValue="business">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="business" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -145,7 +149,7 @@ export function SettingsPage() {
           {hasPermission('settings:write') && (
             <TabsTrigger value="whatsapp" className="gap-2">
               <MessageCircle className="h-4 w-4" />
-              WhatsApp
+              WhatsApp Integration
             </TabsTrigger>
           )}
           <TabsTrigger value="notifications" className="gap-2">

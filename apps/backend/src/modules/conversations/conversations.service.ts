@@ -5,6 +5,7 @@ import { getWhatsappQueue } from '../../infrastructure/queue/queues';
 import { prisma } from '../../infrastructure/database/prisma';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { sendConversationMessage } from '../whatsapp/whatsapp-outbound.service';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
 export class ConversationsService {
   async list(
@@ -84,7 +85,7 @@ export class ConversationsService {
           type: input.type,
           mediaUrl: input.mediaUrl,
           mediaFilename: input.mediaFilename,
-          accessToken: conversation.whatsappAccount.accessToken || undefined,
+          accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
         });
       }
     } else {
@@ -158,7 +159,7 @@ export class ConversationsService {
     await whatsappService.sendTypingIndicator(
       conversation.whatsappAccount.phoneNumberId,
       conversation.customer.phone,
-      conversation.whatsappAccount.accessToken || undefined
+      resolveStoredToken(conversation.whatsappAccount.accessToken)
     );
 
     await prisma.conversation.update({

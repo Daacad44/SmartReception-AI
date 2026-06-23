@@ -219,6 +219,11 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
+enum WhatsAppStatus {
+  CONNECTED
+  NOT_CONNECTED
+}
+
 model BusinessTypeDefinition {
   id          String   @id
   label       String
@@ -263,6 +268,7 @@ model Business {
   mainGoal    String?
   businessType String?
   businessCategory String?
+  whatsappStatus WhatsAppStatus @default(NOT_CONNECTED)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
