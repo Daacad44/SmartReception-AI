@@ -212,12 +212,12 @@ export function OnboardingPage() {
                     <BusinessTypeCombobox
                       value={business.businessTypeId}
                       onChange={(type) =>
-                        setBusiness({
-                          ...business,
+                        setBusiness((prev) => ({
+                          ...prev,
                           businessTypeId: type.id,
                           businessType: type.label,
                           industry: type.industry,
-                        })
+                        }))
                       }
                     />
                   </div>
