@@ -56,6 +56,7 @@ export class OnboardingService {
         id: business.id,
         name: business.name,
         industry: business.industry,
+        businessType: business.businessType,
         phone: business.phone,
         whatsappNumber: business.whatsappNumber,
         country: business.country,
@@ -81,6 +82,7 @@ export class OnboardingService {
         data: {
           name: input.name,
           industry: input.industry as Industry,
+          businessType: input.businessType,
           phone: input.phone,
           whatsappNumber: input.whatsappNumber,
           country: input.country,
@@ -109,6 +111,7 @@ export class OnboardingService {
     await prisma.business.update({
       where: { id: business.id },
       data: {
+        businessType: input.businessType,
         whatsappNumber: input.whatsappNumber,
         country: input.country,
         city: input.city,
