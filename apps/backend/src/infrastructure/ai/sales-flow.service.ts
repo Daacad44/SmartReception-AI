@@ -15,9 +15,14 @@ import {
   buildLeadSummary,
 } from './sales-flow-content';
 import { MENU_OPTIONS } from './somali-menu';
-import { isValidEmail, INVALID_EMAIL_MESSAGE, normalizeEmail } from '../appointments/email-validation';
+import { isValidEmail, INVALID_EMAIL_MESSAGE } from '../appointments/email-validation';
 import { scheduleAppointmentReminders } from '../appointments/appointment-scheduler.service';
 import { sendAppointmentConfirmation } from '../appointments/appointment-notification.service';
+import { parseAppointmentStart } from '../../core/utils/appointment-datetime';
+import { resolveCustomerForAppointment } from '../../core/utils/customer-phone';
+import { appointmentsRepository } from '../../modules/appointments/appointments.repository';
+import { notifyAppointment } from '../notifications/notification-helper';
+import { broadcastBusinessEvent } from '../realtime/broadcast.service';
 
 const FLOW_META_TYPE = 'sales_flow';
 
@@ -293,7 +298,22 @@ export async function processSalesFlowMessage(
     }
 
     await persistSalesLead(ctx, { ...state, answers });
-    await createAppointmentFromFlow(ctx, { ...state, answers });
+    const created = await createAppointmentFromFlow(ctx, { ...state, answers });
+
+    if (!created.success) {
+      logger.error('WhatsApp appointment booking failed after confirmation step', {
+        businessId: ctx.businessId,
+        conversationId: ctx.conversationId,
+        customerId: ctx.customerId,
+        error: created.error,
+      });
+      return {
+        handled: true,
+        reply:
+          'Waan ka xunnahay, ballanka lama diiwaangelin karin. Fadlan isku day mar kale ama nagala soo xiriir WhatsApp: +252687716299',
+        nextState: { ...state, answers, questionIndex: APPOINTMENT_QUESTIONS.length - 1 },
+      };
+    }
 
     return {
       handled: true,
@@ -371,73 +391,133 @@ async function persistSalesLead(ctx: SalesFlowContext, state: SalesFlowState): P
   }
 }
 
+interface AppointmentFlowResult {
+  success: boolean;
+  appointmentId?: string;
+  error?: string;
+}
+
 async function createAppointmentFromFlow(
   ctx: SalesFlowContext,
   state: SalesFlowState
-): Promise<void> {
-  try {
-    const dateStr = state.answers.apptDate ?? '';
-    const timeStr = state.answers.apptTime ?? '10:00';
-    const start = parseAppointmentStart(dateStr, timeStr);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-    const email = state.answers.apptEmail;
-    const name = state.answers.apptName || state.answers.fullName;
-    const phone = state.answers.apptPhone;
+): Promise<AppointmentFlowResult> {
+  const dateStr = state.answers.apptDate ?? '';
+  const timeStr = state.answers.apptTime ?? '10:00';
+  const email = state.answers.apptEmail;
+  const name = state.answers.apptName || state.answers.fullName;
+  const phone = state.answers.apptPhone || ctx.customerPhone;
 
-    if (email && isValidEmail(email)) {
-      await prisma.customer.update({
-        where: { id: ctx.customerId },
-        data: {
-          email: normalizeEmail(email),
-          ...(name && { name }),
-          ...(phone && { phone }),
-        },
-      });
+  if (email && !isValidEmail(email)) {
+    return { success: false, error: 'Invalid email' };
+  }
+
+  try {
+    const customer = await resolveCustomerForAppointment(ctx.businessId, {
+      phone,
+      name,
+      email,
+      fallbackCustomerId: ctx.customerId,
+    });
+
+    if (!customer) {
+      return { success: false, error: 'Customer not found' };
     }
 
-    const appointment = await prisma.appointment.create({
+    const start = parseAppointmentStart(dateStr, timeStr);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+    const service = await prisma.service.findFirst({
+      where: {
+        businessId: ctx.businessId,
+        isActive: true,
+        name: { equals: state.serviceName, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    const appointment = await appointmentsRepository.create(ctx.businessId, {
+      customerId: customer.id,
+      serviceId: service?.id,
+      title: `Kulan: ${state.serviceName}`,
+      serviceRequested: state.serviceName,
+      description: Object.entries(state.answers)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n'),
+      startTime: start,
+      endTime: end,
+      leadSource: 'WHATSAPP',
+      notes: 'WhatsApp Sales Flow',
+      additionalNotes: state.answers.additionalNotes,
+      companyName: state.answers.businessName || state.answers.companyName,
+    });
+
+    await prisma.auditLog.create({
       data: {
         businessId: ctx.businessId,
-        customerId: ctx.customerId,
-        title: `Kulan: ${state.serviceName}`,
-        serviceRequested: state.serviceName,
-        description: Object.entries(state.answers)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join('\n'),
-        startTime: start,
-        endTime: end,
-        status: 'SCHEDULED',
-        leadSource: 'WHATSAPP',
-        notes: 'WhatsApp Sales Flow',
-        additionalNotes: state.answers.additionalNotes,
-        companyName: state.answers.businessName || state.answers.companyName,
+        action: 'CREATE',
+        entity: 'Appointment',
+        entityId: appointment.id,
+        newData: {
+          source: 'whatsapp_sales_flow',
+          conversationId: ctx.conversationId,
+          customerId: customer.id,
+        },
       },
     });
 
-    const customer = await prisma.customer.findUnique({ where: { id: ctx.customerId } });
-    if (customer) {
+    await notifyAppointment(
+      ctx.businessId,
+      'New appointment',
+      `${appointment.title} scheduled for ${start.toLocaleDateString()}`,
+      appointment.id
+    );
+
+    void broadcastBusinessEvent(ctx.businessId, {
+      type: 'appointment',
+      appointmentId: appointment.id,
+      action: 'create',
+    });
+
+    try {
       await scheduleAppointmentReminders({
         appointmentId: appointment.id,
         businessId: ctx.businessId,
         customerPhone: customer.phone,
         startTime: start,
       });
-      void sendAppointmentConfirmation(appointment.id, ctx.businessId).catch(() => undefined);
+    } catch (reminderErr) {
+      logger.warn('Appointment created but reminder scheduling failed', {
+        appointmentId: appointment.id,
+        err: reminderErr,
+      });
     }
+
+    void sendAppointmentConfirmation(appointment.id, ctx.businessId).catch((err) => {
+      logger.warn('Appointment created but confirmation email failed', {
+        appointmentId: appointment.id,
+        err,
+      });
+    });
+
+    logger.info('WhatsApp sales flow appointment created', {
+      appointmentId: appointment.id,
+      businessId: ctx.businessId,
+      customerId: customer.id,
+      startTime: start.toISOString(),
+    });
+
+    return { success: true, appointmentId: appointment.id };
   } catch (err) {
-    logger.warn('Failed to create appointment from sales flow', { err });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error('Failed to create appointment from sales flow', {
+      err,
+      businessId: ctx.businessId,
+      conversationId: ctx.conversationId,
+      customerId: ctx.customerId,
+      phone,
+    });
+    return { success: false, error: message };
   }
-}
-
-function parseAppointmentStart(dateStr: string, timeStr: string): Date {
-  const combined = `${dateStr} ${timeStr}`.trim();
-  const parsed = new Date(combined);
-  if (!isNaN(parsed.getTime()) && parsed > new Date()) return parsed;
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 0, 0, 0);
-  return tomorrow;
 }
 
 export function salesFlowMetadata(state: SalesFlowState | null): Record<string, unknown> {

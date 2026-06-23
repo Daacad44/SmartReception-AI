@@ -1,5 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { Prisma } from '@prisma/client';
+import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/customer-phone';
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
@@ -31,13 +32,15 @@ export class WhatsAppRepository {
   }
 
   async findOrCreateCustomer(businessId: string, phone: string, name?: string) {
-    const normalizedPhone = phone.replace(/\D/g, '');
-    const existing = await prisma.customer.findUnique({
-      where: { businessId_phone: { businessId, phone: normalizedPhone } },
-    });
+    const digits = phoneDigits(phone);
+    if (!digits) {
+      throw new Error('Invalid phone number');
+    }
+
+    const existing = await findCustomerByPhoneDigits(businessId, phone);
 
     if (existing) {
-      if (name && name !== existing.name && name !== normalizedPhone) {
+      if (name && name !== existing.name && name !== digits) {
         return prisma.customer.update({
           where: { id: existing.id },
           data: { name, whatsappId: phone },
@@ -49,8 +52,8 @@ export class WhatsAppRepository {
     const customer = await prisma.customer.create({
       data: {
         businessId,
-        phone: normalizedPhone,
-        name: name || normalizedPhone,
+        phone: digits,
+        name: name || digits,
         whatsappId: phone,
         source: 'whatsapp',
       },
