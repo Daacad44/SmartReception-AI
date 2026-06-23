@@ -509,6 +509,7 @@ model Conversation {
   @@index([businessId])
   @@index([businessId, status])
   @@index([businessId, lastMessageAt])
+  @@index([businessId, assignedToId])
   @@index([customerId])
   @@index([assignedToId])
   @@map("conversations")

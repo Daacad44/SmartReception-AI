@@ -34,6 +34,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { cn, getInitials, formatRelativeTime } from '@/lib/utils';
+import { isNetworkOrTimeoutError } from '@/lib/api';
 import type { Message } from '@/lib/entities';
 
 function messageStatusLabel(status: Message['status']): string {
@@ -76,7 +77,7 @@ export function ConversationsPage() {
     status: statusFilter,
     search: debouncedSearch || undefined,
   });
-  const { data: messages, isLoading: messagesLoading } = useMessages(selectedId);
+  const { data: messages, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
   const sendMessage = useSendMessage();
   const takeover = useTakeoverConversation();
   const transferToAi = useTransferToAi();
@@ -244,10 +245,24 @@ export function ConversationsPage() {
             </div>
 
             <ScrollArea className="flex-1 p-4">
-              {messagesLoading ? (
+              {messagesLoading && !messages ? (
                 <LoadingState rows={6} />
+              ) : messagesError ? (
+                <ErrorState
+                  message={
+                    isNetworkOrTimeoutError(messagesError)
+                      ? 'Connection lost. Retrying messages...'
+                      : 'Failed to load messages.'
+                  }
+                  onRetry={() => refetchMessages()}
+                />
               ) : (
               <div className="space-y-3">
+                {messagesFetching && messages && (
+                  <p className="text-center text-xs text-muted-foreground animate-pulse">
+                    Syncing messages...
+                  </p>
+                )}
                 {messages?.map((msg) => (
                   <div
                     key={msg.id}

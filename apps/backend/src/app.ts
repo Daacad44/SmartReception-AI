@@ -11,6 +11,7 @@ import { prisma } from './infrastructure/database/prisma';
 import { isSupabaseStorageConfigured } from './infrastructure/storage';
 import { createRateLimiter } from './core/rate-limit-store';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
+import { requestTimingMiddleware } from './core/middleware/request-timing.middleware';
 
 const WEBHOOK_RAW_PATHS = [
   '/webhook',
@@ -106,6 +107,7 @@ export function createApp(): express.Application {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(requestTimingMiddleware);
 
   app.get('/health', async (_req, res) => {
     const timestamp = new Date().toISOString();

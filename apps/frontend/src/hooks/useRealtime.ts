@@ -42,29 +42,6 @@ export function useBusinessRealtime(userId?: string | null) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
           event: '*',
           schema: 'public',
           table: 'conversations',
@@ -139,7 +116,6 @@ export function useBusinessRealtime(userId?: string | null) {
  * so it never collides with the business-wide channel.
  */
 export function useConversationRealtime(conversationId: string | null) {
-  const businessId = useAuthStore((s) => s.currentBusinessId);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -149,7 +125,6 @@ export function useConversationRealtime(conversationId: string | null) {
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     };
 
     const messageChannel = supabase
@@ -176,20 +151,8 @@ export function useConversationRealtime(conversationId: string | null) {
       )
       .subscribe();
 
-    let businessChannel: ReturnType<typeof supabase.channel> | null = null;
-    if (businessId) {
-      businessChannel = supabase
-        .channel(`business-${businessId}`)
-        .on('broadcast', { event: 'conversation_update' }, (payload) => {
-          const convId = (payload.payload as { conversationId?: string })?.conversationId;
-          if (!convId || convId === conversationId) invalidate();
-        })
-        .subscribe();
-    }
-
     return () => {
       supabase.removeChannel(messageChannel);
-      if (businessChannel) supabase.removeChannel(businessChannel);
     };
-  }, [conversationId, businessId, queryClient]);
+  }, [conversationId, queryClient]);
 }

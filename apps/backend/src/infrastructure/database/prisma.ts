@@ -3,7 +3,7 @@ import { logger } from '../../core/logger';
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-const DEFAULT_SERVERLESS_CONNECTION_LIMIT = '3';
+const DEFAULT_SERVERLESS_CONNECTION_LIMIT = '5';
 const DEFAULT_POOL_TIMEOUT_SECONDS = '20';
 
 /**

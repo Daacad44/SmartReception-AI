@@ -183,8 +183,8 @@ export function useMarkConversationRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
+    onError: () => {
+      // Non-blocking: read status should not interrupt the inbox
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, isInitialLoading } from '@/hooks/useAuthQuery';
 import api, { extractData } from '@/lib/api';
+import { isSupabaseConfigured } from '@/lib/supabase-config';
 import type {
   Conversation,
   Message,
@@ -255,6 +256,9 @@ export function transformFaq(raw: any): Faq {
 // ─── Query hooks ─────────────────────────────────────────────────────────────
 
 const ANALYTICS_TIMEOUT = 30_000;
+const CONVERSATIONS_TIMEOUT = 15_000;
+const REALTIME_POLL_INTERVAL = 60_000;
+const FALLBACK_POLL_INTERVAL = 12_000;
 
 export function useDashboardBundle() {
   return useAuthQuery<DashboardBundle>({
@@ -339,22 +343,22 @@ export function useConversations(params?: { status?: string; search?: string }) 
     queryFn: async () => {
       const response = await api.get('/conversations', {
         params: {
-          limit: 100,
+          limit: 50,
           search: params?.search || undefined,
           status: apiStatus,
         },
-        timeout: ANALYTICS_TIMEOUT,
+        timeout: CONVERSATIONS_TIMEOUT,
       });
       const data = extractData(response);
-      const items = Array.isArray(data) ? data : [];
-      let conversations = items.map(transformConversation);
+      const items = Array.isArray(data) ? data : (data as { data?: unknown[] })?.data ?? [];
+      let conversations = (Array.isArray(items) ? items : []).map(transformConversation);
       if (params?.status === 'ai_handling') {
         conversations = conversations.filter((c) => c.status === 'ai_handling');
       }
       return conversations;
     },
     staleTime: 5_000,
-    refetchInterval: 8_000,
+    refetchInterval: isSupabaseConfigured ? REALTIME_POLL_INTERVAL : FALLBACK_POLL_INTERVAL,
   });
 }
 
@@ -362,14 +366,16 @@ export function useMessages(conversationId: string | null) {
   return useAuthQuery<Message[]>({
     queryKey: ['messages', conversationId],
     queryFn: async () => {
-      const response = await api.get(`/conversations/${conversationId}`);
-      const data = extractData<{ messages?: unknown[] } & Record<string, unknown>>(response);
-      const messages = data.messages ?? [];
-      return (messages as unknown[]).map((m) => transformMessage(m, conversationId!));
+      const response = await api.get(`/conversations/${conversationId}/messages`, {
+        timeout: CONVERSATIONS_TIMEOUT,
+      });
+      const data = extractData<unknown[]>(response);
+      const messages = Array.isArray(data) ? data : [];
+      return messages.map((m) => transformMessage(m, conversationId!));
     },
     enabled: !!conversationId,
     staleTime: 2_000,
-    refetchInterval: 5_000,
+    refetchInterval: isSupabaseConfigured ? REALTIME_POLL_INTERVAL : FALLBACK_POLL_INTERVAL,
   });
 }
 

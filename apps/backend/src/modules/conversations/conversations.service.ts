@@ -104,7 +104,7 @@ export class ConversationsService {
   }
 
   async takeover(businessId: string, conversationId: string, userId: string) {
-    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
@@ -121,7 +121,7 @@ export class ConversationsService {
   }
 
   async markAsRead(businessId: string, conversationId: string) {
-    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
@@ -130,7 +130,7 @@ export class ConversationsService {
   }
 
   async transferToAi(businessId: string, conversationId: string) {
-    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
@@ -139,7 +139,7 @@ export class ConversationsService {
   }
 
   async handoffToHuman(businessId: string, conversationId: string, userId: string) {
-    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }

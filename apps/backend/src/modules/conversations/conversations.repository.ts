@@ -40,6 +40,13 @@ export class ConversationsRepository {
           messages: {
             orderBy: { createdAt: 'desc' },
             take: 1,
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              direction: true,
+              status: true,
+            },
           },
         },
       }),
@@ -47,6 +54,13 @@ export class ConversationsRepository {
     ]);
 
     return { conversations, total, page, limit };
+  }
+
+  async exists(businessId: string, id: string) {
+    return prisma.conversation.findFirst({
+      where: { id, businessId },
+      select: { id: true },
+    });
   }
 
   async findById(businessId: string, id: string) {

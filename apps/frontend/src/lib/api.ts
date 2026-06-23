@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-const API_TIMEOUT_MS = 30_000;
+const API_TIMEOUT_MS = 15_000;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -34,6 +34,11 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'An unexpected error occurred';
+}
+
+export function isNetworkOrTimeoutError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  return !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout');
 }
 
 export function getErrorCode(error: unknown): string | undefined {
@@ -79,17 +84,13 @@ async function refreshAccessToken(): Promise<string> {
     return refreshPromise;
   }
 
-  const refreshToken = useAuthStore.getState().refreshToken;
-  if (!refreshToken) {
-    clearSession();
-    throw new Error('No refresh token');
-  }
+  const storeRefreshToken = useAuthStore.getState().refreshToken;
 
   refreshPromise = axios
     .post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
       `${API_BASE_URL}/auth/refresh`,
-      refreshToken ? { refreshToken } : {},
-      { timeout: 10000, withCredentials: true }
+      storeRefreshToken ? { refreshToken: storeRefreshToken } : {},
+      { timeout: 10_000, withCredentials: true }
     )
     .then((response) => {
       const tokens = extractData(response);
@@ -110,9 +111,25 @@ async function refreshAccessToken(): Promise<string> {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+      _timeoutRetry?: boolean;
+    };
 
-    if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
+    if (
+      isNetworkOrTimeoutError(error) &&
+      !originalRequest._timeoutRetry &&
+      originalRequest.method?.toUpperCase() === 'GET'
+    ) {
+      originalRequest._timeoutRetry = true;
+      return api(originalRequest);
+    }
+
+    if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
 

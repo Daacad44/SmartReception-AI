@@ -12,7 +12,11 @@ export function getSupabase(): SupabaseClient | null {
 
   if (!client) {
     client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      realtime: { params: { eventsPerSecond: 10 } },
+      realtime: {
+        params: { eventsPerSecond: 10 },
+        heartbeatIntervalMs: 15_000,
+        reconnectAfterMs: (tries) => Math.min(tries * 1_000, 10_000),
+      },
     });
   }
 
