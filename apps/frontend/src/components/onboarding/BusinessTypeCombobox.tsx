@@ -37,8 +37,19 @@ const BusinessTypeList = memo(function BusinessTypeList({
   onSelect: (type: BusinessTypeOption) => void;
   onClose?: () => void;
 }) {
+  const handlePick = (type: BusinessTypeOption) => {
+    onSelect(type);
+    onClose?.();
+  };
+
   return (
-    <Command shouldFilter>
+    <Command
+      shouldFilter
+      filter={(value, search, keywords) => {
+        const haystack = [value, ...(keywords ?? [])].join(' ').toLowerCase();
+        return haystack.includes(search.toLowerCase()) ? 1 : 0;
+      }}
+    >
       <CommandInput placeholder="Search business type..." />
       <CommandList className="max-h-[min(400px,50vh)]">
         <CommandEmpty>No business type found.</CommandEmpty>
@@ -47,11 +58,11 @@ const BusinessTypeList = memo(function BusinessTypeList({
             {types.map((type) => (
               <CommandItem
                 key={type.id}
-                value={`${type.label} ${type.category} ${type.keywords.join(' ')}`}
-                onSelect={() => {
-                  onSelect(type);
-                  onClose?.();
-                }}
+                value={type.id}
+                keywords={[type.label, type.category, ...type.keywords]}
+                onSelect={() => handlePick(type)}
+                onPointerDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
               >
                 <span className="text-base leading-none" aria-hidden>{type.icon}</span>
                 <span className="flex-1 truncate">{type.label}</span>
@@ -147,7 +158,7 @@ export function BusinessTypeCombobox({ value, onChange, disabled, className }: B
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         className="z-[130] w-[var(--radix-popover-trigger-width)] p-0"
@@ -157,6 +168,7 @@ export function BusinessTypeCombobox({ value, onChange, disabled, className }: B
         collisionPadding={8}
         avoidCollisions={false}
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <BusinessTypeList value={value} onSelect={handleSelect} onClose={() => setOpen(false)} />
       </PopoverContent>
