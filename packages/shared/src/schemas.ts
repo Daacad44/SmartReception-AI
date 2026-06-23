@@ -29,6 +29,7 @@ export const checkEmailSchema = z.object({
 export const onboardingBusinessInfoSchema = z.object({
   name: z.string().min(1).max(200),
   industry: z.string().min(1),
+  businessType: z.string().min(1).max(200),
   phone: z.string().min(1).max(20),
   whatsappNumber: z.string().min(1).max(20),
   country: z.string().min(1).max(100),

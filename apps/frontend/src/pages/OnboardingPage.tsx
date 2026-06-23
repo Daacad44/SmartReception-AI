@@ -13,17 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BusinessTypeCombobox } from '@/components/onboarding/BusinessTypeCombobox';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const STEPS = ['Business Info', 'Profile', 'Discovery', 'Plan', 'WhatsApp'] as const;
-
-const INDUSTRIES = [
-  'RESTAURANT', 'HOSPITAL', 'CLINIC', 'SCHOOL', 'UNIVERSITY', 'TRAVEL_AGENCY',
-  'REAL_ESTATE', 'CONSTRUCTION', 'ECOMMERCE', 'RETAIL', 'LOGISTICS', 'HOTEL',
-  'NGO', 'GOVERNMENT', 'CONSULTING', 'SERVICE_BUSINESS', 'OTHER',
-];
 
 const PLANS = [
   {
@@ -63,8 +58,8 @@ export function OnboardingPage() {
   const [step, setStep] = useState(0);
 
   const [business, setBusiness] = useState({
-    name: '', industry: '', phone: '', whatsappNumber: '',
-    country: '', city: '', address: '', website: '',
+    name: '', industry: '', businessType: '', businessTypeId: '',
+    phone: '', whatsappNumber: '', country: '', city: '', address: '', website: '',
   });
   const [profile, setProfile] = useState({
     employeeRange: '', customerVolume: '', mainGoal: '',
@@ -80,7 +75,8 @@ export function OnboardingPage() {
 
   const saveBusiness = useMutation({
     mutationFn: async () => {
-      const response = await api.post('/onboarding/business', business);
+      const { businessTypeId: _id, ...payload } = business;
+      const response = await api.post('/onboarding/business', payload);
       return extractData<{
         business: { id: string; name: string };
         tokens: { accessToken: string; refreshToken: string } | null;
@@ -157,7 +153,7 @@ export function OnboardingPage() {
   };
 
   const canProceed = () => {
-    if (step === 0) return business.name && business.industry && business.phone && business.whatsappNumber && business.country && business.city && business.address;
+    if (step === 0) return business.name && business.industry && business.businessType && business.phone && business.whatsappNumber && business.country && business.city && business.address;
     if (step === 1) return profile.employeeRange && profile.customerVolume && profile.mainGoal;
     if (step === 2) return discovery.referralSource && discovery.problemToSolve.length >= 10 && discovery.biggestChallenge.length >= 10;
     if (step === 3) return Boolean(selectedPlan);
@@ -167,7 +163,7 @@ export function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-4 py-4 md:px-8">
+      <header className="relative z-10 border-b bg-card px-4 py-4 md:px-8">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy">
@@ -211,14 +207,19 @@ export function OnboardingPage() {
                     <Label>Business Name *</Label>
                     <Input value={business.name} onChange={(e) => setBusiness({ ...business, name: e.target.value })} />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <Label>Business Type *</Label>
-                    <Select value={business.industry} onValueChange={(v) => setBusiness({ ...business, industry: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        {INDUSTRIES.map((i) => <SelectItem key={i} value={i}>{i.replace(/_/g, ' ')}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <BusinessTypeCombobox
+                      value={business.businessTypeId}
+                      onChange={(type) =>
+                        setBusiness({
+                          ...business,
+                          businessTypeId: type.id,
+                          businessType: type.label,
+                          industry: type.industry,
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Business Phone *</Label>
