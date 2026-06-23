@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OtpInput } from '@/components/OtpInput';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/auth.store';
+import { toast } from 'sonner';
+import type { UserProfile } from '@/lib/types';
 
 const RESEND_COOLDOWN = 60;
 
@@ -15,6 +18,7 @@ export function VerifyOtpPage() {
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(RESEND_COOLDOWN);
   const [verified, setVerified] = useState(false);
+  const login = useAuthStore((s) => s.login);
 
   const { verifyOtp, resendOtp, isVerifyingOtp, isResendingOtp } = useAuth();
 
@@ -29,19 +33,38 @@ export function VerifyOtpPage() {
     verifyOtp(
       { email, code },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          if (data.accessToken && data.refreshToken && data.user) {
+            const profile: UserProfile = {
+              id: data.user.id,
+              email: data.user.email,
+              firstName: data.user.firstName,
+              lastName: data.user.lastName,
+              role: data.businesses?.[0]?.role ?? 'OWNER',
+              businesses: (data.businesses ?? []).map((b) => ({
+                id: b.id,
+                name: b.name,
+                industry: b.industry ?? 'OTHER',
+                plan: b.plan ?? 'FREE',
+                role: b.role,
+              })),
+            };
+            login(data.accessToken, data.refreshToken, profile);
+          }
           setVerified(true);
-          setTimeout(() => navigate('/login'), 2000);
+          toast.success('Email verified!');
+          setTimeout(() => {
+            navigate(data.requiresOnboarding !== false ? '/onboarding' : '/dashboard');
+          }, 1500);
         },
+        onError: () => toast.error('Invalid or expired code'),
       }
     );
   };
 
   const handleResend = () => {
     if (!email || countdown > 0) return;
-    resendOtp(email, {
-      onSuccess: () => setCountdown(RESEND_COOLDOWN),
-    });
+    resendOtp(email, { onSuccess: () => setCountdown(RESEND_COOLDOWN) });
   };
 
   if (!email) {
@@ -68,7 +91,7 @@ export function VerifyOtpPage() {
               <CheckCircle2 className="h-8 w-8 text-success" />
             </div>
             <h2 className="text-xl font-semibold">Email verified!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Redirecting you to sign in...</p>
+            <p className="mt-2 text-sm text-muted-foreground">Setting up your business workspace...</p>
           </CardContent>
         </Card>
       </div>
@@ -101,7 +124,7 @@ export function VerifyOtpPage() {
                 Verifying...
               </>
             ) : (
-              'Verify email'
+              'Verify & Continue'
             )}
           </Button>
 
@@ -122,13 +145,6 @@ export function VerifyOtpPage() {
 
           <p className="text-center text-xs text-muted-foreground">
             Code expires in 10 minutes. Never share it with anyone.
-          </p>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Already verified?{' '}
-            <Link to="/login" className="font-medium text-accent hover:underline">
-              Sign in
-            </Link>
           </p>
         </CardContent>
       </Card>

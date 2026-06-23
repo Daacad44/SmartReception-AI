@@ -1,3 +1,4 @@
+import { OnboardingGate, OnboardingOnlyRoute } from '@/components/OnboardingGate';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
@@ -14,6 +15,8 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
 import { TwoFactorLoginPage } from '@/pages/TwoFactorLoginPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
+import { OnboardingPage } from '@/pages/OnboardingPage';
+import { WelcomePage } from '@/pages/WelcomePage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
@@ -89,7 +92,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   if (isAuthenticated && accessToken) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -125,6 +128,22 @@ export default function App() {
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
                 <Route
+                  path="/onboarding"
+                  element={
+                    <OnboardingOnlyRoute>
+                      <OnboardingPage />
+                    </OnboardingOnlyRoute>
+                  }
+                />
+                <Route
+                  path="/welcome"
+                  element={
+                    <ProtectedRoute>
+                      <WelcomePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/forgot-password"
                   element={
                     <PublicRoute>
@@ -142,9 +161,11 @@ export default function App() {
                 />
                 <Route
                   element={
-                    <ProtectedRoute>
-                      <DashboardLayout />
-                    </ProtectedRoute>
+                    <OnboardingGate>
+                      <ProtectedRoute>
+                        <DashboardLayout />
+                      </ProtectedRoute>
+                    </OnboardingGate>
                   }
                 >
                   <Route

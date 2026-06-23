@@ -19,15 +19,6 @@ import {
 } from '../../infrastructure/auth/login-lockout.service';
 import { twoFactorService } from '../two-factor/two-factor.service';
 
-const VERIFY_EXPIRY_HOURS = 24;
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
-
 export class AuthService {
   async register(input: RegisterInput) {
     const existing = await authRepository.findUserByEmail(input.email);
@@ -48,36 +39,18 @@ export class AuthService {
       emailOtpAttempts: 0,
     });
 
-    let slug = slugify(input.businessName);
-    const existingSlug = await prisma.business.findUnique({ where: { slug } });
-    if (existingSlug) {
-      slug = `${slug}-${Date.now()}`;
-    }
-
-    const { business } = await authRepository.createBusinessWithOwner(user.id, {
-      name: input.businessName,
-      slug,
-      industry: input.industry,
-    });
-
     await emailService.sendOtpEmail(user.email, otpCode, user.firstName, 'verification');
 
-    await prisma.auditLog.create({
-      data: {
-        businessId: business.id,
-        userId: user.id,
-        action: 'CREATE',
-        entity: 'User',
-        entityId: user.id,
-        newData: { event: 'registration', otpSent: true },
-      },
-    });
-
     return {
-      message: 'Registration successful. Enter the 6-digit code sent to your email.',
+      message: 'Registration successful. Please verify your email to continue.',
       email: user.email,
       requiresVerification: true,
     };
+  }
+
+  async checkEmailAvailability(email: string) {
+    const existing = await authRepository.findUserByEmail(email);
+    return { available: !existing };
   }
 
   async login(input: LoginInput, ipAddress?: string) {
@@ -149,6 +122,9 @@ export class AuthService {
       .sendLoginAlert(user.email, { firstName: user.firstName, ipAddress })
       .catch(() => undefined);
 
+    const needsOnboarding =
+      memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt;
+
     return {
       user: {
         id: user.id,
@@ -163,9 +139,10 @@ export class AuthService {
         slug: m.business.slug,
         role: m.role,
         industry: m.business.industry,
-        plan: m.business.subscription?.plan ?? 'STARTER',
+        plan: m.business.subscription?.plan ?? 'FREE',
       })),
       isSuperAdmin: user.isSuperAdmin,
+      requiresOnboarding: needsOnboarding,
       ...tokens,
     };
   }
@@ -210,9 +187,11 @@ export class AuthService {
         slug: m.business.slug,
         role: m.role,
         industry: m.business.industry,
-        plan: m.business.subscription?.plan ?? 'STARTER',
+        plan: m.business.subscription?.plan ?? 'FREE',
       })),
       isSuperAdmin: user.isSuperAdmin,
+      requiresOnboarding:
+        memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
       ...tokens,
     };
   }
@@ -243,7 +222,33 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      return { message: 'Email already verified. You can sign in.' };
+      const memberships = await authRepository.getUserBusinesses(user.id);
+      const tokens = await tokenService.createTokenPair(
+        user.id,
+        user.email,
+        memberships[0]?.businessId,
+        memberships[0]?.role
+      );
+      return {
+        message: 'Email already verified.',
+        requiresOnboarding:
+          memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        businesses: memberships.map((m) => ({
+          id: m.business.id,
+          name: m.business.name,
+          slug: m.business.slug,
+          role: m.role,
+          industry: m.business.industry,
+          plan: m.business.subscription?.plan ?? 'FREE',
+        })),
+        ...tokens,
+      };
     }
 
     if ((user.emailOtpAttempts ?? 0) >= otpService.maxAttempts) {
@@ -264,20 +269,43 @@ export class AuthService {
       emailOtpAttempts: 0,
     });
 
-    const membership = await authRepository.getUserBusinesses(user.id);
-    const businessName = membership[0]?.business.name ?? 'your business';
+    const memberships = await authRepository.getUserBusinesses(user.id);
+    const businessName = memberships[0]?.business.name ?? 'your business';
 
     await emailService.sendWelcomeEmail(user.email, {
       firstName: user.firstName,
       businessName,
     });
 
-    await emailService.sendAccountActivatedEmail(user.email, {
-      firstName: user.firstName,
-      businessName,
-    });
+    const tokens = await tokenService.createTokenPair(
+      user.id,
+      user.email,
+      memberships[0]?.businessId,
+      memberships[0]?.role
+    );
 
-    return { message: 'Email verified successfully. You can now sign in.' };
+    const needsOnboarding =
+      memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt;
+
+    return {
+      message: 'Email verified successfully.',
+      requiresOnboarding: needsOnboarding,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      businesses: memberships.map((m) => ({
+        id: m.business.id,
+        name: m.business.name,
+        slug: m.business.slug,
+        role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'FREE',
+      })),
+      ...tokens,
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -403,13 +431,16 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       isEmailVerified: user.isEmailVerified,
       isSuperAdmin: user.isSuperAdmin,
+      welcomeSeen: Boolean(user.welcomeSeenAt),
+      needsOnboarding: memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
+      onboardingCompleted: memberships.length > 0 && Boolean(memberships[0]?.business.onboardingCompletedAt),
       businesses: memberships.map((m) => ({
         id: m.business.id,
         name: m.business.name,
         slug: m.business.slug,
         role: m.role,
         industry: m.business.industry,
-        plan: m.business.subscription?.plan ?? 'STARTER',
+        plan: m.business.subscription?.plan ?? 'FREE',
       })),
     };
   }

@@ -37,7 +37,13 @@ export class AuthRepository {
 
   async createBusinessWithOwner(
     userId: string,
-    businessData: { name: string; slug: string; industry?: string; phone?: string }
+    businessData: {
+      name: string;
+      slug: string;
+      industry?: string;
+      phone?: string;
+      onboardingStep?: number;
+    }
   ): Promise<{ business: Business; membership: BusinessMember }> {
     return prisma.$transaction(async (tx) => {
       const business = await tx.business.create({
@@ -46,6 +52,7 @@ export class AuthRepository {
           slug: businessData.slug,
           industry: (businessData.industry as never) || 'OTHER',
           phone: businessData.phone,
+          onboardingStep: businessData.onboardingStep ?? 1,
         },
       });
 
@@ -60,7 +67,7 @@ export class AuthRepository {
       await tx.subscription.create({
         data: {
           businessId: business.id,
-          plan: 'PROFESSIONAL',
+          plan: 'FREE',
           status: 'TRIALING',
           currentPeriodStart: new Date(),
           currentPeriodEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),

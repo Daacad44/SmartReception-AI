@@ -28,8 +28,15 @@ enum Industry {
   RESTAURANT
   SALON
   UNIVERSITY
+  SCHOOL
   TRAVEL_AGENCY
   REAL_ESTATE
+  CONSTRUCTION
+  ECOMMERCE
+  RETAIL
+  LOGISTICS
+  NGO
+  GOVERNMENT
   CONSULTING
   SERVICE_BUSINESS
   OTHER
@@ -224,9 +231,18 @@ model Business {
   email       String?
   website     String?
   address     String?
+  country     String?
+  city        String?
+  whatsappNumber String?
   timezone    String   @default("UTC")
   logoUrl     String?
   isActive    Boolean  @default(true)
+  onboardingStep Int   @default(0)
+  onboardingCompletedAt DateTime?
+  onboardingData Json?
+  employeeRange String?
+  customerVolume String?
+  mainGoal    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -282,6 +298,7 @@ model User {
   totpSecret        String?
   totpEnabled       Boolean   @default(false)
   totpBackupCodes   String?
+  welcomeSeenAt     DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

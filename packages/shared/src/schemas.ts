@@ -1,19 +1,83 @@
 import { z } from 'zod';
 
+const strongPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128)
+  .regex(/[A-Z]/, 'Password must include an uppercase letter')
+  .regex(/[a-z]/, 'Password must include a lowercase letter')
+  .regex(/[0-9]/, 'Password must include a number')
+  .regex(/[^A-Za-z0-9]/, 'Password must include a special character');
+
 export const registerSchema = z
   .object({
     email: z.string().email(),
-    password: z.string().min(8).max(128),
+    password: strongPasswordSchema,
     confirmPassword: z.string().min(8).max(128),
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
-    businessName: z.string().min(1).max(200),
-    industry: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   });
+
+export const checkEmailSchema = z.object({
+  email: z.string().email(),
+});
+
+export const onboardingBusinessInfoSchema = z.object({
+  name: z.string().min(1).max(200),
+  industry: z.string().min(1),
+  phone: z.string().min(1).max(20),
+  whatsappNumber: z.string().min(1).max(20),
+  country: z.string().min(1).max(100),
+  city: z.string().min(1).max(100),
+  address: z.string().min(1).max(500),
+  website: z.string().url().optional().or(z.literal('')),
+});
+
+export const onboardingProfileSchema = z.object({
+  employeeRange: z.enum(['1-5', '5-20', '20-50', '50-100', '100+']),
+  customerVolume: z.enum(['1-50', '50-200', '200-1000', '1000+']),
+  mainGoal: z.enum([
+    'AI_RECEPTIONIST',
+    'WHATSAPP_AUTOMATION',
+    'APPOINTMENT_BOOKING',
+    'CRM',
+    'MARKETING_CAMPAIGNS',
+    'CUSTOMER_SUPPORT',
+    'LEAD_GENERATION',
+  ]),
+});
+
+export const onboardingDiscoverySchema = z.object({
+  referralSource: z.enum([
+    'FACEBOOK',
+    'TIKTOK',
+    'GOOGLE',
+    'WHATSAPP',
+    'YOUTUBE',
+    'FRIEND_REFERRAL',
+    'EXISTING_CUSTOMER',
+    'OTHER',
+  ]),
+  problemToSolve: z.string().min(10).max(2000),
+  biggestChallenge: z.string().min(10).max(2000),
+});
+
+export const onboardingPlanSchema = z.object({
+  plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+});
+
+export const onboardingWhatsAppSchema = z.object({
+  wabaId: z.string().min(1),
+  phoneNumberId: z.string().min(1),
+  accessToken: z.string().min(1),
+  phoneNumber: z.string().optional(),
+  displayName: z.string().optional(),
+  skipConnection: z.boolean().optional(),
+});
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -298,6 +362,11 @@ export const transferOwnershipSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type OnboardingBusinessInfoInput = z.infer<typeof onboardingBusinessInfoSchema>;
+export type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>;
+export type OnboardingDiscoveryInput = z.infer<typeof onboardingDiscoverySchema>;
+export type OnboardingPlanInput = z.infer<typeof onboardingPlanSchema>;
+export type OnboardingWhatsAppInput = z.infer<typeof onboardingWhatsAppSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateBusinessInput = z.infer<typeof createBusinessSchema>;
 export type UpdateBusinessInput = z.infer<typeof updateBusinessSchema>;
