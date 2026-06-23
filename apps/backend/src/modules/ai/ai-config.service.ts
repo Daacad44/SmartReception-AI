@@ -19,7 +19,11 @@ export async function ensureAiConfiguration(businessId: string) {
   });
 }
 
+/** Fast read on the hot path — no upsert. Defaults to enabled when unset. */
 export async function isAutoReplyEnabled(businessId: string): Promise<boolean> {
-  const config = await ensureAiConfiguration(businessId);
-  return config.enableAutoReply;
+  const row = await prisma.aIConfiguration.findUnique({
+    where: { businessId },
+    select: { enableAutoReply: true },
+  });
+  return row?.enableAutoReply ?? true;
 }

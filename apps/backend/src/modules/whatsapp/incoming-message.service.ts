@@ -23,6 +23,11 @@ import { sendAutomatedReply, sendServiceMenu } from '../ai/menu-reply.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
+import {
+  logPipelineStep,
+  persistPipelineTiming,
+  updatePipelineContext,
+} from './message-pipeline.logger';
 
 export interface HandleIncomingMessageParams {
   businessId: string;
@@ -31,6 +36,7 @@ export interface HandleIncomingMessageParams {
   accessToken?: string;
   msg: WhatsAppWebhookMessage;
   contactName?: string;
+  pipelineKey: string;
   extracted: {
     type: string;
     content: string;
@@ -52,21 +58,25 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     accessToken,
     msg,
     contactName,
+    pipelineKey,
     extracted,
   } = params;
   const startedAt = Date.now();
+  const timings: Record<string, number> = {};
 
   const customer = await whatsappRepository.findOrCreateCustomer(
     businessId,
     msg.from,
     contactName ?? msg.from
   );
+  timings.customerMs = Date.now() - startedAt;
 
   const { conversation } = await whatsappRepository.findOrCreateConversation(
     businessId,
     customer.id,
     whatsappAccountId
   );
+  timings.conversationMs = Date.now() - startedAt;
 
   recordInboundMessage(businessId, extracted.content);
 
@@ -82,11 +92,13 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       whatsappTimestamp: msg.timestamp,
     },
   });
+  timings.messageSavedMs = Date.now() - startedAt;
 
-  await broadcastConversationEvent(businessId, {
+  updatePipelineContext(pipelineKey, {
     conversationId: conversation.id,
-    type: 'message',
+    messageId: message.id,
   });
+  logPipelineStep(pipelineKey, 'message_saved', { timings });
 
   const aiText = extracted.content?.trim() ?? '';
   const autoReplyEnabled =
@@ -95,6 +107,8 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
 
   if (canReplyWithAi) {
+    logPipelineStep(pipelineKey, 'reply_started');
+    const replyStartedAt = Date.now();
     await runSomaliSalesAgent({
       businessId,
       conversationId: conversation.id,
@@ -105,7 +119,11 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       customerPhone: msg.from,
       accessToken,
       preferEnglish: requestsEnglish(aiText),
+      pipelineKey,
     });
+    timings.replyMs = Date.now() - replyStartedAt;
+    logPipelineStep(pipelineKey, 'reply_sent', { timings });
+    persistPipelineTiming(message.id, { ...timings, totalMs: Date.now() - startedAt });
   } else {
     logger.debug('Auto-reply skipped', {
       conversationId: conversation.id,
@@ -113,46 +131,100 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       isAiEnabled: conversation.isAiEnabled,
       hasText: Boolean(aiText),
     });
+    logPipelineStep(pipelineKey, 'deferred_tasks_done');
   }
 
-  if (extracted.mediaId) {
-    const token = accessToken || config.whatsapp.accessToken;
-    if (token) {
-      void downloadAndAttachMedia({
-        messageId: message.id,
-        conversationId: conversation.id,
-        businessId,
-        mediaId: extracted.mediaId,
-        filename: extracted.filename,
-        token,
-        baseMetadata: extracted.metadata ?? {},
-      }).catch((error) => logger.error('Failed to download/store WhatsApp media:', error));
-    }
-  }
-
-  whatsappService.markAsRead(phoneNumberId, msg.id, accessToken).catch((error) => {
-    logger.warn('Failed to mark WhatsApp message as read', { error });
+  // Non-critical work after reply — must not block WhatsApp response time.
+  void runDeferredInboundTasks({
+    businessId,
+    conversationId: conversation.id,
+    messageId: message.id,
+    customerName: customer.name,
+    phoneNumberId,
+    whatsappMsgId: msg.id,
+    accessToken,
+    extracted,
+    pipelineKey,
+    startedAt,
   });
+}
 
-  notifyNewMessage(businessId, customer.name, conversation.id).catch((error) => {
-    logger.warn('Failed to send new message notification', { error });
-  });
+interface DeferredInboundTasksParams {
+  businessId: string;
+  conversationId: string;
+  messageId: string;
+  customerName: string;
+  phoneNumberId: string;
+  whatsappMsgId: string;
+  accessToken?: string;
+  pipelineKey: string;
+  startedAt: number;
+  extracted: HandleIncomingMessageParams['extracted'];
+}
 
-  prisma.auditLog
-    .create({
-      data: {
-        businessId,
-        action: 'CREATE',
-        entity: 'WhatsAppMessage',
-        entityId: message.id,
-        newData: { direction: 'INBOUND', type: extracted.type, from: msg.from },
-      },
-    })
-    .catch((error) => {
-      logger.warn('Failed to write WhatsApp audit log', { error });
+async function runDeferredInboundTasks(params: DeferredInboundTasksParams): Promise<void> {
+  const {
+    businessId,
+    conversationId,
+    messageId,
+    customerName,
+    phoneNumberId,
+    whatsappMsgId,
+    accessToken,
+    extracted,
+    pipelineKey,
+    startedAt,
+  } = params;
+
+  try {
+    await broadcastConversationEvent(businessId, {
+      conversationId,
+      type: 'message',
     });
 
-  console.log(`[WhatsApp] handleIncomingMessage completed in ${Date.now() - startedAt}ms`);
+    if (extracted.mediaId) {
+      const token = accessToken || config.whatsapp.accessToken;
+      if (token) {
+        await downloadAndAttachMedia({
+          messageId,
+          conversationId,
+          businessId,
+          mediaId: extracted.mediaId,
+          filename: extracted.filename,
+          token,
+          baseMetadata: extracted.metadata ?? {},
+        });
+      }
+    }
+
+    whatsappService.markAsRead(phoneNumberId, whatsappMsgId, accessToken).catch((error) => {
+      logger.warn('Failed to mark WhatsApp message as read', { error });
+    });
+
+    notifyNewMessage(businessId, customerName, conversationId).catch((error) => {
+      logger.warn('Failed to send new message notification', { error });
+    });
+
+    prisma.auditLog
+      .create({
+        data: {
+          businessId,
+          action: 'CREATE',
+          entity: 'WhatsAppMessage',
+          entityId: messageId,
+          newData: { direction: 'INBOUND', type: extracted.type, from: whatsappMsgId },
+        },
+      })
+      .catch((error) => {
+        logger.warn('Failed to write WhatsApp audit log', { error });
+      });
+
+    logPipelineStep(pipelineKey, 'deferred_tasks_done', {
+      deferredMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    logger.error('Deferred inbound tasks failed', { error, conversationId, messageId });
+  }
 }
 
 interface SomaliSalesAgentParams {
@@ -165,6 +237,7 @@ interface SomaliSalesAgentParams {
   customerPhone: string;
   accessToken?: string;
   preferEnglish?: boolean;
+  pipelineKey: string;
 }
 
 async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
@@ -200,6 +273,10 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
         content: result.reply,
         metadata: salesFlowMetadata(result.nextState ?? null),
       });
+      logPipelineStep(params.pipelineKey, 'sales_flow_handled', {
+        service: activeFlow.serviceOption,
+        phase: activeFlow.phase,
+      });
       return;
     }
   }
@@ -214,18 +291,20 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
         content: start.reply,
         metadata: salesFlowMetadata(start.nextState ?? null),
       });
+      logPipelineStep(params.pipelineKey, 'sales_flow_handled', { option: menuOption });
       return;
     }
   }
 
-  await sendServiceMenu(base);
-
   if (isMenuOnlyTrigger(params.customerMessage)) {
-    console.log('[AI] Greeting — menu sent, awaiting selection');
+    console.log('[AI] Greeting — sending service menu');
+    await sendServiceMenu(base);
+    logPipelineStep(params.pipelineKey, 'menu_sent');
     return;
   }
 
   console.log('[AI] Free-form — Knowledge Base + Gemini (Somali sales consultant)');
+  logPipelineStep(params.pipelineKey, 'ai_started');
   await processAndSendAiReply({
     businessId: params.businessId,
     conversationId: params.conversationId,
@@ -235,6 +314,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     customerPhone: params.customerPhone,
     accessToken: params.accessToken,
     preferEnglish: params.preferEnglish,
+    pipelineKey: params.pipelineKey,
   });
 }
 

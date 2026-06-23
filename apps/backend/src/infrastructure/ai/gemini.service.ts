@@ -6,10 +6,10 @@ import {
   GEMINI_ERROR_MESSAGE_SO,
   SMARTRECEPTION_SYSTEM_PROMPT,
 } from './smartreception-knowledge';
-import { CONTACT_FOOTER_SO } from './somali-menu';
+import { CONTACT_FOOTER_SO, requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
-import { requestsEnglish } from './somali-menu';
+import { withAiTimeout } from './gemini-timeout';
 
 export interface GenerateResponseOptions {
   /** Reply in English only when customer explicitly requested it. */
@@ -127,7 +127,24 @@ RULES:
 
   try {
     const model = getChatModel({ temperature: aiConfig?.temperature ?? 0.7 });
-    const result = await model.generateContent(prompt);
+    const fallback: AIResponse = {
+      content: aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
+      intent: 'general',
+      actions: [{ type: 'none' }],
+      confidence: 0,
+      language,
+    };
+
+    const result = await withAiTimeout(
+      model.generateContent(prompt),
+      null as unknown as Awaited<ReturnType<typeof model.generateContent>>,
+      'Gemini generateContent'
+    );
+
+    if (!result) {
+      return fallback;
+    }
+
     const responseText = result.response.text()?.trim() || '{}';
 
     let parsed: AIResponse;

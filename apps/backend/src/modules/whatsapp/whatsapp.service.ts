@@ -16,6 +16,7 @@ import { getPipelineState } from './whatsapp-pipeline-state';
 import { handleIncomingMessage } from './incoming-message.service';
 import { ensureAiConfiguration } from '../ai/ai-config.service';
 import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
+import { startPipelineTrace } from './message-pipeline.logger';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -154,7 +155,6 @@ export class WhatsAppModuleService {
 
   async handleWebhook(body: Record<string, unknown>): Promise<void> {
     console.log('[WhatsApp] Incoming webhook received');
-    await this.recordWebhookReceived(body);
     await this.processWebhook(body);
   }
 
@@ -233,7 +233,10 @@ export class WhatsAppModuleService {
       webhookStatus: 'verified',
     });
 
-    await ensureAiConfiguration(account.businessId);
+    // Ensure AI config exists in background — must not block message processing.
+    void ensureAiConfiguration(account.businessId).catch((error) => {
+      logger.warn('Failed to ensure AI configuration', { error, businessId: account.businessId });
+    });
 
     for (const status of parsed.statuses) {
       const recorded = await whatsappRepository.tryRecordWebhookEvent(
@@ -260,6 +263,11 @@ export class WhatsAppModuleService {
       const extracted = extractMessageContent(msg);
       console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
 
+      startPipelineTrace(msg.id, {
+        businessId: account.businessId,
+        whatsappMsgId: msg.id,
+      });
+
       await handleIncomingMessage({
         businessId: account.businessId,
         whatsappAccountId: account.id,
@@ -267,16 +275,22 @@ export class WhatsAppModuleService {
         accessToken: this.getAccountToken(account.accessToken),
         msg,
         contactName: contactName ?? undefined,
+        pipelineKey: msg.id,
         extracted,
       });
     }
 
-    await whatsappRepository.markWebhookVerified(account.phoneNumberId);
-    await whatsappRepository.syncAccountHealth(account.phoneNumberId, {
-      webhookStatus: 'verified',
-      webhookVerified: true,
-      lastWebhookReceivedAt: new Date(),
-    });
+    // Health sync after messages — non-blocking for response latency.
+    void whatsappRepository
+      .markWebhookVerified(account.phoneNumberId)
+      .then(() =>
+        whatsappRepository.syncAccountHealth(account.phoneNumberId, {
+          webhookStatus: 'verified',
+          webhookVerified: true,
+          lastWebhookReceivedAt: new Date(),
+        })
+      )
+      .catch((error) => logger.warn('Failed to sync webhook health', { error }));
   }
 
   async getWebhookHealth(businessId: string): Promise<WhatsAppWebhookHealth> {

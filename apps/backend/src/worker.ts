@@ -100,13 +100,39 @@ async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
 async function startWorkers(): Promise<void> {
   await connectDatabase();
 
-  createWorker<AIJobData>(QUEUE_NAMES.AI_PROCESSING, processAIJob, 3);
-  createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5);
-  createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2);
-  createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJob, 3);
-  createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2);
+  const workers = [
+    createWorker<AIJobData>(QUEUE_NAMES.AI_PROCESSING, processAIJob, 3),
+    createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5),
+    createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2),
+    createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJob, 3),
+    createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2),
+  ].filter(Boolean);
 
-  logger.info('BullMQ workers started');
+  if (workers.length === 0) {
+    logger.error('No workers started — REDIS_URL is not configured');
+    process.exit(1);
+  }
+
+  // Retry failed jobs on startup (stale failures from crashed workers).
+  const { getAiQueue, getWhatsappQueue } = await import('./infrastructure/queue/queues');
+  for (const queue of [getAiQueue(), getWhatsappQueue()]) {
+    if (!queue) continue;
+    try {
+      const failed = await queue.getJobs(['failed'], 0, 50);
+      for (const job of failed) {
+        await job.retry().catch((error) => {
+          logger.warn('Failed to retry job on worker startup', { jobId: job.id, error });
+        });
+      }
+      if (failed.length > 0) {
+        logger.info(`Retried ${failed.length} failed jobs in queue ${queue.name}`);
+      }
+    } catch (error) {
+      logger.warn('Failed to recover failed jobs on startup', { error, queue: queue.name });
+    }
+  }
+
+  logger.info('BullMQ workers started', { count: workers.length });
 }
 
 const shutdown = async (signal: string) => {

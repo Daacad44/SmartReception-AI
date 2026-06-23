@@ -12,6 +12,7 @@ import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 import { LEAD_THANK_YOU_SO } from '../../infrastructure/ai/smartreception-knowledge';
 import type { LeadData } from '../../infrastructure/ai/ai.types';
+import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -22,6 +23,7 @@ export interface ProcessAiReplyParams {
   customerPhone: string;
   accessToken?: string;
   preferEnglish?: boolean;
+  pipelineKey?: string;
 }
 
 function parseLeadData(data: Record<string, unknown> | undefined): LeadData | null {
@@ -120,6 +122,9 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     customerMessage,
     { preferEnglish: params.preferEnglish }
   );
+  if (params.pipelineKey) {
+    logPipelineStep(params.pipelineKey, 'ai_finished', { intent: aiResponse.intent });
+  }
   console.log('[AI] Response generated (Gemini)', {
     intent: aiResponse.intent,
     preview: aiResponse.content.slice(0, 120),
@@ -177,6 +182,9 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   } else {
     recordGraphApiError(businessId, sendResult.error);
     console.error('[WhatsApp] Message failed:', sendResult.error);
+    if (params.pipelineKey) {
+      logPipelineStep(params.pipelineKey, 'reply_failed', { error: sendResult.error });
+    }
   }
 
   await whatsappRepository

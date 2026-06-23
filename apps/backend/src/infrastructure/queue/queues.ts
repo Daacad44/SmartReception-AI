@@ -136,5 +136,13 @@ export function createWorker<T>(
     logger.error(`Job ${job?.id} failed in queue ${queueName}:`, err);
   });
 
+  worker.on('stalled', (jobId) => {
+    logger.warn(`Job ${jobId} stalled in queue ${queueName}`);
+  });
+
+  worker.on('error', (err) => {
+    logger.error(`Worker error in queue ${queueName}:`, err);
+  });
+
   return worker;
 }
