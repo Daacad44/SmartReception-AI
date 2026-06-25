@@ -9,11 +9,11 @@ import {
 
 test('isSmartReceptionBusiness detects platform workspace by slug', () => {
   assert.equal(
-    isSmartReceptionBusiness({ id: '1', slug: 'smartreception', name: 'Botan Automation' }),
+    isSmartReceptionBusiness({ id: '1', slug: 'smartreception', name: 'Botan Dev' }),
     true
   );
   assert.equal(
-    isSmartReceptionBusiness({ id: '2', slug: 'botan-automation', name: 'Botan Automation' }),
+    isSmartReceptionBusiness({ id: '2', slug: 'botan-dev', name: 'Botan Dev' }),
     false
   );
 });
@@ -31,14 +31,14 @@ test('isSmartReceptionStoredContent detects seeded SmartReception copy', () => {
     true
   );
   assert.equal(
-    isSmartReceptionStoredContent('Ku soo dhawoow Botan Automation.'),
+    isSmartReceptionStoredContent('Ku soo dhawoow Botan Dev.'),
     false
   );
 });
 
 test('buildDefaultGreetingMessage uses business name', () => {
-  const greeting = buildDefaultGreetingMessage('Botan Automation');
-  assert.match(greeting, /Botan Automation/);
+  const greeting = buildDefaultGreetingMessage('Botan Dev');
+  assert.match(greeting, /Botan Dev/);
   assert.doesNotMatch(greeting, /SmartReception/);
 });
 
