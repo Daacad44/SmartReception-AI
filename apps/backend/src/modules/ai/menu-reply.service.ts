@@ -9,10 +9,8 @@ import {
 } from '../whatsapp/whatsapp-pipeline-state';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { logger } from '../../core/logger';
-import {
-  SMARTRECEPTION_SERVICE_MENU,
-  getMenuOptionContent,
-} from '../../infrastructure/ai/somali-menu';
+import { buildBusinessGreetingMenu } from '../../infrastructure/ai/business-menu.service';
+import { getMenuOptionContent } from '../../infrastructure/ai/somali-menu';
 
 export interface SendAutomatedReplyParams {
   businessId: string;
@@ -100,12 +98,13 @@ export interface SendMenuParams {
   accessToken?: string;
 }
 
-/** Send the Somali SmartReception service menu to any customer. */
+/** Send the business-scoped greeting/menu (SmartReception menu only for the platform workspace). */
 export async function sendServiceMenu(params: SendMenuParams): Promise<boolean> {
-  console.log('[AI] Sending SmartReception service menu');
+  const content = await buildBusinessGreetingMenu(params.businessId);
+  console.log('[AI] Sending business greeting menu', { businessId: params.businessId });
   return sendAutomatedReply({
     ...params,
-    content: SMARTRECEPTION_SERVICE_MENU,
+    content,
     metadata: { type: 'service_menu', language: 'so' },
   });
 }

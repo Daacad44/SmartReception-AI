@@ -1,6 +1,11 @@
 import type { AIConfiguration, Business, KnowledgeDocument } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { knowledgeRepository } from '../../modules/knowledge/knowledge.repository';
+import {
+  buildDefaultSystemPrompt,
+  isSmartReceptionBusiness,
+  isSmartReceptionStoredContent,
+} from './smartreception-tenant';
 
 export interface BusinessAIContext {
   businessId: string;
@@ -26,13 +31,14 @@ function formatKnowledgeDocuments(documents: KnowledgeDocument[]): string {
 }
 
 function buildBusinessSystemPrompt(business: Business, aiConfig: AIConfiguration): string {
-  if (aiConfig.systemPrompt?.trim()) {
-    return aiConfig.systemPrompt.trim();
+  const stored = aiConfig.systemPrompt?.trim();
+  if (stored) {
+    if (isSmartReceptionBusiness(business) || !isSmartReceptionStoredContent(stored)) {
+      return stored;
+    }
   }
 
-  return `You are the AI assistant for ${business.name}.
-Help customers with support, appointment booking, and lead qualification using only the business knowledge provided below.
-Be professional, concise, and helpful.`;
+  return buildDefaultSystemPrompt(business.name);
 }
 
 function buildBusinessFallbackMessage(business: Business, aiConfig: AIConfiguration): string {

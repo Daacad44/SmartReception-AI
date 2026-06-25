@@ -10,7 +10,7 @@ import {
 } from '../whatsapp/whatsapp-pipeline-state';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
-import { LEAD_THANK_YOU_SO } from '../../infrastructure/ai/smartreception-knowledge';
+import { buildDefaultLeadThankYou } from '../../infrastructure/ai/smartreception-tenant';
 import type { LeadData } from '../../infrastructure/ai/ai.types';
 import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 
@@ -137,7 +137,14 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   let replyContent = aiResponse.content;
   if (leadData?.complete) {
-    replyContent = `${replyContent}\n\n${LEAD_THANK_YOU_SO}`;
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { name: true },
+    });
+    const thankYou = business
+      ? buildDefaultLeadThankYou(business.name)
+      : 'Mahadsanid. Kooxdayadu waxay kula soo xiriiri doontaa dhawaan.';
+    replyContent = `${replyContent}\n\n${thankYou}`;
   }
 
   recordOutboundAttempt(businessId, replyContent);
