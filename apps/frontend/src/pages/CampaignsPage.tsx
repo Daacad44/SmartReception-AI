@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Megaphone, Send, Calendar, Radio, Plus, BarChart3, FileText, Trash2, Pencil,
   Users, Check, ChevronRight, ChevronLeft, Truck, Clock, XCircle, Loader2,
+  Sparkles, Pause, Play, Copy, Archive, Route,
 } from 'lucide-react';
 import api, { extractData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -27,8 +28,12 @@ import { CustomerSearchSelect } from '@/components/campaigns/CustomerSearchSelec
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const CAMPAIGN_TYPES = ['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'];
-const SCHEDULES = ['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'];
+const CAMPAIGN_TYPES = [
+  'PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING',
+  'WELCOME', 'APPOINTMENT_REMINDER', 'BIRTHDAY', 'PAYMENT_REMINDER', 'INVOICE',
+  'PRODUCT_LAUNCH', 'SEASONAL', 'DISCOUNT', 'RETENTION', 'RE_ENGAGEMENT', 'THANK_YOU', 'CUSTOM',
+];
+const SCHEDULES = ['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'RECURRING', 'CUSTOM'];
 const WIZARD_STEPS = ['Audience', 'Template', 'Message', 'Delivery', 'Review'] as const;
 const DELIVERY_TABS = [
   { id: 'scheduled', label: 'Scheduled', icon: Clock },
@@ -92,6 +97,38 @@ interface Delivery {
   failedReason?: string;
 }
 
+interface CalendarData {
+  campaigns: Array<{
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    schedule: string;
+    scheduledAt?: string;
+    nextRunAt?: string;
+    lastRunAt?: string;
+    sentCount: number;
+    _count?: { recipients: number };
+  }>;
+}
+
+interface Journey {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  triggerType: string;
+  steps: Array<{ orderIndex: number; delayMinutes: number; message: string }>;
+  _count?: { enrollments: number };
+}
+
+interface AiVersion {
+  title: string;
+  message: string;
+  callToAction: string;
+  tone: string;
+}
+
 interface Analytics {
   totals: { sent: number; delivered: number; failed: number; read: number; responses: number; linkClicks: number };
   responseRate: number;
@@ -127,22 +164,41 @@ function statusColor(status: string) {
   const map: Record<string, string> = {
     COMPLETED: 'bg-emerald-500/10 text-emerald-600',
     SENDING: 'bg-blue-500/10 text-blue-600',
+    RUNNING: 'bg-blue-500/10 text-blue-600',
     SCHEDULED: 'bg-amber-500/10 text-amber-600',
+    PAUSED: 'bg-orange-500/10 text-orange-600',
     FAILED: 'bg-red-500/10 text-red-600',
     DRAFT: 'bg-gray-500/10 text-gray-600',
     CANCELLED: 'bg-gray-500/10 text-gray-500',
+    ARCHIVED: 'bg-gray-500/10 text-gray-400',
     SENT: 'bg-emerald-500/10 text-emerald-600',
     DELIVERED: 'bg-emerald-500/10 text-emerald-600',
     PENDING: 'bg-amber-500/10 text-amber-600',
+    ACTIVE: 'bg-emerald-500/10 text-emerald-600',
   };
   return map[status] ?? '';
 }
 
+function formatLabel(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const CampaignCard = memo(function CampaignCard({
   campaign,
+  onPause,
+  onResume,
+  onDuplicate,
+  onArchive,
 }: {
   campaign: Campaign;
+  onPause?: (id: string) => void;
+  onResume?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
+  onArchive?: (id: string) => void;
 }) {
+  const canPause = ['SCHEDULED', 'RUNNING', 'SENDING'].includes(campaign.status);
+  const canResume = campaign.status === 'PAUSED';
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -151,7 +207,7 @@ const CampaignCard = memo(function CampaignCard({
           <Badge variant="outline" className={statusColor(campaign.status)}>{campaign.status}</Badge>
         </div>
         <p className="text-xs text-muted-foreground">
-          {campaign.type} ·{' '}
+          {formatLabel(campaign.type)} ·{' '}
           {campaign.sendToAll
             ? 'All Customers'
             : campaign.targetCustomer?.name
@@ -167,6 +223,28 @@ const CampaignCard = memo(function CampaignCard({
           <div><p className="font-semibold text-red-600">{campaign.failedCount}</p><p className="text-muted-foreground">Failed</p></div>
           <div><p className="font-semibold">{campaign.readCount}</p><p className="text-muted-foreground">Read</p></div>
         </div>
+        <div className="flex flex-wrap gap-1">
+          {canPause && onPause && (
+            <Button size="sm" variant="outline" onClick={() => onPause(campaign.id)}>
+              <Pause className="mr-1 h-3 w-3" />Pause
+            </Button>
+          )}
+          {canResume && onResume && (
+            <Button size="sm" variant="outline" onClick={() => onResume(campaign.id)}>
+              <Play className="mr-1 h-3 w-3" />Resume
+            </Button>
+          )}
+          {onDuplicate && (
+            <Button size="sm" variant="ghost" onClick={() => onDuplicate(campaign.id)}>
+              <Copy className="mr-1 h-3 w-3" />Duplicate
+            </Button>
+          )}
+          {onArchive && campaign.status !== 'ARCHIVED' && (
+            <Button size="sm" variant="ghost" onClick={() => onArchive(campaign.id)}>
+              <Archive className="mr-1 h-3 w-3" />Archive
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -181,6 +259,15 @@ export function CampaignsPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [templateForm, setTemplateForm] = useState({ name: '', content: '', type: 'MARKETING' });
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiVersions, setAiVersions] = useState<AiVersion[]>([]);
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  const [journeyForm, setJourneyForm] = useState({
+    name: '',
+    description: '',
+    triggerType: 'MANUAL',
+    steps: [{ delayMinutes: 5, message: '' }],
+  });
   const queryClient = useQueryClient();
 
   const { data: segments } = useQuery({
@@ -213,6 +300,27 @@ export function CampaignsPage() {
     enabled: tab === 'analytics',
   });
 
+  const calendarFrom = useMemo(() => new Date().toISOString(), []);
+  const calendarTo = useMemo(
+    () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    []
+  );
+
+  const { data: calendar, isLoading: calendarLoading } = useQuery({
+    queryKey: ['campaign-calendar', calendarFrom, calendarTo],
+    queryFn: async () =>
+      extractData<CalendarData>(
+        await api.get('/campaigns/calendar', { params: { from: calendarFrom, to: calendarTo } })
+      ),
+    enabled: tab === 'calendar',
+  });
+
+  const { data: journeys, isLoading: journeysLoading } = useQuery({
+    queryKey: ['campaign-journeys'],
+    queryFn: async () => extractData<Journey[]>(await api.get('/campaigns/journeys/list')),
+    enabled: tab === 'journeys',
+  });
+
   const createMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => api.post('/campaigns', payload),
     onSuccess: () => {
@@ -231,6 +339,73 @@ export function CampaignsPage() {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['campaign-deliveries'] });
       toast.success('Broadcast started');
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/campaigns/${id}/pause`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campaign paused');
+    },
+    onError: () => toast.error('Failed to pause campaign'),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/campaigns/${id}/resume`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campaign resumed');
+    },
+    onError: () => toast.error('Failed to resume campaign'),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/campaigns/${id}/duplicate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campaign duplicated');
+    },
+    onError: () => toast.error('Failed to duplicate campaign'),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/campaigns/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campaign archived');
+    },
+    onError: () => toast.error('Failed to archive campaign'),
+  });
+
+  const generateAiMutation = useMutation({
+    mutationFn: async (prompt: string) =>
+      extractData<{ versions: AiVersion[] }>(
+        await api.post('/campaigns/generate-ai', { prompt, type: form.type, versions: 3 })
+      ),
+    onSuccess: (data) => {
+      setAiVersions(data.versions);
+      toast.success('AI generated campaign versions');
+    },
+    onError: () => toast.error('AI generation failed — check your plan or try again'),
+  });
+
+  const createJourneyMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => api.post('/campaigns/journeys', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-journeys'] });
+      setJourneyOpen(false);
+      setJourneyForm({ name: '', description: '', triggerType: 'MANUAL', steps: [{ delayMinutes: 5, message: '' }] });
+      toast.success('Journey created');
+    },
+    onError: () => toast.error('Failed to create journey'),
+  });
+
+  const activateJourneyMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/campaigns/journeys/${id}/activate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-journeys'] });
+      toast.success('Journey activated');
     },
   });
 
@@ -353,8 +528,18 @@ export function CampaignsPage() {
     [campaigns]
   );
   const broadcastCampaigns = useMemo(
-    () => campaigns?.filter((c) => ['COMPLETED', 'SENDING'].includes(c.status)) ?? [],
+    () => campaigns?.filter((c) => ['COMPLETED', 'SENDING', 'RUNNING', 'PAUSED'].includes(c.status)) ?? [],
     [campaigns]
+  );
+
+  const campaignActions = useMemo(
+    () => ({
+      onPause: (id: string) => pauseMutation.mutate(id),
+      onResume: (id: string) => resumeMutation.mutate(id),
+      onDuplicate: (id: string) => duplicateMutation.mutate(id),
+      onArchive: (id: string) => archiveMutation.mutate(id),
+    }),
+    [pauseMutation, resumeMutation, duplicateMutation, archiveMutation]
   );
 
   const wizardProgress = ((wizardStep + 1) / WIZARD_STEPS.length) * 100;
@@ -381,6 +566,8 @@ export function CampaignsPage() {
         <TabsList className="flex h-auto flex-wrap gap-1">
           <TabsTrigger value="broadcasts"><Radio className="mr-1 h-3 w-3" />Broadcasts</TabsTrigger>
           <TabsTrigger value="scheduled"><Calendar className="mr-1 h-3 w-3" />Scheduled</TabsTrigger>
+          <TabsTrigger value="calendar"><Calendar className="mr-1 h-3 w-3" />Calendar</TabsTrigger>
+          <TabsTrigger value="journeys"><Route className="mr-1 h-3 w-3" />Journeys</TabsTrigger>
           <TabsTrigger value="deliveries"><Truck className="mr-1 h-3 w-3" />Delivery Center</TabsTrigger>
           <TabsTrigger value="templates"><FileText className="mr-1 h-3 w-3" />Templates</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="mr-1 h-3 w-3" />Analytics</TabsTrigger>
@@ -396,7 +583,7 @@ export function CampaignsPage() {
                 </p>
               )}
               {broadcastCampaigns.map((c) => (
-                <CampaignCard key={c.id} campaign={c} />
+                <CampaignCard key={c.id} campaign={c} {...campaignActions} />
               ))}
             </div>
           )}
@@ -422,6 +609,15 @@ export function CampaignsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={statusColor(c.status)}>{c.status}</Badge>
+                      {c.status === 'PAUSED' ? (
+                        <Button size="sm" variant="outline" onClick={() => resumeMutation.mutate(c.id)}>
+                          <Play className="mr-1 h-3 w-3" />Resume
+                        </Button>
+                      ) : ['SCHEDULED', 'RUNNING'].includes(c.status) ? (
+                        <Button size="sm" variant="outline" onClick={() => pauseMutation.mutate(c.id)}>
+                          <Pause className="mr-1 h-3 w-3" />Pause
+                        </Button>
+                      ) : null}
                       <Button size="sm" variant="outline" onClick={() => sendMutation.mutate(c.id)}>
                         <Send className="mr-1 h-3 w-3" />Send Now
                       </Button>
@@ -431,6 +627,89 @@ export function CampaignsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Upcoming & Recent Campaigns</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {calendarLoading ? (
+                <div className="p-6"><LoadingState rows={5} /></div>
+              ) : !calendar?.campaigns?.length ? (
+                <p className="p-6 text-sm text-muted-foreground">No campaigns in the next 30 days.</p>
+              ) : (
+                <div className="divide-y">
+                  {calendar.campaigns.map((c) => {
+                    const when = c.nextRunAt || c.scheduledAt || c.lastRunAt;
+                    return (
+                      <div key={c.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium">{c.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatLabel(c.type)} · {formatLabel(c.schedule)}
+                            {when ? ` · ${new Date(when).toLocaleString()}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={statusColor(c.status)}>{c.status}</Badge>
+                          <span className="text-xs text-muted-foreground">{c.sentCount} sent</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="journeys" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setJourneyOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />New Journey
+            </Button>
+          </div>
+          {journeysLoading ? (
+            <LoadingState rows={3} />
+          ) : !journeys?.length ? (
+            <p className="text-sm text-muted-foreground">
+              No customer journeys yet. Create automated multi-step flows for welcome sequences, follow-ups, and retention.
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {journeys.map((j) => (
+                <Card key={j.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{j.name}</CardTitle>
+                      <Badge variant="outline" className={statusColor(j.status)}>{j.status}</Badge>
+                    </div>
+                    {j.description && <p className="text-xs text-muted-foreground">{j.description}</p>}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {j.steps.length} steps · {j._count?.enrollments ?? 0} enrolled · Trigger: {formatLabel(j.triggerType)}
+                    </p>
+                    <ol className="space-y-1 text-xs text-muted-foreground">
+                      {j.steps.slice(0, 3).map((step) => (
+                        <li key={step.orderIndex}>
+                          Wait {step.delayMinutes}m → {step.message.slice(0, 60)}{step.message.length > 60 ? '…' : ''}
+                        </li>
+                      ))}
+                      {j.steps.length > 3 && <li>+{j.steps.length - 3} more steps</li>}
+                    </ol>
+                    {j.status === 'DRAFT' && (
+                      <Button size="sm" variant="outline" onClick={() => activateJourneyMutation.mutate(j.id)}>
+                        <Play className="mr-1 h-3 w-3" />Activate
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="deliveries" className="mt-4 space-y-4">
@@ -732,7 +1011,7 @@ export function CampaignsPage() {
                     <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {CAMPAIGN_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        {CAMPAIGN_TYPES.map((t) => <SelectItem key={t} value={t}>{formatLabel(t)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -745,14 +1024,58 @@ export function CampaignsPage() {
                     />
                   </div>
                 </div>
+                <div className="rounded-lg border border-dashed border-accent/30 bg-accent/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    <Label>Generate with AI</Label>
+                  </div>
+                  <Textarea
+                    rows={2}
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Describe your campaign goal, e.g. 'Welcome new customers with a 10% discount offer'"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={aiPrompt.trim().length < 5 || generateAiMutation.isPending}
+                    onClick={() => generateAiMutation.mutate(aiPrompt)}
+                  >
+                    {generateAiMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 h-3 w-3" />
+                    )}
+                    Generate Campaign with AI
+                  </Button>
+                  {aiVersions.length > 0 && (
+                    <div className="space-y-2">
+                      {aiVersions.map((v, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="w-full rounded-lg border bg-background p-3 text-left text-sm hover:border-accent"
+                          onClick={() => setForm((prev) => ({ ...prev, name: v.title, message: v.message }))}
+                        >
+                          <p className="font-medium">{v.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.message}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label>Message</Label>
                   <Textarea
                     rows={6}
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    placeholder="Write your WhatsApp message... Use {{name}} for personalization."
+                    placeholder="Write your WhatsApp message... Use {{customer_name}} for personalization."
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Variables: {'{{customer_name}}'}, {'{{business_name}}'}, {'{{appointment_date}}'}, {'{{discount_code}}'}
+                  </p>
                   <p className="text-xs text-muted-foreground">{form.message.length} characters</p>
                 </div>
               </div>
@@ -942,6 +1265,91 @@ export function CampaignsPage() {
               disabled={!templateForm.name || !templateForm.content}
             >
               Save Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={journeyOpen} onOpenChange={setJourneyOpen}>
+        <DialogContent scrollable className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Customer Journey</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="space-y-2">
+              <Label>Journey Name</Label>
+              <Input
+                value={journeyForm.name}
+                onChange={(e) => setJourneyForm({ ...journeyForm, name: e.target.value })}
+                placeholder="e.g. Welcome Sequence"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Trigger</Label>
+              <Select
+                value={journeyForm.triggerType}
+                onValueChange={(v) => setJourneyForm({ ...journeyForm, triggerType: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MANUAL">Manual Enrollment</SelectItem>
+                  <SelectItem value="CUSTOMER_CREATED">New Customer Registered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-3">
+              <Label>Steps</Label>
+              {journeyForm.steps.map((step, index) => (
+                <div key={index} className="space-y-2 rounded-lg border p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Step {index + 1}</p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-28"
+                      value={step.delayMinutes}
+                      onChange={(e) => {
+                        const steps = [...journeyForm.steps];
+                        steps[index] = { ...steps[index], delayMinutes: Number(e.target.value) };
+                        setJourneyForm({ ...journeyForm, steps });
+                      }}
+                    />
+                    <span className="self-center text-xs text-muted-foreground">minutes wait</span>
+                  </div>
+                  <Textarea
+                    rows={3}
+                    value={step.message}
+                    onChange={(e) => {
+                      const steps = [...journeyForm.steps];
+                      steps[index] = { ...steps[index], message: e.target.value };
+                      setJourneyForm({ ...journeyForm, steps });
+                    }}
+                    placeholder="WhatsApp message for this step..."
+                  />
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setJourneyForm({
+                    ...journeyForm,
+                    steps: [...journeyForm.steps, { delayMinutes: 1440, message: '' }],
+                  })
+                }
+              >
+                <Plus className="mr-1 h-3 w-3" />Add Step
+              </Button>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="bg-accent hover:bg-accent/90"
+              disabled={!journeyForm.name || journeyForm.steps.some((s) => !s.message.trim())}
+              onClick={() => createJourneyMutation.mutate(journeyForm)}
+            >
+              Create Journey
             </Button>
           </DialogFooter>
         </DialogContent>

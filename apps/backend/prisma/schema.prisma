@@ -190,6 +190,18 @@ enum CampaignType {
   FOLLOW_UP
   HOLIDAY
   MARKETING
+  WELCOME
+  APPOINTMENT_REMINDER
+  BIRTHDAY
+  PAYMENT_REMINDER
+  INVOICE
+  PRODUCT_LAUNCH
+  SEASONAL
+  DISCOUNT
+  RETENTION
+  RE_ENGAGEMENT
+  THANK_YOU
+  CUSTOM
 }
 
 enum CampaignSchedule {
@@ -197,7 +209,34 @@ enum CampaignSchedule {
   DAILY
   WEEKLY
   MONTHLY
+  YEARLY
+  RECURRING
   CUSTOM
+}
+
+enum CampaignMessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  VIDEO
+  AUDIO
+  LOCATION
+  INTERACTIVE
+  TEMPLATE
+}
+
+enum JourneyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum JourneyEnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FAILED
 }
 
 enum ImportJobStatus {
@@ -210,10 +249,13 @@ enum ImportJobStatus {
 enum CampaignStatus {
   DRAFT
   SCHEDULED
+  RUNNING
   SENDING
+  PAUSED
   COMPLETED
   FAILED
   CANCELLED
+  ARCHIVED
 }
 
 enum CampaignRecipientStatus {
@@ -316,6 +358,8 @@ model Business {
   campaigns         Campaign[]
   messageTemplates  MessageTemplate[]
   customerImportJobs CustomerImportJob[]
+  campaignJourneys  CampaignJourney[]
+  campaignOptOuts   CustomerCampaignOptOut[]
 
   @@index([slug])
   @@index([isActive])
@@ -459,6 +503,8 @@ model Customer {
   segmentMembers CustomerSegmentMember[]
   campaignRecipients CampaignRecipient[]
   targetedCampaigns Campaign[] @relation("CampaignTargetCustomer")
+  journeyEnrollments CampaignJourneyEnrollment[]
+  campaignOptOut     CustomerCampaignOptOut?
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -719,37 +765,52 @@ model CustomerSegmentMember {
 }
 
 model Campaign {
-  id             String           @id @default(uuid())
-  businessId     String
-  name           String
-  message        String
-  type           CampaignType     @default(MARKETING)
-  schedule       CampaignSchedule @default(ONE_TIME)
-  status         CampaignStatus   @default(DRAFT)
-  segmentId      String?
-  templateId     String?
-  customerTypes  CustomerType[]
-  sendToAll        Boolean          @default(false)
+  id               String              @id @default(uuid())
+  businessId       String
+  name             String
+  message          String
+  type             CampaignType        @default(MARKETING)
+  schedule         CampaignSchedule    @default(ONE_TIME)
+  status           CampaignStatus      @default(DRAFT)
+  messageType      CampaignMessageType @default(TEXT)
+  segmentId        String?
+  templateId       String?
+  customerTypes    CustomerType[]
+  sendToAll        Boolean             @default(false)
   targetCustomerId String?
-  isSent           Boolean          @default(false)
-  runVersion       Int              @default(0)
+  isSent           Boolean             @default(false)
+  runVersion       Int                 @default(0)
   scheduledAt      DateTime?
   nextRunAt        DateTime?
   lastRunAt        DateTime?
+  timezone         String?
+  cronExpression   String?
+  scheduleConfig   Json?
+  repeatCount      Int?
+  repeatUntil      DateTime?
+  runsCompleted    Int                 @default(0)
+  mediaUrl         String?
+  mediaFilename    String?
+  category         String?
+  journeyId        String?
   createdById      String?
-  sentCount      Int              @default(0)
-  deliveredCount Int              @default(0)
-  failedCount    Int              @default(0)
-  readCount      Int              @default(0)
-  responseCount  Int              @default(0)
-  linkClickCount Int              @default(0)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  sentCount        Int                 @default(0)
+  deliveredCount   Int                 @default(0)
+  failedCount      Int                 @default(0)
+  readCount        Int                 @default(0)
+  responseCount    Int                 @default(0)
+  linkClickCount   Int                 @default(0)
+  optOutCount      Int                 @default(0)
+  blockedCount     Int                 @default(0)
+  archivedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   business       Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   segment        CustomerSegment?    @relation(fields: [segmentId], references: [id])
   template       MessageTemplate?    @relation(fields: [templateId], references: [id])
   targetCustomer Customer?           @relation("CampaignTargetCustomer", fields: [targetCustomerId], references: [id])
+  journey        CampaignJourney?    @relation(fields: [journeyId], references: [id])
   createdBy      User?               @relation("CampaignCreator", fields: [createdById], references: [id])
   recipients     CampaignRecipient[]
 
@@ -759,6 +820,7 @@ model Campaign {
   @@index([nextRunAt])
   @@index([templateId])
   @@index([targetCustomerId])
+  @@index([journeyId])
   @@map("campaigns")
 }
 
@@ -796,6 +858,7 @@ model MessageTemplate {
   name        String
   content     String
   type        CampaignType @default(MARKETING)
+  category    String?
   isSystem    Boolean      @default(false)
   variables   String[]     @default([])
   createdAt   DateTime     @default(now())
@@ -806,7 +869,83 @@ model MessageTemplate {
 
   @@unique([businessId, name])
   @@index([businessId])
+  @@index([businessId, category])
   @@map("message_templates")
+}
+
+model CampaignJourney {
+  id          String        @id @default(uuid())
+  businessId  String
+  name        String
+  description String?
+  status      JourneyStatus @default(DRAFT)
+  triggerType String        @default("MANUAL")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  business    Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  steps       CampaignJourneyStep[]
+  enrollments CampaignJourneyEnrollment[]
+  campaigns   Campaign[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@index([businessId, status])
+  @@map("campaign_journeys")
+}
+
+model CampaignJourneyStep {
+  id           String   @id @default(uuid())
+  journeyId    String
+  orderIndex   Int
+  delayMinutes Int      @default(0)
+  message      String
+  messageType  CampaignMessageType @default(TEXT)
+  mediaUrl     String?
+  templateId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  journey CampaignJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, orderIndex])
+  @@index([journeyId])
+  @@map("campaign_journey_steps")
+}
+
+model CampaignJourneyEnrollment {
+  id          String                  @id @default(uuid())
+  journeyId   String
+  businessId  String
+  customerId  String
+  currentStep Int                     @default(0)
+  status      JourneyEnrollmentStatus @default(ACTIVE)
+  nextStepAt  DateTime?
+  startedAt   DateTime                @default(now())
+  completedAt DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  journey  CampaignJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, customerId])
+  @@index([businessId, status, nextStepAt])
+  @@index([customerId])
+  @@map("campaign_journey_enrollments")
+}
+
+model CustomerCampaignOptOut {
+  businessId String
+  customerId String @unique
+  optedOutAt DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, customerId])
+  @@index([businessId])
+  @@map("customer_campaign_opt_outs")
 }
 
 model CustomerImportJob {

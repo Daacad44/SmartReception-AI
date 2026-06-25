@@ -211,6 +211,17 @@ async function runDeferredInboundTasks(params: DeferredInboundTasksParams): Prom
       logger.warn('Failed to send new message notification', { error });
     });
 
+    const { markCampaignResponse } = await import('../campaigns/campaign-webhook-sync.service');
+    const customer = await prisma.customer.findFirst({
+      where: { businessId, conversations: { some: { id: conversationId } } },
+      select: { id: true },
+    });
+    if (customer) {
+      void markCampaignResponse(businessId, customer.id).catch((error) => {
+        logger.warn('Failed to mark campaign response', { error });
+      });
+    }
+
     prisma.auditLog
       .create({
         data: {

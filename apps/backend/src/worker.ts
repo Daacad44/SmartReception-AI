@@ -7,6 +7,8 @@ import {
   ReminderJobData,
   WhatsAppJobData,
   CampaignJobData,
+  CampaignBatchJobData,
+  CampaignJourneyJobData,
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
@@ -18,6 +20,8 @@ import {
 import { processAndSendAiReply } from './modules/ai/ai-reply.service';
 import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
 import { executeCampaignSend } from './modules/campaigns/campaigns.service';
+import { sendCampaignBatch } from './modules/campaigns/campaign-batch.service';
+import { scheduleJourneyStep } from './modules/campaigns/campaign-journey.service';
 import { logger } from './core/logger';
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
@@ -90,6 +94,14 @@ async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
   await executeCampaignSend(campaignId, businessId);
 }
 
+async function processCampaignBatchJob(job: Job<CampaignBatchJobData>): Promise<void> {
+  await sendCampaignBatch(job.data);
+}
+
+async function processCampaignJourneyJob(job: Job<CampaignJourneyJobData>): Promise<void> {
+  await scheduleJourneyStep(job.data.enrollmentId);
+}
+
 async function startWorkers(): Promise<void> {
   await connectDatabase();
 
@@ -99,6 +111,8 @@ async function startWorkers(): Promise<void> {
     createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2),
     createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJobHandler, 3),
     createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2),
+    createWorker<CampaignBatchJobData>(QUEUE_NAMES.CAMPAIGN_BATCH, processCampaignBatchJob, 5),
+    createWorker<CampaignJourneyJobData>(QUEUE_NAMES.CAMPAIGN_JOURNEY, processCampaignJourneyJob, 3),
   ].filter(Boolean);
 
   if (workers.length === 0) {
@@ -107,8 +121,20 @@ async function startWorkers(): Promise<void> {
   }
 
   // Retry failed jobs on startup (stale failures from crashed workers).
-  const { getAiQueue, getWhatsappQueue } = await import('./infrastructure/queue/queues');
-  for (const queue of [getAiQueue(), getWhatsappQueue()]) {
+  const {
+    getAiQueue,
+    getWhatsappQueue,
+    getCampaignQueue,
+    getCampaignBatchQueue,
+    getCampaignJourneyQueue,
+  } = await import('./infrastructure/queue/queues');
+  for (const queue of [
+    getAiQueue(),
+    getWhatsappQueue(),
+    getCampaignQueue(),
+    getCampaignBatchQueue(),
+    getCampaignJourneyQueue(),
+  ]) {
     if (!queue) continue;
     try {
       const failed = await queue.getJobs(['failed'], 0, 50);

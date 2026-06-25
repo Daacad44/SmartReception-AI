@@ -439,6 +439,60 @@ export class SuperAdminService {
 
     return { accessToken, business };
   }
+
+  async listCampaigns(page = 1, limit = 20, businessId?: string) {
+    const skip = (page - 1) * limit;
+    const where = businessId ? { businessId } : {};
+    const [data, total] = await Promise.all([
+      prisma.campaign.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          business: { select: { id: true, name: true } },
+          _count: { select: { recipients: true } },
+        },
+      }),
+      prisma.campaign.count({ where }),
+    ]);
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getCampaignStats() {
+    const [total, active, scheduled, failed, messagesSent] = await Promise.all([
+      prisma.campaign.count(),
+      prisma.campaign.count({ where: { status: { in: ['RUNNING', 'SENDING'] } } }),
+      prisma.campaign.count({ where: { status: 'SCHEDULED' } }),
+      prisma.campaign.count({ where: { status: 'FAILED' } }),
+      prisma.campaign.aggregate({ _sum: { sentCount: true } }),
+    ]);
+    return {
+      total,
+      active,
+      scheduled,
+      failed,
+      messagesSent: messagesSent._sum.sentCount ?? 0,
+    };
+  }
+
+  async pauseCampaign(campaignId: string, adminUserId: string) {
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+    if (!campaign) throw new NotFoundError('Campaign not found');
+    const { removeCampaignQueueJobs } = await import('../campaigns/campaign-queue.utils');
+    await removeCampaignQueueJobs(campaignId);
+    await prisma.campaign.update({ where: { id: campaignId }, data: { status: 'PAUSED' } });
+    await prisma.auditLog.create({
+      data: {
+        businessId: campaign.businessId,
+        userId: adminUserId,
+        action: 'UPDATE',
+        entity: 'Campaign',
+        entityId: campaignId,
+        newData: { superAdminPause: true },
+      },
+    });
+  }
 }
 
 export const superAdminService = new SuperAdminService();

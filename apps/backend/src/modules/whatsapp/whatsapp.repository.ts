@@ -61,6 +61,8 @@ export class WhatsAppRepository {
         source: 'whatsapp',
       },
     });
+    const { triggerJourneyOnCustomerCreated } = await import('../campaigns/campaign-journey.service');
+    void triggerJourneyOnCustomerCreated(businessId, customer.id).catch(() => undefined);
     console.log('[WhatsApp] Customer created');
     return customer;
   }

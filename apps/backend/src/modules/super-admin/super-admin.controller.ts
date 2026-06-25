@@ -160,6 +160,35 @@ export class SuperAdminController {
       next(error);
     }
   }
+
+  async listCampaigns(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { page, limit } = paginationSchema.parse(req.query);
+      const businessId = typeof req.query.businessId === 'string' ? req.query.businessId : undefined;
+      const result = await superAdminService.listCampaigns(page, limit, businessId);
+      res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async campaignStats(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.getCampaignStats();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async pauseCampaign(req: Request, res: Response, next: NextFunction) {
+    try {
+      await superAdminService.pauseCampaign(routeParam(req.params.id), req.user!.userId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const superAdminController = new SuperAdminController();

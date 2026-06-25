@@ -310,23 +310,84 @@ export const createSegmentSchema = z.object({
 
 export const updateSegmentSchema = createSegmentSchema.partial();
 
+export const CAMPAIGN_TYPES = [
+  'PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING',
+  'WELCOME', 'APPOINTMENT_REMINDER', 'BIRTHDAY', 'PAYMENT_REMINDER', 'INVOICE',
+  'PRODUCT_LAUNCH', 'SEASONAL', 'DISCOUNT', 'RETENTION', 'RE_ENGAGEMENT', 'THANK_YOU', 'CUSTOM',
+] as const;
+
+export const CAMPAIGN_SCHEDULES = [
+  'ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'RECURRING', 'CUSTOM',
+] as const;
+
+export const CAMPAIGN_MESSAGE_TYPES = [
+  'TEXT', 'IMAGE', 'DOCUMENT', 'VIDEO', 'AUDIO', 'LOCATION', 'INTERACTIVE', 'TEMPLATE',
+] as const;
+
+const scheduleConfigSchema = z.object({
+  weekdays: z.array(z.number().min(0).max(6)).optional(),
+  dayOfMonth: z.number().min(1).max(31).optional(),
+  lastDayOfMonth: z.boolean().optional(),
+  yearlyMonth: z.number().min(1).max(12).optional(),
+  yearlyDay: z.number().min(1).max(31).optional(),
+  hour: z.number().min(0).max(23).optional(),
+  minute: z.number().min(0).max(59).optional(),
+}).optional();
+
 export const createCampaignSchema = z.object({
   name: z.string().min(1).max(200),
   message: z.string().min(1).max(4096),
-  type: z
-    .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
-    .default('MARKETING'),
-  schedule: z.enum(['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM']).default('ONE_TIME'),
+  type: z.enum(CAMPAIGN_TYPES).default('MARKETING'),
+  schedule: z.enum(CAMPAIGN_SCHEDULES).default('ONE_TIME'),
+  messageType: z.enum(CAMPAIGN_MESSAGE_TYPES).default('TEXT'),
   segmentId: z.string().uuid().optional(),
   templateId: z.string().uuid().optional(),
   customerTypes: z.array(customerTypeSchema).optional(),
+  customerIds: z.array(z.string().uuid()).optional(),
   sendToAll: z.boolean().optional(),
   targetCustomerId: z.string().uuid().optional(),
   scheduledAt: z.string().datetime().optional(),
   sendNow: z.boolean().optional(),
+  timezone: z.string().max(64).optional(),
+  cronExpression: z.string().max(100).optional(),
+  scheduleConfig: scheduleConfigSchema,
+  repeatCount: z.number().int().positive().optional(),
+  repeatUntil: z.string().datetime().optional(),
+  mediaUrl: z.string().url().optional(),
+  mediaFilename: z.string().max(255).optional(),
+  category: z.string().max(64).optional(),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const testCampaignSchema = z.object({
+  phone: z.string().min(5).max(20),
+});
+
+export const generateCampaignAiSchema = z.object({
+  prompt: z.string().min(5).max(2000),
+  type: z.enum(CAMPAIGN_TYPES).optional(),
+  tone: z.string().max(100).optional(),
+  language: z.enum(['so', 'en']).optional(),
+  versions: z.number().int().min(1).max(4).optional(),
+});
+
+export const createJourneySchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  triggerType: z.string().max(64).optional(),
+  steps: z.array(z.object({
+    delayMinutes: z.number().int().min(0).max(525600),
+    message: z.string().min(1).max(4096),
+    messageType: z.enum(CAMPAIGN_MESSAGE_TYPES).optional(),
+    mediaUrl: z.string().url().optional(),
+    templateId: z.string().uuid().optional(),
+  })).min(1).max(20),
+});
+
+export const enrollJourneySchema = z.object({
+  customerId: z.string().uuid(),
+});
 
 export const createMessageTemplateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -417,6 +478,9 @@ export type CreateSegmentInput = z.infer<typeof createSegmentSchema>;
 export type UpdateSegmentInput = z.infer<typeof updateSegmentSchema>;
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 export type UpdateCampaignInput = z.infer<typeof updateCampaignSchema>;
+export type TestCampaignInput = z.infer<typeof testCampaignSchema>;
+export type GenerateCampaignAiInput = z.infer<typeof generateCampaignAiSchema>;
+export type CreateJourneyInput = z.infer<typeof createJourneySchema>;
 export type CreateMessageTemplateInput = z.infer<typeof createMessageTemplateSchema>;
 export type UpdateMessageTemplateInput = z.infer<typeof updateMessageTemplateSchema>;
 export type SuperAdminCreateBusinessInput = z.infer<typeof superAdminCreateBusinessSchema>;

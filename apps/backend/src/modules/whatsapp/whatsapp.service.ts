@@ -291,6 +291,13 @@ export class WhatsAppModuleService {
         if (!recorded) continue;
 
         await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
+        const { syncCampaignRecipientFromWebhook } = await import('../campaigns/campaign-webhook-sync.service');
+        void syncCampaignRecipientFromWebhook({
+          whatsappMsgId: status.id,
+          status: status.status.toLowerCase() as 'sent' | 'delivered' | 'read' | 'failed',
+          timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
+          errorMessage: status.errors?.[0]?.title,
+        }).catch(() => undefined);
         console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
       }
 
