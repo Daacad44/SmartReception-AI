@@ -2,6 +2,7 @@ import { servicesRepository } from './services.repository';
 import { NotFoundError } from '../../core/errors';
 import { CreateServiceInput, PaginationInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
 
 export class ServicesService {
   async list(businessId: string, params: PaginationInput) {
@@ -43,6 +44,7 @@ export class ServicesService {
       },
     });
 
+    invalidateBusinessTenantCache(businessId);
     return service;
   }
 
@@ -75,6 +77,7 @@ export class ServicesService {
       },
     });
 
+    invalidateBusinessTenantCache(businessId);
     return service;
   }
 
@@ -95,6 +98,8 @@ export class ServicesService {
         entityId: id,
       },
     });
+
+    invalidateBusinessTenantCache(businessId);
   }
 }
 

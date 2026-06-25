@@ -10,7 +10,8 @@ import { CONTACT_FOOTER_SO, requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
 import { withAiTimeout } from './gemini-timeout';
-import { loadBusinessAIContext } from './business-ai-context.service';
+import { loadBusinessAIPrompt } from './business-ai-context.service';
+import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import { isSmartReceptionBusiness } from './smartreception-tenant';
 
 export interface GenerateResponseOptions {
@@ -60,17 +61,14 @@ export async function generateResponse(
 ): Promise<AIResponse> {
   const preferEnglish = options.preferEnglish === true;
   const language = preferEnglish ? 'en' : 'so';
-  const business = await prisma.business.findUnique({ where: { id: businessId } });
-  if (!business) {
-    throw new Error(`Business not found: ${businessId}`);
-  }
 
-  const [businessContext, aiConfig] = await Promise.all([
-    loadBusinessAIContext(businessId),
-    prisma.aIConfiguration.findUnique({ where: { businessId } }),
+  const [profile, businessContext, knowledgeContext] = await Promise.all([
+    getCachedBusinessProfile(businessId),
+    loadBusinessAIPrompt(businessId),
+    searchKnowledgeContext(businessId, customerMessage),
   ]);
-
-  const knowledgeContext = await searchKnowledgeContext(businessId, customerMessage);
+  const business = profile.business;
+  const aiConfig = businessContext.aiConfiguration;
 
   const conversationHistory = await prisma.message.findMany({
     where: conversationMessageScope(conversationId, businessId),

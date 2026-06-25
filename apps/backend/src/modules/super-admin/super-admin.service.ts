@@ -10,6 +10,7 @@ import {
 import { passwordService } from '../../infrastructure/auth/password.service';
 import { authRepository } from '../auth/auth.repository';
 import { tokenService } from '../../infrastructure/auth/token.service';
+import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
 import type { Industry, SubscriptionPlan, UserRole } from '@prisma/client';
 
 function slugify(text: string): string {
@@ -192,6 +193,7 @@ export class SuperAdminService {
       },
     });
 
+    invalidateBusinessTenantCache(businessId);
     return business;
   }
 
@@ -402,6 +404,7 @@ export class SuperAdminService {
         newData: { isActive },
       },
     });
+    invalidateBusinessTenantCache(businessId);
     return business;
   }
 

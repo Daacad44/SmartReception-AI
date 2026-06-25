@@ -3,6 +3,7 @@ import { NotFoundError } from '../../core/errors';
 import { UpdateBusinessInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
 import { Industry } from '@prisma/client';
+import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
 
 export class BusinessService {
   async getBusiness(businessId: string) {
@@ -41,6 +42,7 @@ export class BusinessService {
       },
     });
 
+    invalidateBusinessTenantCache(businessId);
     return business;
   }
 
@@ -89,6 +91,7 @@ export class BusinessService {
       },
     });
 
+    invalidateBusinessTenantCache(businessId);
     return business;
   }
 }
