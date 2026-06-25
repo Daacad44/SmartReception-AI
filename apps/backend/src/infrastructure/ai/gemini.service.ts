@@ -4,12 +4,12 @@ import { prisma } from '../database/prisma';
 import { logger } from '../../core/logger';
 import {
   GEMINI_ERROR_MESSAGE_SO,
-  SMARTRECEPTION_SYSTEM_PROMPT,
 } from './smartreception-knowledge';
 import { CONTACT_FOOTER_SO, requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
 import { withAiTimeout } from './gemini-timeout';
+import { loadBusinessAIContext } from './business-ai-context.service';
 
 export interface GenerateResponseOptions {
   /** Reply in English only when customer explicitly requested it. */
@@ -58,9 +58,10 @@ export async function generateResponse(
 ): Promise<AIResponse> {
   const preferEnglish = options.preferEnglish === true;
   const language = preferEnglish ? 'en' : 'so';
-  const aiConfig = await prisma.aIConfiguration.findUnique({
-    where: { businessId },
-  });
+  const [businessContext, aiConfig] = await Promise.all([
+    loadBusinessAIContext(businessId),
+    prisma.aIConfiguration.findUnique({ where: { businessId } }),
+  ]);
 
   const knowledgeContext = await searchKnowledgeContext(businessId, customerMessage);
 
@@ -76,7 +77,7 @@ export async function generateResponse(
     .map((m) => `${m.direction === 'INBOUND' ? 'Customer' : 'Assistant'}: ${m.content}`)
     .join('\n');
 
-  const systemPrompt = aiConfig?.systemPrompt || SMARTRECEPTION_SYSTEM_PROMPT;
+  const systemPrompt = businessContext.systemPrompt;
   const hasKnowledge = Boolean(knowledgeContext?.trim());
 
   const prompt = `${systemPrompt}
@@ -84,14 +85,13 @@ export async function generateResponse(
 ${buildLanguageInstruction(preferEnglish)}
 
 CRITICAL — ANSWER PRIORITY (follow strictly):
-1. KNOWLEDGE BASE excerpts below (primary — never contradict them)
+1. KNOWLEDGE BASE excerpts below for ${businessContext.businessName} (primary — never contradict them)
 2. FAQ content in knowledge base
-3. SmartReception service menu facts
-4. Only if nothing above applies, politely ask for more information in Somali
+3. Only if nothing above applies, politely ask for more information
 
-${hasKnowledge ? 'You MUST answer using the KNOWLEDGE BASE below. Do NOT use general world knowledge when KB has the answer.' : 'No KB excerpts matched — use SmartReception company facts. If unsure, ask the customer for more details politely in Somali.'}
+${hasKnowledge ? `You MUST answer using the KNOWLEDGE BASE below for ${businessContext.businessName}. Do NOT use general world knowledge when KB has the answer.` : `No KB excerpts matched for ${businessContext.businessName} — ask the customer for more details politely.`}
 
-KNOWLEDGE BASE EXCERPTS:
+KNOWLEDGE BASE EXCERPTS (${businessContext.businessName}):
 ${knowledgeContext || '(none indexed)'}
 
 LEAD COLLECTION:
@@ -117,18 +117,16 @@ Action types: none, collect_lead, book_appointment, qualify_lead, escalate
 For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
 
 RULES:
-- You are a Smart Sales Consultant, NOT a simple FAQ bot
+- You are the AI assistant for ${businessContext.businessName}, NOT a generic bot
+- Never reference SmartReception or any other business
 - Never say "I am having trouble right now" or generic fallbacks
-- End service-related answers with contact: WhatsApp +25268776299
-- Always mention portfolio https://botandev.com when discussing projects
-- Offer free consultation (kulan bilaash ah) when customer shows interest
 - Ask qualifying questions to understand project needs
-- Be specific using KB facts`;
+- Be specific using KB facts for ${businessContext.businessName}`;
 
   try {
     const model = getChatModel({ temperature: aiConfig?.temperature ?? 0.7 });
     const fallback: AIResponse = {
-      content: aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
+      content: businessContext.fallbackMessage || aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
       intent: 'general',
       actions: [{ type: 'none' }],
       confidence: 0,

@@ -37,7 +37,7 @@ async function fetchWithRetry(
 
 export class WhatsAppService {
   private getToken(accessToken?: string): string | null {
-    return accessToken || config.whatsapp.accessToken || null;
+    return accessToken?.trim() || null;
   }
 
   async sendOutbound(params: SendOutboundParams): Promise<SendOutboundResult> {

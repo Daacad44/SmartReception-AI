@@ -17,6 +17,7 @@ import { handleIncomingMessage } from './incoming-message.service';
 import { ensureAiConfiguration } from '../ai/ai-config.service';
 import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { startPipelineTrace } from './message-pipeline.logger';
+import { whatsappTenantResolver } from './whatsapp-tenant-resolver.service';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -68,7 +69,7 @@ export interface WhatsAppSendStatus {
 
 export class WhatsAppModuleService {
   private getAccountToken(accessToken?: string | null): string | undefined {
-    return resolveStoredToken(accessToken) || config.whatsapp.accessToken || undefined;
+    return resolveStoredToken(accessToken) || undefined;
   }
 
   private async setBusinessWhatsAppStatus(
@@ -166,7 +167,12 @@ export class WhatsAppModuleService {
     const parsed = parseWebhookBody(body);
     this.logWebhookPayload(body, parsed);
 
-    const phoneNumberId = parsed.phoneNumberId ?? config.whatsapp.phoneNumberId;
+    const phoneNumberId = parsed.phoneNumberId?.trim();
+    if (!phoneNumberId) {
+      logger.warn('Webhook received without phone_number_id');
+      return;
+    }
+
     const account = await whatsappRepository.resolveAccountForWebhook(phoneNumberId);
 
     if (!account) {
@@ -205,13 +211,14 @@ export class WhatsAppModuleService {
 
   async processWebhook(body: Record<string, unknown>) {
     const parsed = parseWebhookBody(body);
-    const phoneNumberId = parsed.phoneNumberId ?? config.whatsapp.phoneNumberId;
-    const account = await whatsappRepository.resolveAccountForWebhook(phoneNumberId);
+    const phoneNumberId = parsed.phoneNumberId?.trim();
 
-    if (!account) {
-      logger.warn(`No WhatsApp account found for phone_number_id: ${phoneNumberId ?? 'unknown'}`);
-      return;
+    if (!phoneNumberId) {
+      throw new NotFoundError('Webhook missing phone_number_id');
     }
+
+    const tenant = await whatsappTenantResolver.resolveByPhoneNumberId(phoneNumberId);
+    const account = tenant.account;
 
     if (!parsed.messages.length && !parsed.statuses.length) {
       logger.info('Webhook received with no messages or statuses to process');
@@ -219,8 +226,8 @@ export class WhatsAppModuleService {
       return;
     }
 
-    void ensureAiConfiguration(account.businessId).catch((error) => {
-      logger.warn('Failed to ensure AI configuration', { error, businessId: account.businessId });
+    void ensureAiConfiguration(tenant.businessId).catch((error) => {
+      logger.warn('Failed to ensure AI configuration', { error, businessId: tenant.businessId });
     });
 
     // Inbound messages first — customer is waiting for a WhatsApp reply.
@@ -228,7 +235,7 @@ export class WhatsAppModuleService {
       const recorded = await whatsappRepository.tryRecordWebhookEvent(
         msg.id,
         `message:${msg.type}`,
-        account.businessId
+        tenant.businessId
       );
       if (!recorded) continue;
 
@@ -237,15 +244,15 @@ export class WhatsAppModuleService {
       console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
 
       startPipelineTrace(msg.id, {
-        businessId: account.businessId,
+        businessId: tenant.businessId,
         whatsappMsgId: msg.id,
       });
 
       await handleIncomingMessage({
-        businessId: account.businessId,
+        businessId: tenant.businessId,
         whatsappAccountId: account.id,
-        phoneNumberId: account.phoneNumberId,
-        accessToken: this.getAccountToken(account.accessToken),
+        phoneNumberId: tenant.phoneNumberId,
+        accessToken: tenant.accessToken,
         msg,
         contactName: contactName ?? undefined,
         pipelineKey: msg.id,

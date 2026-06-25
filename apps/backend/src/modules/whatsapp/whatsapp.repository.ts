@@ -4,8 +4,9 @@ import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/custome
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
-    return prisma.whatsAppAccount.findUnique({
-      where: { phoneNumberId },
+    return prisma.whatsAppAccount.findFirst({
+      where: { phoneNumberId, isActive: true },
+      include: { business: true },
     });
   }
 
@@ -71,12 +72,29 @@ export class WhatsAppRepository {
       where: {
         businessId,
         customerId,
+        whatsappAccountId,
         status: { in: ['OPEN', 'PENDING'] },
       },
     });
 
     if (existing) {
       return { conversation: existing, isNew: false };
+    }
+
+    const staleConversation = await prisma.conversation.findFirst({
+      where: {
+        businessId,
+        customerId,
+        status: { in: ['OPEN', 'PENDING'] },
+      },
+    });
+
+    if (staleConversation) {
+      const updated = await prisma.conversation.update({
+        where: { id: staleConversation.id },
+        data: { whatsappAccountId },
+      });
+      return { conversation: updated, isNew: false };
     }
 
     const conversation = await prisma.conversation.create({
@@ -245,22 +263,12 @@ export class WhatsAppRepository {
     return event?.receivedAt ?? null;
   }
 
+  /** Strict tenant lookup — never falls back to env or arbitrary active accounts. */
   async resolveAccountForWebhook(phoneNumberId?: string) {
-    if (phoneNumberId) {
-      const byId = await this.findAccountByPhoneNumberId(phoneNumberId);
-      if (byId) return byId;
+    if (!phoneNumberId?.trim()) {
+      return null;
     }
-
-    const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    if (envPhoneNumberId) {
-      const byEnv = await this.findAccountByPhoneNumberId(envPhoneNumberId);
-      if (byEnv) return byEnv;
-    }
-
-    return prisma.whatsAppAccount.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.findAccountByPhoneNumberId(phoneNumberId.trim());
   }
 
   async markAllActiveWebhooksVerified() {

@@ -4,6 +4,7 @@ import { logger } from '../../core/logger';
 import { connectWhatsAppSchema } from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
 import { config } from '../../config';
+import { NotFoundError } from '../../core/errors';
 
 export class WhatsAppController {
   async verify(req: Request, res: Response, next: NextFunction) {
@@ -66,6 +67,11 @@ export class WhatsAppController {
           durationMs: Date.now() - startedAt,
         });
       } catch (error) {
+        if (error instanceof NotFoundError) {
+          logger.warn('WhatsApp webhook tenant not found', { error: error.message });
+          res.status(404).json({ success: false, error: error.message });
+          return;
+        }
         logger.error('WhatsApp webhook processing error:', error);
       }
 
