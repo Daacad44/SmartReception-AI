@@ -1,5 +1,6 @@
 import { prisma } from '../database/prisma';
 import { generateEmbedding, cosineSimilarity } from './embedding.service';
+import { isSmartReceptionBusiness } from './smartreception-tenant';
 
 const KB_CACHE_TTL_MS = 60_000;
 const kbDocumentCache = new Map<string, { docs: CachedDoc[]; loadedAt: number }>();
@@ -13,8 +14,8 @@ type CachedDoc = {
   embedding: string | null;
 };
 
-/** Somali/English service keywords → boost matching KB chunks */
-const SERVICE_KEYWORD_BOOSTS: Array<{ pattern: RegExp; terms: string[] }> = [
+/** Somali/English service keywords → boost matching KB chunks (SmartReception platform only). */
+const SMARTRECEPTION_KEYWORD_BOOSTS: Array<{ pattern: RegExp; terms: string[] }> = [
   { pattern: /adeeg|service|maxay/i, terms: ['adeeg', 'service', 'AI Receptionist', 'WhatsApp'] },
   { pattern: /website|web/i, terms: ['website', 'Website Development', 'samaysaan'] },
   { pattern: /app|mobile|dhistaan/i, terms: ['mobile', 'app', 'Android', 'iOS'] },
@@ -24,6 +25,12 @@ const SERVICE_KEYWORD_BOOSTS: Array<{ pattern: RegExp; terms: string[] }> = [
   { pattern: /smartreception|waa maxay/i, terms: ['SmartReception', 'Waa maxay'] },
   { pattern: /ballan|appointment/i, terms: ['appointment', 'ballan'] },
   { pattern: /qiimo|price|cost/i, terms: ['pricing', 'qiimo', 'cost'] },
+];
+
+const GENERIC_KEYWORD_BOOSTS: Array<{ pattern: RegExp; terms: string[] }> = [
+  { pattern: /ballan|appointment/i, terms: ['appointment', 'ballan', 'booking'] },
+  { pattern: /qiimo|price|cost|menu/i, terms: ['pricing', 'qiimo', 'price', 'menu'] },
+  { pattern: /xiriir|contact|phone/i, terms: ['contact', 'phone', 'whatsapp'] },
 ];
 
 async function loadIndexedDocuments(businessId: string): Promise<CachedDoc[]> {
@@ -54,10 +61,10 @@ export function invalidateKnowledgeCache(businessId: string): void {
   kbDocumentCache.delete(businessId);
 }
 
-function keywordBoost(query: string, text: string): number {
+function keywordBoost(query: string, text: string, boosts: Array<{ pattern: RegExp; terms: string[] }>): number {
   let boost = 0;
   const textLower = text.toLowerCase();
-  for (const { pattern, terms } of SERVICE_KEYWORD_BOOSTS) {
+  for (const { pattern, terms } of boosts) {
     if (pattern.test(query)) {
       for (const term of terms) {
         if (textLower.includes(term.toLowerCase())) {
@@ -69,11 +76,23 @@ function keywordBoost(query: string, text: string): number {
   return boost;
 }
 
+async function resolveKeywordBoosts(businessId: string) {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { id: true, slug: true, name: true },
+  });
+  if (business && isSmartReceptionBusiness(business)) {
+    return SMARTRECEPTION_KEYWORD_BOOSTS;
+  }
+  return GENERIC_KEYWORD_BOOSTS;
+}
+
 /** Retrieve relevant knowledge chunks for AI context (semantic + keyword fallback). */
 export async function searchKnowledgeContext(businessId: string, query: string): Promise<string> {
   const documents = await loadIndexedDocuments(businessId);
   if (!documents.length) return '';
 
+  const boosts = await resolveKeywordBoosts(businessId);
   const queryLower = query.toLowerCase();
 
   type Scored = { text: string; score: number; source: string };
@@ -84,14 +103,14 @@ export async function searchKnowledgeContext(businessId: string, query: string):
       const text = `Q: ${doc.question}\nA: ${doc.answer ?? ''}`;
       let score = text.toLowerCase().includes(queryLower) ? 0.65 : 0.25;
       if (doc.question.toLowerCase().includes(queryLower)) score = 0.92;
-      score += keywordBoost(query, text);
+      score += keywordBoost(query, text, boosts);
       scored.push({ text, score, source: doc.title });
       continue;
     }
 
     if (doc.content) {
       const content = doc.content.slice(0, 900);
-      const score = 0.3 + keywordBoost(query, content);
+      const score = 0.3 + keywordBoost(query, content, boosts);
       if (content.toLowerCase().includes(queryLower)) {
         scored.push({ text: content, score: Math.max(score, 0.6), source: doc.title });
       } else if (score > 0.35) {
@@ -122,7 +141,7 @@ export async function searchKnowledgeContext(businessId: string, query: string):
           if (queryEmbedding && emb?.length) {
             score = Math.max(score, cosineSimilarity(queryEmbedding, emb));
           }
-          score += keywordBoost(query, text);
+          score += keywordBoost(query, text, boosts);
           if (score > 0.2) scored.push({ text: text.slice(0, 900), score, source: doc.title });
         }
       } catch {
@@ -130,7 +149,7 @@ export async function searchKnowledgeContext(businessId: string, query: string):
         if (content) {
           scored.push({
             text: content,
-            score: 0.35 + keywordBoost(query, content),
+            score: 0.35 + keywordBoost(query, content, boosts),
             source: doc.title,
           });
         }
@@ -139,7 +158,7 @@ export async function searchKnowledgeContext(businessId: string, query: string):
       const content = doc.content.slice(0, 900);
       scored.push({
         text: content,
-        score: 0.3 + keywordBoost(query, content),
+        score: 0.3 + keywordBoost(query, content, boosts),
         source: doc.title,
       });
     }

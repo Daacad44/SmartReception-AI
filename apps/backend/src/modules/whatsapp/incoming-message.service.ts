@@ -10,6 +10,7 @@ import {
   parseMenuSelection,
   requestsEnglish,
 } from '../../infrastructure/ai/somali-menu';
+import { isSmartReceptionBusiness } from '../../infrastructure/ai/smartreception-tenant';
 import {
   createSalesFlow,
   getActiveSalesFlow,
@@ -184,17 +185,18 @@ async function runDeferredInboundTasks(params: DeferredInboundTasksParams): Prom
     });
 
     if (extracted.mediaId) {
-      const token = accessToken || config.whatsapp.accessToken;
-      if (token) {
+      if (accessToken) {
         await downloadAndAttachMedia({
           messageId,
           conversationId,
           businessId,
           mediaId: extracted.mediaId,
           filename: extracted.filename,
-          token,
+          token: accessToken,
           baseMetadata: extracted.metadata ?? {},
         });
+      } else {
+        logger.warn('Skipping media download — no business access token', { messageId });
       }
     }
 
@@ -242,6 +244,16 @@ interface SomaliSalesAgentParams {
 }
 
 async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
+  const business = await prisma.business.findUnique({
+    where: { id: params.businessId },
+    select: { id: true, slug: true, name: true },
+  });
+  if (!business) {
+    logger.warn('Business not found for inbound AI reply', { businessId: params.businessId });
+    return;
+  }
+
+  const isPlatformBusiness = isSmartReceptionBusiness(business);
   const base = {
     businessId: params.businessId,
     conversationId: params.conversationId,
@@ -259,54 +271,59 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     accessToken: params.accessToken,
   };
 
-  const menuReset = /^(menu|adeegyada|bilow|start)$/i.test(params.customerMessage.trim());
-  const activeFlow = menuReset ? null : await getActiveSalesFlow(params.conversationId);
+  if (isPlatformBusiness) {
+    const menuReset = /^(menu|adeegyada|bilow|start)$/i.test(params.customerMessage.trim());
+    const activeFlow = menuReset ? null : await getActiveSalesFlow(params.conversationId);
 
-  if (activeFlow) {
-    console.log('[AI] Sales flow active', {
-      service: activeFlow.serviceOption,
-      phase: activeFlow.phase,
-    });
-    const result = await processSalesFlowMessage(params.customerMessage, activeFlow, flowCtx);
-    if (result.handled && result.reply) {
-      await sendAutomatedReply({
-        ...base,
-        content: result.reply,
-        metadata: salesFlowMetadata(result.nextState ?? null),
-      });
-      invalidateSalesFlowCache(params.conversationId);
-      logPipelineStep(params.pipelineKey, 'sales_flow_handled', {
+    if (activeFlow) {
+      console.log('[AI] Sales flow active', {
         service: activeFlow.serviceOption,
         phase: activeFlow.phase,
       });
-      return;
+      const result = await processSalesFlowMessage(params.customerMessage, activeFlow, flowCtx);
+      if (result.handled && result.reply) {
+        await sendAutomatedReply({
+          ...base,
+          content: result.reply,
+          metadata: salesFlowMetadata(result.nextState ?? null),
+        });
+        invalidateSalesFlowCache(params.conversationId);
+        logPipelineStep(params.pipelineKey, 'sales_flow_handled', {
+          service: activeFlow.serviceOption,
+          phase: activeFlow.phase,
+        });
+        return;
+      }
     }
-  }
 
-  const menuOption = parseMenuSelection(params.customerMessage);
-  if (menuOption !== null && !activeFlow) {
-    console.log('[AI] Starting sales consultant flow', { option: menuOption });
-    const start = createSalesFlow(menuOption);
-    if (start.handled && start.reply) {
-      await sendAutomatedReply({
-        ...base,
-        content: start.reply,
-        metadata: salesFlowMetadata(start.nextState ?? null),
-      });
-      invalidateSalesFlowCache(params.conversationId);
-      logPipelineStep(params.pipelineKey, 'sales_flow_handled', { option: menuOption });
-      return;
+    const menuOption = parseMenuSelection(params.customerMessage);
+    if (menuOption !== null && !activeFlow) {
+      console.log('[AI] Starting sales consultant flow', { option: menuOption });
+      const start = createSalesFlow(menuOption);
+      if (start.handled && start.reply) {
+        await sendAutomatedReply({
+          ...base,
+          content: start.reply,
+          metadata: salesFlowMetadata(start.nextState ?? null),
+        });
+        invalidateSalesFlowCache(params.conversationId);
+        logPipelineStep(params.pipelineKey, 'sales_flow_handled', { option: menuOption });
+        return;
+      }
     }
   }
 
   if (isMenuOnlyTrigger(params.customerMessage)) {
-    console.log('[AI] Greeting — sending service menu');
+    console.log('[AI] Greeting — sending business greeting menu', {
+      businessId: params.businessId,
+      isPlatformBusiness,
+    });
     await sendServiceMenu(base);
     logPipelineStep(params.pipelineKey, 'menu_sent');
     return;
   }
 
-  console.log('[AI] Free-form — Knowledge Base + Gemini (Somali sales consultant)');
+  console.log('[AI] Free-form — Knowledge Base + Gemini', { businessId: params.businessId });
   logPipelineStep(params.pipelineKey, 'ai_started');
   await processAndSendAiReply({
     businessId: params.businessId,

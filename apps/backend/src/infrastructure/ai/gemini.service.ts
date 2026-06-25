@@ -10,6 +10,7 @@ import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
 import { withAiTimeout } from './gemini-timeout';
 import { loadBusinessAIContext } from './business-ai-context.service';
+import { isSmartReceptionBusiness } from './smartreception-tenant';
 
 export interface GenerateResponseOptions {
   /** Reply in English only when customer explicitly requested it. */
@@ -58,6 +59,11 @@ export async function generateResponse(
 ): Promise<AIResponse> {
   const preferEnglish = options.preferEnglish === true;
   const language = preferEnglish ? 'en' : 'so';
+  const business = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!business) {
+    throw new Error(`Business not found: ${businessId}`);
+  }
+
   const [businessContext, aiConfig] = await Promise.all([
     loadBusinessAIContext(businessId),
     prisma.aIConfiguration.findUnique({ where: { businessId } }),
@@ -173,6 +179,7 @@ RULES:
 
     let content = parsed.content;
     if (
+      isSmartReceptionBusiness(business) &&
       !preferEnglish &&
       !content.includes('+25268776299') &&
       ['services', 'pricing', 'general', 'support', 'lead'].includes(parsed.intent || 'general')
