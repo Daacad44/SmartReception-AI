@@ -81,7 +81,7 @@ export class CustomersRepository {
       tagIds?: string[];
     }
   ): Promise<Customer> {
-    return prisma.customer.create({
+    const customer = await prisma.customer.create({
       data: {
         businessId,
         name: data.name,
@@ -102,6 +102,11 @@ export class CustomersRepository {
       },
       include: { tags: { include: { tag: true } } },
     });
+
+    const { triggerJourneyOnCustomerCreated } = await import('../campaigns/campaign-journey.service');
+    void triggerJourneyOnCustomerCreated(businessId, customer.id).catch(() => undefined);
+
+    return customer;
   }
 
   async update(

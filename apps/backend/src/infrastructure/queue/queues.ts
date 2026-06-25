@@ -19,6 +19,8 @@ export const QUEUE_NAMES = {
   APPOINTMENT_REMINDER: 'appointment-reminder',
   EMAIL: 'email',
   CAMPAIGN: 'campaign',
+  CAMPAIGN_BATCH: 'campaign-batch',
+  CAMPAIGN_JOURNEY: 'campaign-journey',
 } as const;
 
 let whatsappQueue: Queue | null = null;
@@ -27,6 +29,8 @@ let documentQueue: Queue | null = null;
 let reminderQueue: Queue | null = null;
 let emailQueue: Queue | null = null;
 let campaignQueue: Queue | null = null;
+let campaignBatchQueue: Queue | null = null;
+let campaignJourneyQueue: Queue | null = null;
 
 export function getWhatsappQueue(): Queue | null {
   const conn = getConnection();
@@ -70,6 +74,20 @@ export function getCampaignQueue(): Queue | null {
   return campaignQueue;
 }
 
+export function getCampaignBatchQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!campaignBatchQueue) campaignBatchQueue = new Queue(QUEUE_NAMES.CAMPAIGN_BATCH, conn);
+  return campaignBatchQueue;
+}
+
+export function getCampaignJourneyQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!campaignJourneyQueue) campaignJourneyQueue = new Queue(QUEUE_NAMES.CAMPAIGN_JOURNEY, conn);
+  return campaignJourneyQueue;
+}
+
 export interface WhatsAppJobData {
   businessId: string;
   conversationId: string;
@@ -110,6 +128,17 @@ export interface EmailJobData {
 export interface CampaignJobData {
   campaignId: string;
   businessId: string;
+}
+
+export interface CampaignBatchJobData {
+  campaignId: string;
+  businessId: string;
+  recipientIds: string[];
+  runVersion: number;
+}
+
+export interface CampaignJourneyJobData {
+  enrollmentId: string;
 }
 
 export function createWorker<T>(

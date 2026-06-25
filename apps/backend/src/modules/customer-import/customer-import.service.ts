@@ -237,6 +237,9 @@ export class CustomerImportService {
           },
         });
 
+        const { triggerJourneyOnCustomerCreated } = await import('../campaigns/campaign-journey.service');
+        void triggerJourneyOnCustomerCreated(businessId, customer.id).catch(() => undefined);
+
         if (tagNames.length > 0) {
           for (const tagName of tagNames) {
             const tag = await prisma.customerTag.upsert({
