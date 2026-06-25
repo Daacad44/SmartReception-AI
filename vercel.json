@@ -5,6 +5,7 @@
     "autoJobCancellation": false,
     "autoJobCancelation": false
   },
+  "ignoreCommand": "exit 1",
   "installCommand": "npm install --include=dev",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "apps/frontend/dist",
