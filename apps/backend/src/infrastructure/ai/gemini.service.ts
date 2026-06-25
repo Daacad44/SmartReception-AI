@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
 import { config } from '../../config';
 import { prisma } from '../database/prisma';
+import { conversationMessageScope } from '../database/tenant-query';
 import { logger } from '../../core/logger';
 import {
   GEMINI_ERROR_MESSAGE_SO,
@@ -72,7 +73,7 @@ export async function generateResponse(
   const knowledgeContext = await searchKnowledgeContext(businessId, customerMessage);
 
   const conversationHistory = await prisma.message.findMany({
-    where: { conversationId },
+    where: conversationMessageScope(conversationId, businessId),
     orderBy: { createdAt: 'desc' },
     take: 8,
     select: { direction: true, content: true },

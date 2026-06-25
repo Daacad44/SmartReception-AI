@@ -7,8 +7,11 @@ import {
 const AI_CONFIG_CACHE_TTL_MS = 60_000;
 const autoReplyCache = new Map<string, { enabled: boolean; loadedAt: number }>();
 
+import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
+
 export function invalidateAiConfigCache(businessId: string): void {
   autoReplyCache.delete(businessId);
+  invalidateBusinessTenantCache(businessId);
 }
 
 /** Ensure AI configuration exists with business-scoped defaults (never SmartReception platform copy). */

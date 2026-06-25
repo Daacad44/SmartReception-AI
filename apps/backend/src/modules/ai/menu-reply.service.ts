@@ -9,7 +9,7 @@ import {
 } from '../whatsapp/whatsapp-pipeline-state';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { logger } from '../../core/logger';
-import { buildBusinessGreetingMenu } from '../../infrastructure/ai/business-menu.service';
+import { buildDynamicBusinessWelcome } from '../../infrastructure/ai/business-welcome.service';
 import { getMenuOptionContent } from '../../infrastructure/ai/somali-menu';
 
 export interface SendAutomatedReplyParams {
@@ -100,7 +100,7 @@ export interface SendMenuParams {
 
 /** Send the business-scoped greeting/menu (SmartReception menu only for the platform workspace). */
 export async function sendServiceMenu(params: SendMenuParams): Promise<boolean> {
-  const content = await buildBusinessGreetingMenu(params.businessId);
+  const content = await buildDynamicBusinessWelcome(params.businessId);
   console.log('[AI] Sending business greeting menu', { businessId: params.businessId });
   return sendAutomatedReply({
     ...params,

@@ -21,12 +21,12 @@ export class WhatsAppTenantResolver {
    * Never falls back to a default workspace or global assistant.
    */
   async resolveByPhoneNumberId(phoneNumberId: string): Promise<WhatsAppTenantContext> {
-    const account = await prisma.whatsAppAccount.findFirst({
-      where: { phoneNumberId, isActive: true },
+    const account = await prisma.whatsAppAccount.findUnique({
+      where: { phoneNumberId },
       include: { business: true },
     });
 
-    if (!account) {
+    if (!account || !account.isActive) {
       throw new NotFoundError(`WhatsApp account not found for phone_number_id: ${phoneNumberId}`);
     }
 

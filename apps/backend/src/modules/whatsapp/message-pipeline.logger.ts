@@ -6,6 +6,7 @@ export type PipelineStep =
   | 'message_saved'
   | 'reply_started'
   | 'menu_sent'
+  | 'tenant_menu_option'
   | 'sales_flow_handled'
   | 'ai_started'
   | 'ai_finished'

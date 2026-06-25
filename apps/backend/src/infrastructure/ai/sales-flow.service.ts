@@ -1,4 +1,5 @@
 import { prisma } from '../database/prisma';
+import { conversationMessageScope } from '../database/tenant-query';
 import { logger } from '../../core/logger';
 import type { SalesFlowContext, SalesFlowResult, SalesFlowState } from './sales-flow.types';
 import {
@@ -29,20 +30,36 @@ const FLOW_META_TYPE = 'sales_flow';
 const SALES_FLOW_CACHE_TTL_MS = 120_000;
 const salesFlowCache = new Map<string, { state: SalesFlowState | null; loadedAt: number }>();
 
-export function invalidateSalesFlowCache(conversationId: string): void {
-  salesFlowCache.delete(conversationId);
+export function invalidateSalesFlowCache(conversationId: string, businessId?: string): void {
+  if (businessId) {
+    salesFlowCache.delete(`${businessId}:${conversationId}`);
+    return;
+  }
+  for (const key of salesFlowCache.keys()) {
+    if (key.endsWith(`:${conversationId}`)) {
+      salesFlowCache.delete(key);
+    }
+  }
 }
 
 /** Load active sales flow from latest outbound message metadata. */
-export async function getActiveSalesFlow(conversationId: string): Promise<SalesFlowState | null> {
-  const cached = salesFlowCache.get(conversationId);
+export async function getActiveSalesFlow(
+  conversationId: string,
+  businessId: string
+): Promise<SalesFlowState | null> {
+  const cacheKey = `${businessId}:${conversationId}`;
+  const cached = salesFlowCache.get(cacheKey);
   const now = Date.now();
   if (cached && now - cached.loadedAt < SALES_FLOW_CACHE_TTL_MS) {
     return cached.state;
   }
 
   const messages = await prisma.message.findMany({
-    where: { conversationId, direction: 'OUTBOUND', isAiGenerated: true },
+    where: {
+      ...conversationMessageScope(conversationId, businessId),
+      direction: 'OUTBOUND',
+      isAiGenerated: true,
+    },
     orderBy: { createdAt: 'desc' },
     take: 3,
     select: { metadata: true },
@@ -51,12 +68,12 @@ export async function getActiveSalesFlow(conversationId: string): Promise<SalesF
   for (const msg of messages) {
     const meta = msg.metadata as { type?: string; salesFlow?: SalesFlowState } | null;
     if (meta?.type === FLOW_META_TYPE && meta.salesFlow && meta.salesFlow.phase !== 'completed') {
-      salesFlowCache.set(conversationId, { state: meta.salesFlow, loadedAt: now });
+      salesFlowCache.set(cacheKey, { state: meta.salesFlow, loadedAt: now });
       return meta.salesFlow;
     }
   }
 
-  salesFlowCache.set(conversationId, { state: null, loadedAt: now });
+  salesFlowCache.set(cacheKey, { state: null, loadedAt: now });
   return null;
 }
 

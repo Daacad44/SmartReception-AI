@@ -1,6 +1,7 @@
 import { aiService } from '../../infrastructure/ai/conversation-ai.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { prisma } from '../../infrastructure/database/prisma';
+import { conversationScope } from '../../infrastructure/database/tenant-query';
 import { logger } from '../../core/logger';
 import {
   recordOutboundAttempt,
@@ -113,7 +114,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   void prisma.conversation
     .update({
-      where: { id: conversationId },
+      where: conversationScope(conversationId, businessId),
       data: { isTyping: true },
     })
     .catch(() => {});
@@ -188,7 +189,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   });
 
   void prisma.conversation.update({
-    where: { id: conversationId },
+    where: conversationScope(conversationId, businessId),
     data: { isTyping: false, lastMessageAt: new Date() },
   });
 
@@ -211,7 +212,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {
     await prisma.conversation.update({
-      where: { id: conversationId },
+      where: conversationScope(conversationId, businessId),
       data: { isAiEnabled: false, status: 'PENDING' },
     });
   }

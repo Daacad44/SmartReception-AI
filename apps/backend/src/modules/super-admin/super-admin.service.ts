@@ -9,6 +9,7 @@ import {
 } from '@smartreception/shared';
 import { passwordService } from '../../infrastructure/auth/password.service';
 import { authRepository } from '../auth/auth.repository';
+import { tokenService } from '../../infrastructure/auth/token.service';
 import type { Industry, SubscriptionPlan, UserRole } from '@prisma/client';
 
 function slugify(text: string): string {
@@ -72,14 +73,22 @@ export class SuperAdminService {
       prisma.business.count({ where }),
     ]);
 
+    const aiUsageByBusiness = await Promise.all(
+      data.map((business) =>
+        prisma.message.count({
+          where: { isAiGenerated: true, conversation: { businessId: business.id } },
+        })
+      )
+    );
+
     return {
-      data: data.map((b) => ({
+      data: data.map((b, index) => ({
         ...b,
         owner: b.members[0]?.user ?? null,
         whatsappNumber: b.whatsappAccounts[0]?.phoneNumber ?? b.phone,
         plan: b.subscription?.plan ?? 'FREE',
         activeCustomers: b._count.customers,
-        aiUsage: 0,
+        aiUsage: aiUsageByBusiness[index] ?? 0,
       })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
@@ -394,6 +403,38 @@ export class SuperAdminService {
       },
     });
     return business;
+  }
+
+  /** Issue a short-lived access token for super-admin support impersonation of a business workspace. */
+  async impersonateBusiness(businessId: string, adminUserId: string, adminEmail: string) {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, name: true, slug: true, isActive: true },
+    });
+    if (!business) throw new NotFoundError('Business not found');
+    if (!business.isActive) throw new ValidationError('Cannot impersonate a suspended business');
+
+    const accessToken = tokenService.generateAccessToken({
+      userId: adminUserId,
+      email: adminEmail,
+      businessId: business.id,
+      role: 'OWNER',
+      isSuperAdmin: true,
+      impersonating: true,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        businessId: business.id,
+        userId: adminUserId,
+        action: 'UPDATE',
+        entity: 'Business',
+        entityId: business.id,
+        newData: { event: 'super_admin_impersonation' },
+      },
+    });
+
+    return { accessToken, business };
   }
 }
 

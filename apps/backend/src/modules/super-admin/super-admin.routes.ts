@@ -18,6 +18,9 @@ router.post('/businesses/:id/transfer-ownership', (req, res, next) =>
   superAdminController.transferOwnership(req, res, next)
 );
 router.patch('/businesses/:id/status', (req, res, next) => superAdminController.toggleBusiness(req, res, next));
+router.post('/businesses/:id/impersonate', (req, res, next) =>
+  superAdminController.impersonateBusiness(req, res, next)
+);
 
 router.get('/users', (req, res, next) => superAdminController.users(req, res, next));
 router.post('/users', (req, res, next) => superAdminController.createUser(req, res, next));

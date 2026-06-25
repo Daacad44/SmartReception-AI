@@ -1,6 +1,7 @@
 import type { AIConfiguration, Business, KnowledgeDocument } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { knowledgeRepository } from '../../modules/knowledge/knowledge.repository';
+import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import {
   buildDefaultSystemPrompt,
   isSmartReceptionBusiness,
@@ -18,7 +19,9 @@ export interface BusinessAIContext {
 
 const KNOWLEDGE_DOC_LIMIT = 20;
 
-function formatKnowledgeDocuments(documents: KnowledgeDocument[]): string {
+type KnowledgeSnippet = Pick<KnowledgeDocument, 'type' | 'question' | 'answer' | 'content'>;
+
+function formatKnowledgeDocuments(documents: KnowledgeSnippet[]): string {
   return documents
     .map((doc) => {
       if (doc.type === 'FAQ') {
@@ -30,7 +33,10 @@ function formatKnowledgeDocuments(documents: KnowledgeDocument[]): string {
     .join('\n\n');
 }
 
-function buildBusinessSystemPrompt(business: Business, aiConfig: AIConfiguration): string {
+function buildBusinessSystemPrompt(
+  business: Pick<Business, 'id' | 'slug' | 'name'>,
+  aiConfig: AIConfiguration
+): string {
   const stored = aiConfig.systemPrompt?.trim();
   if (stored) {
     if (isSmartReceptionBusiness(business) || !isSmartReceptionStoredContent(stored)) {
@@ -41,7 +47,10 @@ function buildBusinessSystemPrompt(business: Business, aiConfig: AIConfiguration
   return buildDefaultSystemPrompt(business.name);
 }
 
-function buildBusinessFallbackMessage(business: Business, aiConfig: AIConfiguration): string {
+function buildBusinessFallbackMessage(
+  business: Pick<Business, 'name'>,
+  aiConfig: AIConfiguration
+): string {
   if (aiConfig.fallbackMessage?.trim()) {
     return aiConfig.fallbackMessage.trim();
   }
@@ -51,21 +60,25 @@ function buildBusinessFallbackMessage(business: Business, aiConfig: AIConfigurat
 
 /** Load AI prompt + knowledge for a single business. Never uses global defaults. */
 export async function loadBusinessAIContext(businessId: string): Promise<BusinessAIContext> {
-  const business = await prisma.business.findUnique({ where: { id: businessId } });
-  if (!business) {
-    throw new Error(`Business not found: ${businessId}`);
-  }
+  const profile = await getCachedBusinessProfile(businessId);
+  const business = profile.business;
 
   const aiConfiguration =
-    (await prisma.aIConfiguration.findUnique({ where: { businessId } })) ??
+    profile.aiConfiguration ??
     (await prisma.aIConfiguration.create({ data: { businessId } }));
 
   const knowledgeBase = await knowledgeRepository.getDefaultBase(businessId);
   const documents = knowledgeBase
     ? await prisma.knowledgeDocument.findMany({
-        where: { knowledgeBaseId: knowledgeBase.id, status: 'INDEXED' },
+        where: { knowledgeBaseId: knowledgeBase.id, status: 'INDEXED', knowledgeBase: { businessId } },
         orderBy: { createdAt: 'desc' },
         take: KNOWLEDGE_DOC_LIMIT,
+        select: {
+          type: true,
+          question: true,
+          answer: true,
+          content: true,
+        },
       })
     : [];
 

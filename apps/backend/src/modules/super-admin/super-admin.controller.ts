@@ -147,6 +147,19 @@ export class SuperAdminController {
       next(error);
     }
   }
+
+  async impersonateBusiness(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.impersonateBusiness(
+        routeParam(req.params.id),
+        req.user!.userId,
+        req.user!.email
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const superAdminController = new SuperAdminController();

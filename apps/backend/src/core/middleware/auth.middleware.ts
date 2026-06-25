@@ -78,11 +78,14 @@ export async function authenticate(
       }),
     ]);
 
-    if (decoded.businessId && membership && !membership.isActive) {
+    if (decoded.businessId && membership && !membership.isActive && !decoded.impersonating) {
       throw new UnauthorizedError('Your account has been deactivated for this business');
     }
 
-    const role = membership?.role || 'VIEWER';
+    const role =
+      decoded.impersonating && user?.isSuperAdmin
+        ? decoded.role || 'OWNER'
+        : membership?.role || 'VIEWER';
     let permissions = [...(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [])];
 
     if (user?.isSuperAdmin) {
@@ -91,7 +94,7 @@ export async function authenticate(
 
     req.user = {
       ...decoded,
-      role: membership?.role,
+      role: decoded.impersonating ? decoded.role : membership?.role,
       permissions,
       isSuperAdmin: user?.isSuperAdmin,
     };

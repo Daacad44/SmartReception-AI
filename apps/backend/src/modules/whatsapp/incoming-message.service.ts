@@ -11,6 +11,8 @@ import {
   requestsEnglish,
 } from '../../infrastructure/ai/somali-menu';
 import { isSmartReceptionBusiness } from '../../infrastructure/ai/smartreception-tenant';
+import { buildTenantMenuOptionReply } from '../../infrastructure/ai/business-welcome.service';
+import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
 import {
   createSalesFlow,
   getActiveSalesFlow,
@@ -244,14 +246,8 @@ interface SomaliSalesAgentParams {
 }
 
 async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
-  const business = await prisma.business.findUnique({
-    where: { id: params.businessId },
-    select: { id: true, slug: true, name: true },
-  });
-  if (!business) {
-    logger.warn('Business not found for inbound AI reply', { businessId: params.businessId });
-    return;
-  }
+  const profile = await getCachedBusinessProfile(params.businessId);
+  const business = profile.business;
 
   const isPlatformBusiness = isSmartReceptionBusiness(business);
   const base = {
@@ -273,7 +269,9 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
 
   if (isPlatformBusiness) {
     const menuReset = /^(menu|adeegyada|bilow|start)$/i.test(params.customerMessage.trim());
-    const activeFlow = menuReset ? null : await getActiveSalesFlow(params.conversationId);
+    const activeFlow = menuReset
+      ? null
+      : await getActiveSalesFlow(params.conversationId, params.businessId);
 
     if (activeFlow) {
       console.log('[AI] Sales flow active', {
@@ -287,7 +285,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
           content: result.reply,
           metadata: salesFlowMetadata(result.nextState ?? null),
         });
-        invalidateSalesFlowCache(params.conversationId);
+        invalidateSalesFlowCache(params.conversationId, params.businessId);
         logPipelineStep(params.pipelineKey, 'sales_flow_handled', {
           service: activeFlow.serviceOption,
           phase: activeFlow.phase,
@@ -306,10 +304,24 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
           content: start.reply,
           metadata: salesFlowMetadata(start.nextState ?? null),
         });
-        invalidateSalesFlowCache(params.conversationId);
+        invalidateSalesFlowCache(params.conversationId, params.businessId);
         logPipelineStep(params.pipelineKey, 'sales_flow_handled', { option: menuOption });
         return;
       }
+    }
+  }
+
+  const tenantMenuOption = !isPlatformBusiness ? parseMenuSelection(params.customerMessage) : null;
+  if (tenantMenuOption !== null) {
+    const reply = await buildTenantMenuOptionReply(params.businessId, tenantMenuOption);
+    if (reply) {
+      await sendAutomatedReply({
+        ...base,
+        content: reply,
+        metadata: { type: 'tenant_menu_option', option: tenantMenuOption },
+      });
+      logPipelineStep(params.pipelineKey, 'tenant_menu_option', { option: tenantMenuOption });
+      return;
     }
   }
 

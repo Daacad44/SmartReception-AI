@@ -24,6 +24,7 @@ export interface JwtPayload {
   businessId?: string;
   role?: string;
   isSuperAdmin?: boolean;
+  impersonating?: boolean;
   purpose?: 'access' | '2fa';
 }
 
