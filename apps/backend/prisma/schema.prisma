@@ -360,6 +360,7 @@ model Business {
   customerImportJobs CustomerImportJob[]
   campaignJourneys  CampaignJourney[]
   campaignOptOuts   CustomerCampaignOptOut[]
+  businessProfile   BusinessProfile?
 
   @@index([slug])
   @@index([isActive])
@@ -1054,6 +1055,65 @@ model WhatsAppWebhookEvent {
   @@index([receivedAt])
   @@index([businessId])
   @@map("whatsapp_webhook_events")
+}
+
+// ─── BUSINESS PROFILE (AI identity — separate from Knowledge Base) ───────────
+
+enum BusinessProfileExtractionStatus {
+  NONE
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model BusinessProfile {
+  id                  String                          @id @default(uuid())
+  businessId          String                          @unique
+  businessName        String?
+  logoUrl             String?
+  businessCategory    String?
+  industryLabel       String?
+  companyOverview     String?
+  aboutUs             String?
+  mission             String?
+  vision              String?
+  coreValues          Json?
+  businessDescription String?
+  founder             String?
+  website             String?
+  email               String?
+  phone               String?
+  whatsapp            String?
+  address             String?
+  country             String?
+  city                String?
+  workingHours        String?
+  googleMapsUrl       String?
+  socialMedia         Json?
+  yearsInBusiness     Int?
+  certifications      Json?
+  awards              Json?
+  brandTone           String?
+  languages           Json?
+  callToAction        String?
+  whyChooseUs         String?
+  companyIntroduction String?
+  companySummary      String?
+  shortIntroduction   String?
+  longIntroduction    String?
+  profilePdfUrl       String?
+  profilePdfFilename  String?
+  extractionStatus    BusinessProfileExtractionStatus @default(NONE)
+  extractionError     String?
+  extractedAt         DateTime?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("business_profiles")
 }
 
 // ─── AI CONFIGURATION ────────────────────────────────────────────────────────

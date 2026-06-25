@@ -23,7 +23,7 @@ import {
 import type { SalesFlowContext } from '../../infrastructure/ai/sales-flow.types';
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { sendAutomatedReply, sendServiceMenu } from '../ai/menu-reply.service';
+import { sendAutomatedReply, sendServiceMenu, sendProfileWelcome } from '../ai/menu-reply.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
@@ -339,30 +339,33 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
   }
 
   if (isMenuOnlyTrigger(params.customerMessage)) {
-    console.log('[AI] Greeting — sending business greeting menu', {
+    console.log('[AI] Greeting — sending business profile welcome', {
       businessId: params.businessId,
       isPlatformBusiness,
-      isNewConversation: params.isNewConversation,
     });
-    await sendServiceMenu(base);
-    logPipelineStep(params.pipelineKey, 'menu_sent');
+    if (isPlatformBusiness) {
+      await sendServiceMenu(base);
+    } else {
+      await sendProfileWelcome({ ...base, preferEnglish: params.preferEnglish });
+    }
+    logPipelineStep(params.pipelineKey, 'profile_welcome_sent');
     return;
   }
 
-  // First contact on a new conversation: greet before AI when message is a short opener.
-  if (
-    params.isNewConversation &&
-    !isPlatformBusiness &&
-    params.customerMessage.trim().length <= 30 &&
-    !params.customerMessage.includes('?')
-  ) {
-    console.log('[AI] New conversation — sending business welcome', { businessId: params.businessId });
-    await sendServiceMenu(base);
-    logPipelineStep(params.pipelineKey, 'new_conversation_welcome');
+  // First contact: introduce company from Business Profile only (not Knowledge Base).
+  if (params.isNewConversation && !isPlatformBusiness) {
+    console.log('[AI] New conversation — Business Profile welcome', { businessId: params.businessId });
+    await sendProfileWelcome({ ...base, preferEnglish: params.preferEnglish });
+    logPipelineStep(params.pipelineKey, 'new_conversation_profile_welcome');
     return;
   }
 
-  console.log('[AI] Free-form — Knowledge Base + Gemini', { businessId: params.businessId });
+  const inboundCount = await prisma.message.count({
+    where: { conversationId: params.conversationId, direction: 'INBOUND' },
+  });
+  const isFirstCustomerMessage = inboundCount <= 1;
+
+  console.log('[AI] Free-form — routed AI reply', { businessId: params.businessId, isFirstCustomerMessage });
   logPipelineStep(params.pipelineKey, 'ai_started');
   await processAndSendAiReply({
     businessId: params.businessId,
@@ -374,6 +377,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     accessToken: params.accessToken,
     preferEnglish: params.preferEnglish,
     pipelineKey: params.pipelineKey,
+    isFirstCustomerMessage,
   });
 }
 

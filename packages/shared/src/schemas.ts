@@ -400,6 +400,41 @@ export const createMessageTemplateSchema = z.object({
 
 export const updateMessageTemplateSchema = createMessageTemplateSchema.partial();
 
+export const updateBusinessProfileSchema = z.object({
+  businessName: z.string().max(200).optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  businessCategory: z.string().max(100).optional(),
+  industryLabel: z.string().max(100).optional(),
+  companyOverview: z.string().max(5000).optional(),
+  aboutUs: z.string().max(5000).optional(),
+  mission: z.string().max(2000).optional(),
+  vision: z.string().max(2000).optional(),
+  coreValues: z.array(z.string().max(200)).optional(),
+  businessDescription: z.string().max(5000).optional(),
+  founder: z.string().max(200).optional(),
+  website: z.string().url().optional().or(z.literal('')),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().max(20).optional(),
+  whatsapp: z.string().max(20).optional(),
+  address: z.string().max(500).optional(),
+  country: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  workingHours: z.string().max(500).optional(),
+  googleMapsUrl: z.string().url().optional().or(z.literal('')),
+  socialMedia: z.record(z.string()).optional(),
+  yearsInBusiness: z.number().int().min(0).max(200).optional(),
+  certifications: z.array(z.string().max(200)).optional(),
+  awards: z.array(z.string().max(200)).optional(),
+  brandTone: z.string().max(200).optional(),
+  languages: z.array(z.string().max(20)).optional(),
+  callToAction: z.string().max(500).optional(),
+  whyChooseUs: z.string().max(3000).optional(),
+  companyIntroduction: z.string().max(5000).optional(),
+  companySummary: z.string().max(3000).optional(),
+  shortIntroduction: z.string().max(1500).optional(),
+  longIntroduction: z.string().max(8000).optional(),
+});
+
 export const superAdminCreateBusinessSchema = z.object({
   name: z.string().min(1).max(200),
   ownerEmail: z.string().email(),
@@ -483,6 +518,7 @@ export type GenerateCampaignAiInput = z.infer<typeof generateCampaignAiSchema>;
 export type CreateJourneyInput = z.infer<typeof createJourneySchema>;
 export type CreateMessageTemplateInput = z.infer<typeof createMessageTemplateSchema>;
 export type UpdateMessageTemplateInput = z.infer<typeof updateMessageTemplateSchema>;
+export type UpdateBusinessProfileInput = z.infer<typeof updateBusinessProfileSchema>;
 export type SuperAdminCreateBusinessInput = z.infer<typeof superAdminCreateBusinessSchema>;
 export type SuperAdminUpdateBusinessInput = z.infer<typeof superAdminUpdateBusinessSchema>;
 export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;

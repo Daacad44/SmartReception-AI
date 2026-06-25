@@ -3,9 +3,7 @@ import { config } from '../../config';
 import { prisma } from '../database/prisma';
 import { conversationMessageScope } from '../database/tenant-query';
 import { logger } from '../../core/logger';
-import {
-  GEMINI_ERROR_MESSAGE_SO,
-} from './smartreception-knowledge';
+import { GEMINI_ERROR_MESSAGE_SO } from './smartreception-knowledge';
 import { CONTACT_FOOTER_SO, requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
@@ -13,10 +11,19 @@ import { withAiTimeout } from './gemini-timeout';
 import { loadBusinessAIPrompt } from './business-ai-context.service';
 import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import { isSmartReceptionBusiness } from './smartreception-tenant';
+import {
+  classifyAiResourceRoute,
+  type AiResourceRoute,
+} from './ai-intent-router.service';
+import { getBusinessProfileContext } from './business-profile-prompt.service';
 
 export interface GenerateResponseOptions {
   /** Reply in English only when customer explicitly requested it. */
   preferEnglish?: boolean;
+  /** True when this is the customer's first inbound message in the conversation. */
+  isFirstCustomerMessage?: boolean;
+  /** Override automatic routing (tests / admin). */
+  forceRoute?: AiResourceRoute;
 }
 
 const CHAT_MODEL = 'gemini-2.5-flash';
@@ -53,6 +60,96 @@ function buildLanguageInstruction(preferEnglish: boolean): string {
   return 'ALWAYS reply ONLY in Somali (Af-Soomaali). Never use English unless the customer explicitly asked for English.';
 }
 
+function buildProfilePrompt(params: {
+  businessName: string;
+  profileContext: string;
+  historyText: string;
+  customerMessage: string;
+  preferEnglish: boolean;
+  fallbackMessage: string;
+}): string {
+  return `You are the company identity assistant for ${params.businessName}.
+
+CRITICAL — USE ONLY BUSINESS PROFILE (never Knowledge Base, never general world knowledge):
+${params.profileContext || '(Business profile not yet configured — introduce the business politely and offer to help.)'}
+
+${buildLanguageInstruction(params.preferEnglish)}
+
+RULES:
+- Answer ONLY company identity questions: who we are, about us, mission, vision, contact, website, hours, address
+- NEVER list product pricing, packages, or operational FAQs — those belong to a separate knowledge system
+- Never reference SmartReception or any business other than ${params.businessName}
+- Be warm and professional; match brand tone if provided
+- If information is missing from the profile, say so politely
+
+CONVERSATION HISTORY:
+${params.historyText || 'No prior messages.'}
+
+CUSTOMER MESSAGE:
+${params.customerMessage}
+
+Respond in JSON only:
+{
+  "content": "your WhatsApp reply",
+  "intent": "company_intro|contact|general",
+  "actions": [{"type": "none"}],
+  "confidence": 0.0-1.0,
+  "language": "${params.preferEnglish ? 'en' : 'so'}"
+}`;
+}
+
+function buildKnowledgePrompt(params: {
+  businessName: string;
+  knowledgeContext: string;
+  historyText: string;
+  customerMessage: string;
+  preferEnglish: boolean;
+  systemPrompt: string;
+}): string {
+  const hasKnowledge = Boolean(params.knowledgeContext?.trim());
+
+  return `${params.systemPrompt}
+
+${buildLanguageInstruction(params.preferEnglish)}
+
+CRITICAL — KNOWLEDGE BASE ONLY (operational questions):
+- Use excerpts below for products, services, pricing, FAQs, policies, how-to, appointments, technical docs
+- NEVER answer company introduction, mission, vision, website, or contact from this context
+- If asked who you are or about the company, say you can share company details — do not invent from KB
+
+${hasKnowledge ? `Answer using KNOWLEDGE BASE excerpts for ${params.businessName}.` : `No KB excerpts matched — ask the customer for more details politely.`}
+
+KNOWLEDGE BASE EXCERPTS (${params.businessName}):
+${params.knowledgeContext || '(none indexed)'}
+
+LEAD COLLECTION:
+If customer shows buying intent, collect: Full Name, Business Name, Phone, Email, Service Required.
+Ask one or two fields at a time. When all fields collected, set action collect_lead with complete:true.
+
+CONVERSATION HISTORY:
+${params.historyText || 'No prior messages.'}
+
+CUSTOMER MESSAGE:
+${params.customerMessage}
+
+Respond in JSON only:
+{
+  "content": "your WhatsApp reply",
+  "intent": "support|booking|lead|pricing|services|general",
+  "actions": [{"type": "none"}],
+  "confidence": 0.0-1.0,
+  "language": "${params.preferEnglish ? 'en' : 'so'}"
+}
+
+Action types: none, collect_lead, book_appointment, qualify_lead, escalate
+For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
+
+RULES:
+- You are the operational assistant for ${params.businessName}, NOT a generic bot
+- Never reference SmartReception unless this is SmartReception
+- Be specific using KB facts only`;
+}
+
 export async function generateResponse(
   businessId: string,
   conversationId: string,
@@ -62,10 +159,21 @@ export async function generateResponse(
   const preferEnglish = options.preferEnglish === true;
   const language = preferEnglish ? 'en' : 'so';
 
-  const [profile, businessContext, knowledgeContext] = await Promise.all([
+  let isFirstCustomerMessage = options.isFirstCustomerMessage;
+  if (isFirstCustomerMessage === undefined) {
+    const inboundCount = await prisma.message.count({
+      where: { conversationId, direction: 'INBOUND' },
+    });
+    isFirstCustomerMessage = inboundCount <= 1;
+  }
+
+  const route =
+    options.forceRoute ??
+    classifyAiResourceRoute(customerMessage, { isFirstCustomerMessage });
+
+  const [profile, businessContext] = await Promise.all([
     getCachedBusinessProfile(businessId),
     loadBusinessAIPrompt(businessId),
-    searchKnowledgeContext(businessId, customerMessage),
   ]);
   const business = profile.business;
   const aiConfig = businessContext.aiConfiguration;
@@ -82,61 +190,42 @@ export async function generateResponse(
     .map((m) => `${m.direction === 'INBOUND' ? 'Customer' : 'Assistant'}: ${m.content}`)
     .join('\n');
 
-  const systemPrompt = businessContext.systemPrompt;
-  const hasKnowledge = Boolean(knowledgeContext?.trim());
+  const fallback: AIResponse = {
+    content: businessContext.fallbackMessage || aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
+    intent: 'general',
+    actions: [{ type: 'none' }],
+    confidence: 0,
+    language,
+  };
 
-  const prompt = `${systemPrompt}
+  let prompt: string;
 
-${buildLanguageInstruction(preferEnglish)}
-
-CRITICAL — ANSWER PRIORITY (follow strictly):
-1. KNOWLEDGE BASE excerpts below for ${businessContext.businessName} (primary — never contradict them)
-2. FAQ content in knowledge base
-3. Only if nothing above applies, politely ask for more information
-
-${hasKnowledge ? `You MUST answer using the KNOWLEDGE BASE below for ${businessContext.businessName}. Do NOT use general world knowledge when KB has the answer.` : `No KB excerpts matched for ${businessContext.businessName} — ask the customer for more details politely.`}
-
-KNOWLEDGE BASE EXCERPTS (${businessContext.businessName}):
-${knowledgeContext || '(none indexed)'}
-
-LEAD COLLECTION:
-If customer shows buying intent or selected pricing (option 8), collect: Full Name, Business Name, Phone, Email, Service Required.
-Ask one or two fields at a time. When all fields collected, set action collect_lead with complete:true.
-
-CONVERSATION HISTORY:
-${historyText || 'No prior messages.'}
-
-CUSTOMER MESSAGE:
-${customerMessage}
-
-Respond in JSON only:
-{
-  "content": "your WhatsApp reply in Somali",
-  "intent": "support|booking|lead|pricing|services|general",
-  "actions": [{"type": "none"}],
-  "confidence": 0.0-1.0,
-  "language": "so"
-}
-
-Action types: none, collect_lead, book_appointment, qualify_lead, escalate
-For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
-
-RULES:
-- You are the AI assistant for ${businessContext.businessName}, NOT a generic bot
-- Never reference SmartReception or any other business
-- Never say "I am having trouble right now" or generic fallbacks
-- Ask qualifying questions to understand project needs
-- Be specific using KB facts for ${businessContext.businessName}`;
+  if (route === 'business_profile') {
+    const profileContext = await getBusinessProfileContext(businessId);
+    prompt = buildProfilePrompt({
+      businessName: businessContext.businessName,
+      profileContext,
+      historyText,
+      customerMessage,
+      preferEnglish,
+      fallbackMessage: fallback.content,
+    });
+    console.log('[AI] Route: Business Profile', { businessId, conversationId });
+  } else {
+    const knowledgeContext = await searchKnowledgeContext(businessId, customerMessage);
+    prompt = buildKnowledgePrompt({
+      businessName: businessContext.businessName,
+      knowledgeContext,
+      historyText,
+      customerMessage,
+      preferEnglish,
+      systemPrompt: businessContext.systemPrompt,
+    });
+    console.log('[AI] Route: Knowledge Base', { businessId, conversationId });
+  }
 
   try {
     const model = getChatModel({ temperature: aiConfig?.temperature ?? 0.7 });
-    const fallback: AIResponse = {
-      content: businessContext.fallbackMessage || aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
-      intent: 'general',
-      actions: [{ type: 'none' }],
-      confidence: 0,
-      language,
-    };
 
     const result = await withAiTimeout(
       model.generateContent(prompt),
@@ -178,6 +267,7 @@ RULES:
 
     let content = parsed.content;
     if (
+      route === 'knowledge_base' &&
       isSmartReceptionBusiness(business) &&
       !preferEnglish &&
       !content.includes('+25268776299') &&
@@ -185,7 +275,7 @@ RULES:
     ) {
       content = `${content}\n\n${CONTACT_FOOTER_SO}`;
     }
-    console.log('[AI] Response generated (Gemini)');
+    console.log('[AI] Response generated (Gemini)', { route });
     return {
       content,
       intent: parsed.intent || 'general',
@@ -196,14 +286,8 @@ RULES:
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('[AI] Gemini generation failed:', detail);
-    logger.error('Gemini generation failed:', { detail });
-    return {
-      content: aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
-      intent: 'general',
-      actions: [{ type: 'none' }],
-      confidence: 0,
-      language,
-    };
+    logger.error('Gemini generation failed:', { detail, route });
+    return fallback;
   }
 }
 
@@ -224,7 +308,10 @@ export async function extractKnowledge(text: string): Promise<string> {
   try {
     const model = getChatModel();
     const result = await model.generateContent(
-      `Extract key facts, services, pricing notes, and FAQs from this document. Output plain text, bilingual Somali/English where useful:\n\n${text.slice(0, 15000)}`
+      `Extract operational knowledge only (products, services, pricing, FAQs, policies, procedures).
+Do NOT extract company mission, vision, or contact details — those belong in Business Profile.
+
+Output plain text, bilingual Somali/English where useful:\n\n${text.slice(0, 15000)}`
     );
     return result.response.text()?.trim() || text.slice(0, 2000);
   } catch (error) {
