@@ -1,6 +1,7 @@
 import type { AIConfiguration, Business, Service } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { invalidateKnowledgeCache } from './knowledge-search.service';
+import { invalidateBusinessProfileCache } from './business-profile-cache.service';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -29,6 +30,7 @@ const profileCache = new Map<string, CachedProfile>();
 export function invalidateBusinessTenantCache(businessId: string): void {
   profileCache.delete(businessId);
   invalidateKnowledgeCache(businessId);
+  invalidateBusinessProfileCache(businessId);
 }
 
 /** Load business profile + services + AI config in one scoped query batch. */

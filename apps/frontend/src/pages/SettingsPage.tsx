@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Bot, Bell, Shield, MessageCircle } from 'lucide-react';
+import { Building2, Bot, Bell, Shield, MessageCircle, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { WhatsAppSettings } from '@/components/settings/WhatsAppSettings';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
+import { BusinessProfileSettings } from '@/components/settings/BusinessProfileSettings';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const businessSchema = z.object({
@@ -142,6 +143,10 @@ export function SettingsPage() {
             <Building2 className="h-4 w-4" />
             Business
           </TabsTrigger>
+          <TabsTrigger value="profile" className="gap-2">
+            <Briefcase className="h-4 w-4" />
+            Business Profile
+          </TabsTrigger>
           <TabsTrigger value="ai" className="gap-2">
             <Bot className="h-4 w-4" />
             AI Assistant
@@ -220,6 +225,10 @@ export function SettingsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="profile" className="mt-6">
+          <BusinessProfileSettings />
         </TabsContent>
 
         <TabsContent value="ai" className="mt-6">

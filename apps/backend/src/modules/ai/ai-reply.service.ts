@@ -26,6 +26,7 @@ export interface ProcessAiReplyParams {
   accessToken?: string;
   preferEnglish?: boolean;
   pipelineKey?: string;
+  isFirstCustomerMessage?: boolean;
 }
 
 function parseLeadData(data: Record<string, unknown> | undefined): LeadData | null {
@@ -124,7 +125,10 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     businessId,
     conversationId,
     customerMessage,
-    { preferEnglish: params.preferEnglish }
+    {
+      preferEnglish: params.preferEnglish,
+      isFirstCustomerMessage: params.isFirstCustomerMessage,
+    }
   );
   if (params.pipelineKey) {
     logPipelineStep(params.pipelineKey, 'ai_finished', { intent: aiResponse.intent });

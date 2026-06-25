@@ -493,6 +493,42 @@ export class SuperAdminService {
       },
     });
   }
+
+  async getBusinessProfile(businessId: string) {
+    const business = await prisma.business.findUnique({ where: { id: businessId } });
+    if (!business) throw new NotFoundError('Business not found');
+    const { ensureBusinessProfile } = await import('../../infrastructure/ai/business-profile-cache.service');
+    return ensureBusinessProfile(businessId);
+  }
+
+  async updateBusinessProfile(
+    businessId: string,
+    input: import('@smartreception/shared').UpdateBusinessProfileInput,
+    adminUserId: string
+  ) {
+    const { businessProfileService } = await import('../business-profile/business-profile.service');
+    const profile = await businessProfileService.update(businessId, input);
+    await prisma.auditLog.create({
+      data: {
+        businessId,
+        userId: adminUserId,
+        action: 'UPDATE',
+        entity: 'BusinessProfile',
+        entityId: profile.id,
+        newData: input as object,
+      },
+    });
+    return profile;
+  }
+
+  async listKnowledgeBases(businessId: string) {
+    const business = await prisma.business.findUnique({ where: { id: businessId } });
+    if (!business) throw new NotFoundError('Business not found');
+    return prisma.knowledgeBase.findMany({
+      where: { businessId },
+      include: { _count: { select: { documents: true } } },
+    });
+  }
 }
 
 export const superAdminService = new SuperAdminService();

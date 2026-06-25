@@ -10,6 +10,7 @@ import {
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { logger } from '../../core/logger';
 import { buildDynamicBusinessWelcome } from '../../infrastructure/ai/business-welcome.service';
+import { buildBusinessProfileWelcome } from '../../infrastructure/ai/business-profile-prompt.service';
 import { getMenuOptionContent } from '../../infrastructure/ai/somali-menu';
 
 export interface SendAutomatedReplyParams {
@@ -98,10 +99,23 @@ export interface SendMenuParams {
   accessToken?: string;
 }
 
-/** Send the business-scoped greeting/menu (SmartReception menu only for the platform workspace). */
+/** Send Business Profile welcome (tenant identity — not Knowledge Base). */
+export async function sendProfileWelcome(
+  params: SendMenuParams & { preferEnglish?: boolean }
+): Promise<boolean> {
+  const content = await buildBusinessProfileWelcome(params.businessId, params.preferEnglish);
+  console.log('[AI] Sending Business Profile welcome', { businessId: params.businessId });
+  return sendAutomatedReply({
+    ...params,
+    content,
+    metadata: { type: 'business_profile_welcome', language: params.preferEnglish ? 'en' : 'so' },
+  });
+}
+
+/** Send the business-scoped greeting/menu (SmartReception platform menu only). */
 export async function sendServiceMenu(params: SendMenuParams): Promise<boolean> {
   const content = await buildDynamicBusinessWelcome(params.businessId);
-  console.log('[AI] Sending business greeting menu', { businessId: params.businessId });
+  console.log('[AI] Sending platform/service menu', { businessId: params.businessId });
   return sendAutomatedReply({
     ...params,
     content,

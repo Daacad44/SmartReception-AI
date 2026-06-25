@@ -7,6 +7,7 @@ import {
   superAdminCreateUserSchema,
   superAdminUpdateUserSchema,
   transferOwnershipSchema,
+  updateBusinessProfileSchema,
 } from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
 import { z } from 'zod';
@@ -185,6 +186,38 @@ export class SuperAdminController {
     try {
       await superAdminService.pauseCampaign(routeParam(req.params.id), req.user!.userId);
       res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBusinessProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.getBusinessProfile(routeParam(req.params.businessId));
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateBusinessProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = updateBusinessProfileSchema.parse(req.body);
+      const data = await superAdminService.updateBusinessProfile(
+        routeParam(req.params.businessId),
+        input,
+        req.user!.userId
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listKnowledgeBases(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.listKnowledgeBases(routeParam(req.params.businessId));
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

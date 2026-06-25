@@ -30,6 +30,16 @@ router.post('/users/:id/reset-password', (req, res, next) =>
   superAdminController.resetPassword(req, res, next)
 );
 
+router.get('/businesses/:businessId/business-profile', (req, res, next) =>
+  superAdminController.getBusinessProfile(req, res, next)
+);
+router.patch('/businesses/:businessId/business-profile', (req, res, next) =>
+  superAdminController.updateBusinessProfile(req, res, next)
+);
+router.get('/businesses/:businessId/knowledge-bases', (req, res, next) =>
+  superAdminController.listKnowledgeBases(req, res, next)
+);
+
 router.get('/campaigns', (req, res, next) => superAdminController.listCampaigns(req, res, next));
 router.get('/campaigns/stats', (req, res, next) => superAdminController.campaignStats(req, res, next));
 router.post('/campaigns/:id/pause', (req, res, next) => superAdminController.pauseCampaign(req, res, next));

@@ -21,6 +21,7 @@ import segmentsRoutes from '../modules/segments/segments.routes';
 import campaignsRoutes from '../modules/campaigns/campaigns.routes';
 import customerImportRoutes from '../modules/customer-import/customer-import.routes';
 import messageTemplatesRoutes from '../modules/message-templates/message-templates.routes';
+import businessProfileRoutes from '../modules/business-profile/business-profile.routes';
 import onboardingRoutes from '../modules/onboarding/onboarding.routes';
 
 const router = Router();
@@ -47,6 +48,7 @@ router.use('/segments', segmentsRoutes);
 router.use('/campaigns', campaignsRoutes);
 router.use('/customer-import', customerImportRoutes);
 router.use('/message-templates', messageTemplatesRoutes);
+router.use('/business-profile', businessProfileRoutes);
 router.use('/onboarding', onboardingRoutes);
 
 export default router;

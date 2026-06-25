@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../config';
 import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
-import { loadBusinessAIPrompt } from '../../infrastructure/ai/business-ai-context.service';
+import { getBusinessProfileContext } from '../../infrastructure/ai/business-profile-prompt.service';
 import { searchKnowledgeContext } from '../../infrastructure/ai/knowledge-search.service';
 import { ValidationError } from '../../core/errors';
 import { assertCampaignCreateAllowed, getCampaignPlanLimits } from './campaign-limits.service';
@@ -39,9 +39,9 @@ export async function generateCampaignWithAi(
     throw new ValidationError('AI Campaign Generator requires Professional or Enterprise plan');
   }
 
-  const [profile, promptCtx, knowledge] = await Promise.all([
+  const [profile, profileContext, knowledge] = await Promise.all([
     getCachedBusinessProfile(businessId),
-    loadBusinessAIPrompt(businessId),
+    getBusinessProfileContext(businessId),
     searchKnowledgeContext(businessId, input.prompt),
   ]);
 
@@ -50,14 +50,14 @@ export async function generateCampaignWithAi(
   const model = getClient().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const aiPrompt = `You are a marketing copywriter for ${profile.business.name} ONLY.
-Use ONLY facts from the business knowledge below. Never mention SmartReception or other businesses.
+Use BUSINESS PROFILE for company identity and KNOWLEDGE BASE for services/pricing details.
+Never mention SmartReception or other businesses.
 
-BUSINESS: ${profile.business.name}
-INDUSTRY: ${profile.business.industry}
-SERVICES: ${profile.services.map((s) => s.name).join(', ') || 'N/A'}
+BUSINESS PROFILE (identity only):
+${profileContext}
 
-KNOWLEDGE BASE:
-${knowledge || promptCtx.systemPrompt}
+KNOWLEDGE BASE (operational — pricing, packages, FAQs):
+${knowledge || '(none)'}
 
 USER REQUEST: ${input.prompt}
 CAMPAIGN TYPE: ${input.type ?? 'MARKETING'}
