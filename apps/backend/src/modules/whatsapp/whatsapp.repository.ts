@@ -4,10 +4,12 @@ import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/custome
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
-    return prisma.whatsAppAccount.findFirst({
-      where: { phoneNumberId, isActive: true },
+    const account = await prisma.whatsAppAccount.findUnique({
+      where: { phoneNumberId },
       include: { business: true },
     });
+    if (!account?.isActive) return null;
+    return account;
   }
 
   async findAccountByBusiness(businessId: string) {

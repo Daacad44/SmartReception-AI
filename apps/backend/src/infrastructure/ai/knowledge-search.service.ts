@@ -1,5 +1,6 @@
 import { prisma } from '../database/prisma';
 import { generateEmbedding, cosineSimilarity } from './embedding.service';
+import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import { isSmartReceptionBusiness } from './smartreception-tenant';
 
 const KB_CACHE_TTL_MS = 60_000;
@@ -77,11 +78,8 @@ function keywordBoost(query: string, text: string, boosts: Array<{ pattern: RegE
 }
 
 async function resolveKeywordBoosts(businessId: string) {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { id: true, slug: true, name: true },
-  });
-  if (business && isSmartReceptionBusiness(business)) {
+  const { business } = await getCachedBusinessProfile(businessId);
+  if (isSmartReceptionBusiness(business)) {
     return SMARTRECEPTION_KEYWORD_BOOSTS;
   }
   return GENERIC_KEYWORD_BOOSTS;

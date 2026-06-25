@@ -58,14 +58,29 @@ function buildBusinessFallbackMessage(
   return `Thank you for contacting ${business.name}. A team member will assist you shortly.`;
 }
 
-/** Load AI prompt + knowledge for a single business. Never uses global defaults. */
-export async function loadBusinessAIContext(businessId: string): Promise<BusinessAIContext> {
+/** Hot-path prompt load — cached profile only, no KB document scan (searchKnowledgeContext handles retrieval). */
+export async function loadBusinessAIPrompt(
+  businessId: string
+): Promise<Pick<BusinessAIContext, 'businessId' | 'businessName' | 'aiConfiguration' | 'systemPrompt' | 'fallbackMessage'>> {
   const profile = await getCachedBusinessProfile(businessId);
   const business = profile.business;
 
   const aiConfiguration =
     profile.aiConfiguration ??
     (await prisma.aIConfiguration.create({ data: { businessId } }));
+
+  return {
+    businessId,
+    businessName: business.name,
+    aiConfiguration,
+    systemPrompt: buildBusinessSystemPrompt(business, aiConfiguration),
+    fallbackMessage: buildBusinessFallbackMessage(business, aiConfiguration),
+  };
+}
+
+/** Load AI prompt + static KB snapshot for a single business. Never uses global defaults. */
+export async function loadBusinessAIContext(businessId: string): Promise<BusinessAIContext> {
+  const prompt = await loadBusinessAIPrompt(businessId);
 
   const knowledgeBase = await knowledgeRepository.getDefaultBase(businessId);
   const documents = knowledgeBase
@@ -87,12 +102,5 @@ export async function loadBusinessAIContext(businessId: string): Promise<Busines
       ? formatKnowledgeDocuments(documents)
       : 'No knowledge base content is available for this business yet.';
 
-  return {
-    businessId,
-    businessName: business.name,
-    aiConfiguration,
-    knowledgeContext,
-    systemPrompt: buildBusinessSystemPrompt(business, aiConfiguration),
-    fallbackMessage: buildBusinessFallbackMessage(business, aiConfiguration),
-  };
+  return { ...prompt, knowledgeContext };
 }

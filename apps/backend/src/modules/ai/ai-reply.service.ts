@@ -12,6 +12,7 @@ import {
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 import { buildDefaultLeadThankYou } from '../../infrastructure/ai/smartreception-tenant';
+import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
 import type { LeadData } from '../../infrastructure/ai/ai.types';
 import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 
@@ -138,13 +139,8 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   let replyContent = aiResponse.content;
   if (leadData?.complete) {
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { name: true },
-    });
-    const thankYou = business
-      ? buildDefaultLeadThankYou(business.name)
-      : 'Mahadsanid. Kooxdayadu waxay kula soo xiriiri doontaa dhawaan.';
+    const { business } = await getCachedBusinessProfile(businessId);
+    const thankYou = buildDefaultLeadThankYou(business.name);
     replyContent = `${replyContent}\n\n${thankYou}`;
   }
 

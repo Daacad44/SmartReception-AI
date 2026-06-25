@@ -75,7 +75,7 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
   );
   timings.customerMs = Date.now() - startedAt;
 
-  const { conversation } = await whatsappRepository.findOrCreateConversation(
+  const { conversation, isNew } = await whatsappRepository.findOrCreateConversation(
     businessId,
     customer.id,
     whatsappAccountId
@@ -124,6 +124,7 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       accessToken,
       preferEnglish: requestsEnglish(aiText),
       pipelineKey,
+      isNewConversation: isNew,
     });
     timings.replyMs = Date.now() - replyStartedAt;
     logPipelineStep(pipelineKey, 'reply_sent', { timings });
@@ -243,6 +244,7 @@ interface SomaliSalesAgentParams {
   accessToken?: string;
   preferEnglish?: boolean;
   pipelineKey: string;
+  isNewConversation?: boolean;
 }
 
 async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
@@ -329,9 +331,23 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     console.log('[AI] Greeting — sending business greeting menu', {
       businessId: params.businessId,
       isPlatformBusiness,
+      isNewConversation: params.isNewConversation,
     });
     await sendServiceMenu(base);
     logPipelineStep(params.pipelineKey, 'menu_sent');
+    return;
+  }
+
+  // First contact on a new conversation: greet before AI when message is a short opener.
+  if (
+    params.isNewConversation &&
+    !isPlatformBusiness &&
+    params.customerMessage.trim().length <= 30 &&
+    !params.customerMessage.includes('?')
+  ) {
+    console.log('[AI] New conversation — sending business welcome', { businessId: params.businessId });
+    await sendServiceMenu(base);
+    logPipelineStep(params.pipelineKey, 'new_conversation_welcome');
     return;
   }
 
