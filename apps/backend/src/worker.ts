@@ -52,27 +52,33 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
     data: { lastMessageAt: new Date() },
   });
 
-  if (conversation.whatsappAccount) {
-    const whatsappMsgId = await whatsappService.sendMessage({
-      phoneNumberId: conversation.whatsappAccount.phoneNumberId,
-      to: conversation.customer.phone,
-      message: aiResponse.content,
-      accessToken: conversation.whatsappAccount.accessToken || undefined,
+  if (!conversation.whatsappAccount?.accessToken?.trim()) {
+    logger.error('Cannot send AI reply: WhatsApp credentials missing for tenant', {
+      businessId,
+      conversationId,
+      phoneNumberId: conversation.whatsappAccount?.phoneNumberId,
     });
-
     await prisma.message.update({
       where: { id: outboundMessage.id },
-      data: {
-        status: whatsappMsgId ? 'SENT' : 'FAILED',
-        whatsappMsgId,
-      },
+      data: { status: 'FAILED' },
     });
-  } else {
-    await prisma.message.update({
-      where: { id: outboundMessage.id },
-      data: { status: 'SENT' },
-    });
+    return;
   }
+
+  const whatsappMsgId = await whatsappService.sendMessage({
+    phoneNumberId: conversation.whatsappAccount.phoneNumberId,
+    to: conversation.customer.phone,
+    message: aiResponse.content,
+    accessToken: conversation.whatsappAccount.accessToken.trim(),
+  });
+
+  await prisma.message.update({
+    where: { id: outboundMessage.id },
+    data: {
+      status: whatsappMsgId ? 'SENT' : 'FAILED',
+      whatsappMsgId,
+    },
+  });
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {
     await prisma.conversation.update({
@@ -92,10 +98,14 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     include: { whatsappAccount: true },
   });
 
-  if (!conversation?.whatsappAccount) {
+  if (!conversation?.whatsappAccount?.accessToken?.trim()) {
     await prisma.message.update({
       where: { id: messageId },
       data: { status: 'FAILED' },
+    });
+    logger.error('Cannot send agent reply: WhatsApp credentials missing for tenant', {
+      businessId,
+      conversationId,
     });
     return;
   }
@@ -104,7 +114,7 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
     to: phoneNumber,
     message: content,
-    accessToken: conversation.whatsappAccount.accessToken || undefined,
+    accessToken: conversation.whatsappAccount.accessToken.trim(),
   });
 
   await prisma.message.update({
@@ -193,7 +203,13 @@ async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
       customer: true,
       service: true,
       business: {
-        include: { whatsappAccounts: { where: { isActive: true }, take: 1 } },
+        include: {
+          whatsappAccounts: {
+            where: { isActive: true },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+        },
       },
     },
   });
@@ -203,8 +219,10 @@ async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
   }
 
   const whatsappAccount = appointment.business.whatsappAccounts[0];
-  if (!whatsappAccount) {
-    logger.warn(`No WhatsApp account for reminder on appointment ${appointmentId}`);
+  if (!whatsappAccount?.accessToken?.trim()) {
+    logger.warn(`No WhatsApp credentials for reminder on appointment ${appointmentId}`, {
+      businessId,
+    });
     return;
   }
 
@@ -221,7 +239,7 @@ async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
     phoneNumberId: whatsappAccount.phoneNumberId,
     to: customerPhone,
     message,
-    accessToken: whatsappAccount.accessToken || undefined,
+    accessToken: whatsappAccount.accessToken.trim(),
   });
 
   if (whatsappMsgId) {

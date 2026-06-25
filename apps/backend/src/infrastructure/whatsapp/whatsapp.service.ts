@@ -1,12 +1,11 @@
 import { config } from '../../config';
 import { logger } from '../../core/logger';
-import { prisma } from '../database/prisma';
 
 export interface SendMessageParams {
   phoneNumberId: string;
   to: string;
   message: string;
-  accessToken?: string;
+  accessToken: string;
 }
 
 export interface WhatsAppWebhookMessage {
@@ -17,15 +16,27 @@ export interface WhatsAppWebhookMessage {
   text?: { body: string };
 }
 
-export class WhatsAppService {
-  async sendMessage(params: SendMessageParams): Promise<string | null> {
-    const { phoneNumberId, to, message, accessToken } = params;
-    const token = accessToken || config.whatsapp.accessToken;
+export class WhatsAppCredentialsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WhatsAppCredentialsError';
+  }
+}
 
+export class WhatsAppService {
+  private requireAccessToken(accessToken: string | undefined | null, operation: string): string {
+    const token = accessToken?.trim();
     if (!token) {
-      logger.warn('WhatsApp access token not configured');
-      return null;
+      throw new WhatsAppCredentialsError(
+        `Missing WhatsApp access token for ${operation}. Configure per-business credentials.`
+      );
     }
+    return token;
+  }
+
+  async sendMessage(params: SendMessageParams): Promise<string | null> {
+    const { phoneNumberId, to, message } = params;
+    const token = this.requireAccessToken(params.accessToken, 'sendMessage');
 
     try {
       const response = await fetch(
@@ -48,21 +59,24 @@ export class WhatsAppService {
 
       if (!response.ok) {
         const error = await response.text();
-        logger.error('WhatsApp send failed:', error);
+        logger.error('WhatsApp send failed:', { error, phoneNumberId });
         return null;
       }
 
       const data = (await response.json()) as { messages: { id: string }[] };
       return data.messages[0]?.id || null;
     } catch (error) {
-      logger.error('WhatsApp send error:', error);
+      logger.error('WhatsApp send error:', { error, phoneNumberId });
       return null;
     }
   }
 
-  async sendTypingIndicator(phoneNumberId: string, to: string, accessToken?: string): Promise<void> {
-    const token = accessToken || config.whatsapp.accessToken;
-    if (!token) return;
+  async sendTypingIndicator(
+    phoneNumberId: string,
+    to: string,
+    accessToken: string
+  ): Promise<void> {
+    const token = this.requireAccessToken(accessToken, 'sendTypingIndicator');
 
     try {
       await fetch(`${config.whatsapp.apiUrl}/${phoneNumberId}/messages`, {
@@ -83,9 +97,12 @@ export class WhatsAppService {
     }
   }
 
-  async markAsRead(phoneNumberId: string, messageId: string, accessToken?: string): Promise<void> {
-    const token = accessToken || config.whatsapp.accessToken;
-    if (!token) return;
+  async markAsRead(
+    phoneNumberId: string,
+    messageId: string,
+    accessToken: string
+  ): Promise<void> {
+    const token = this.requireAccessToken(accessToken, 'markAsRead');
 
     try {
       await fetch(`${config.whatsapp.apiUrl}/${phoneNumberId}/messages`, {
@@ -118,13 +135,6 @@ export class WhatsAppService {
     }
 
     return messages;
-  }
-
-  async identifyBusiness(phoneNumberId: string) {
-    return prisma.whatsAppAccount.findUnique({
-      where: { phoneNumberId },
-      include: { business: true },
-    });
   }
 }
 

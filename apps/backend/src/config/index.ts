@@ -29,6 +29,7 @@ export const config = {
 
   whatsapp: {
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'smartreception-verify',
+    /** Deprecated for outbound API calls — use WhatsAppAccount.accessToken per business */
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`,

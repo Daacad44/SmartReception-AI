@@ -23,12 +23,20 @@ export class WhatsAppController {
 
   async webhook(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(200).send('EVENT_RECEIVED');
+      const result = await whatsappModuleService.processWebhook(req.body);
 
-      whatsappModuleService.processWebhook(req.body).catch((error) => {
-        logger.error('WhatsApp webhook processing error:', error);
-      });
+      if (result.status === 'not_found') {
+        res.status(404).json({
+          success: false,
+          error: 'WhatsApp account not found',
+          phoneNumberId: result.phoneNumberId,
+        });
+        return;
+      }
+
+      res.status(200).send('EVENT_RECEIVED');
     } catch (error) {
+      logger.error('WhatsApp webhook processing error:', error);
       next(error);
     }
   }

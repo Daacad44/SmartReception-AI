@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../../config';
 import { prisma } from '../database/prisma';
 import { logger } from '../../core/logger';
+import { loadBusinessAIContext } from './business-ai-context.service';
 
 export interface AIResponse {
   content: string;
@@ -33,51 +34,38 @@ export class AIService {
     conversationId: string,
     customerMessage: string
   ): Promise<AIResponse> {
-    const aiConfig = await prisma.aIConfiguration.findUnique({
-      where: { businessId },
-    });
-
-    const knowledgeBase = await prisma.knowledgeBase.findFirst({
-      where: { businessId, isActive: true },
-      include: {
-        documents: {
-          where: { status: 'INDEXED' },
-          take: 20,
-        },
-      },
-    });
+    const businessContext = await loadBusinessAIContext(businessId);
+    const { aiConfiguration } = businessContext;
 
     const conversationHistory = await prisma.message.findMany({
-      where: { conversationId },
+      where: { conversationId, conversation: { businessId } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
-    const knowledgeContext = knowledgeBase?.documents
-      .map((doc) => {
-        if (doc.type === 'FAQ') {
-          return `Q: ${doc.question}\nA: ${doc.answer}`;
-        }
-        return doc.content?.slice(0, 1000) || '';
-      })
-      .filter(Boolean)
-      .join('\n\n');
+    const bookingEnabled = aiConfiguration.enableBooking ? 'enabled' : 'disabled';
+    const leadEnabled = aiConfiguration.enableLeadQualification ? 'enabled' : 'disabled';
 
-    const systemPrompt = aiConfig?.systemPrompt || this.getDefaultSystemPrompt();
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `${systemPrompt}
+        content: `${businessContext.systemPrompt}
 
-Knowledge Base:
-${knowledgeContext || 'No knowledge base content available.'}
+Business: ${businessContext.businessName}
+
+Knowledge Base (${businessContext.businessName}):
+${businessContext.knowledgeContext}
+
+Capabilities:
+- Appointment booking: ${bookingEnabled}
+- Lead qualification: ${leadEnabled}
 
 Instructions:
+- Answer ONLY using the knowledge base and business context above
 - Detect customer intent (support, booking, lead, general)
-- Use knowledge base to answer questions accurately
 - If booking is requested and enabled, collect date/time preferences
-- Respond in a professional, helpful tone
 - If you cannot help, suggest human assistance
+- Never reference SmartReception or any other business
 
 Respond in JSON format:
 {
@@ -98,8 +86,8 @@ Respond in JSON format:
       const completion = await this.getClient().chat.completions.create({
         model: config.openai.model,
         messages,
-        temperature: aiConfig?.temperature ?? 0.7,
-        max_tokens: aiConfig?.maxTokens ?? 500,
+        temperature: aiConfiguration.temperature ?? 0.7,
+        max_tokens: aiConfiguration.maxTokens ?? 500,
         response_format: { type: 'json_object' },
       });
 
@@ -107,15 +95,15 @@ Respond in JSON format:
       const parsed = JSON.parse(responseText) as AIResponse;
 
       return {
-        content: parsed.content || aiConfig?.fallbackMessage || 'I apologize, I could not process your request.',
+        content: parsed.content || businessContext.fallbackMessage,
         intent: parsed.intent || 'general',
         actions: parsed.actions || [{ type: 'none' }],
         confidence: parsed.confidence ?? 0.5,
       };
     } catch (error) {
-      logger.error('AI generation failed:', error);
+      logger.error('AI generation failed:', { error, businessId, conversationId });
       return {
-        content: aiConfig?.fallbackMessage || 'I apologize, I am having trouble right now. A team member will assist you shortly.',
+        content: businessContext.fallbackMessage,
         intent: 'general',
         actions: [{ type: 'escalate' }],
         confidence: 0,
@@ -123,14 +111,16 @@ Respond in JSON format:
     }
   }
 
-  async detectIntent(message: string): Promise<string> {
+  async detectIntent(message: string, businessId: string): Promise<string> {
+    const businessContext = await loadBusinessAIContext(businessId);
+
     try {
       const completion = await this.getClient().chat.completions.create({
         model: config.openai.model,
         messages: [
           {
             role: 'system',
-            content: 'Classify the customer message intent. Respond with one word: support, booking, lead, or general.',
+            content: `Classify the customer message intent for ${businessContext.businessName}. Respond with one word: support, booking, lead, or general.`,
           },
           { role: 'user', content: message },
         ],
@@ -141,12 +131,6 @@ Respond in JSON format:
     } catch {
       return 'general';
     }
-  }
-
-  private getDefaultSystemPrompt(): string {
-    return `You are SmartReception AI, an intelligent virtual assistant for businesses.
-You help with customer support, appointment booking, and lead qualification via WhatsApp.
-Be professional, concise, and helpful. Always prioritize customer satisfaction.`;
   }
 }
 

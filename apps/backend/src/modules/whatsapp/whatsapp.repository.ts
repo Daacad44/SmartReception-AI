@@ -2,8 +2,8 @@ import { prisma } from '../../infrastructure/database/prisma';
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
-    return prisma.whatsAppAccount.findUnique({
-      where: { phoneNumberId },
+    return prisma.whatsAppAccount.findFirst({
+      where: { phoneNumberId, isActive: true },
       include: { business: true },
     });
   }
@@ -38,12 +38,28 @@ export class WhatsAppRepository {
       where: {
         businessId,
         customerId,
+        whatsappAccountId,
         status: { in: ['OPEN', 'PENDING'] },
       },
     });
 
     if (existing) {
       return existing;
+    }
+
+    const staleConversation = await prisma.conversation.findFirst({
+      where: {
+        businessId,
+        customerId,
+        status: { in: ['OPEN', 'PENDING'] },
+      },
+    });
+
+    if (staleConversation) {
+      return prisma.conversation.update({
+        where: { id: staleConversation.id },
+        data: { whatsappAccountId },
+      });
     }
 
     return prisma.conversation.create({
