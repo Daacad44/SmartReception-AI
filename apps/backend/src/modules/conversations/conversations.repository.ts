@@ -40,6 +40,13 @@ export class ConversationsRepository {
           messages: {
             orderBy: { createdAt: 'desc' },
             take: 1,
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              direction: true,
+              status: true,
+            },
           },
         },
       }),
@@ -47,6 +54,35 @@ export class ConversationsRepository {
     ]);
 
     return { conversations, total, page, limit };
+  }
+
+  async getSummary(businessId: string) {
+    const [unreadAgg, aiHandlingCount] = await Promise.all([
+      prisma.conversation.aggregate({
+        where: { businessId },
+        _sum: { unreadCount: true },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          status: 'OPEN',
+          isAiEnabled: true,
+          assignedToId: null,
+        },
+      }),
+    ]);
+
+    return {
+      unreadTotal: unreadAgg._sum.unreadCount ?? 0,
+      aiHandlingCount,
+    };
+  }
+
+  async exists(businessId: string, id: string) {
+    return prisma.conversation.findFirst({
+      where: { id, businessId },
+      select: { id: true },
+    });
   }
 
   async findById(businessId: string, id: string) {
@@ -71,6 +107,7 @@ export class ConversationsRepository {
     direction: 'INBOUND' | 'OUTBOUND';
     content: string;
     type?: string;
+    mediaUrl?: string;
     sentByUserId?: string;
     isAiGenerated?: boolean;
     whatsappMsgId?: string;
@@ -83,6 +120,7 @@ export class ConversationsRepository {
           direction: data.direction,
           content: data.content,
           type: (data.type as 'TEXT') || 'TEXT',
+          mediaUrl: data.mediaUrl,
           sentByUserId: data.sentByUserId,
           isAiGenerated: data.isAiGenerated ?? false,
           whatsappMsgId: data.whatsappMsgId,
@@ -103,6 +141,37 @@ export class ConversationsRepository {
   }
 
   async takeover(businessId: string, id: string, userId: string) {
+    // Hybrid mode: assign agent but keep AI enabled for automatic replies
+    return prisma.conversation.update({
+      where: { id, businessId },
+      data: {
+        assignedToId: userId,
+        isAiEnabled: true,
+        status: 'OPEN',
+      },
+      include: {
+        customer: true,
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
+  async transferToAi(businessId: string, id: string) {
+    return prisma.conversation.update({
+      where: { id, businessId },
+      data: {
+        assignedToId: null,
+        isAiEnabled: true,
+        status: 'OPEN',
+      },
+      include: {
+        customer: true,
+      },
+    });
+  }
+
+  /** Human-only mode: disable AI auto-replies for this conversation. */
+  async handoffToHuman(businessId: string, id: string, userId: string) {
     return prisma.conversation.update({
       where: { id, businessId },
       data: {
@@ -121,6 +190,25 @@ export class ConversationsRepository {
     return prisma.conversation.update({
       where: { id, businessId },
       data: { unreadCount: 0 },
+    });
+  }
+
+  async findMessages(businessId: string, conversationId: string) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, businessId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      return null;
+    }
+
+    return prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        sentByUser: { select: { id: true, firstName: true, lastName: true } },
+      },
     });
   }
 

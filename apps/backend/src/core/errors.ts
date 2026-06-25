@@ -39,3 +39,15 @@ export class ConflictError extends AppError {
     super(409, message, 'CONFLICT');
   }
 }
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Service temporarily unavailable') {
+    super(503, message, 'SERVICE_UNAVAILABLE');
+  }
+}
+
+export class EmailNotVerifiedError extends AppError {
+  constructor(message = 'Please verify your email before signing in') {
+    super(403, message, 'EMAIL_NOT_VERIFIED');
+  }
+}

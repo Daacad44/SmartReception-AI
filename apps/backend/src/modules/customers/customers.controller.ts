@@ -26,7 +26,14 @@ export class CustomersController {
     try {
       const params = paginationSchema.parse(req.query);
       const tagId = req.query.tagId as string | undefined;
-      const result = await customersService.list(req.user!.businessId!, { ...params, tagId });
+      const customerType = req.query.customerType as string | undefined;
+      const segmentId = req.query.segmentId as string | undefined;
+      const result = await customersService.list(req.user!.businessId!, {
+        ...params,
+        tagId,
+        customerType,
+        segmentId,
+      });
       res.json({ success: true, data: result.data, meta: result.meta });
     } catch (error) {
       next(error);
@@ -141,6 +148,42 @@ export class CustomersController {
     try {
       const notes = await customersService.getNotes(req.user!.businessId!, routeParam(req.params.id));
       res.json({ success: true, data: notes });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTimeline(req: Request, res: Response, next: NextFunction) {
+    try {
+      const timeline = await customersService.getTimeline(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: timeline });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getInsights(req: Request, res: Response, next: NextFunction) {
+    try {
+      const insights = await customersService.getInsights(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: insights });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const profile = await customersService.getProfile(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: profile });
     } catch (error) {
       next(error);
     }

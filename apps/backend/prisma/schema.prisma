@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
@@ -15,6 +17,8 @@ enum UserRole {
   MANAGER
   AGENT
   VIEWER
+  RECEPTIONIST
+  STAFF
 }
 
 enum Industry {
@@ -24,8 +28,15 @@ enum Industry {
   RESTAURANT
   SALON
   UNIVERSITY
+  SCHOOL
   TRAVEL_AGENCY
   REAL_ESTATE
+  CONSTRUCTION
+  ECOMMERCE
+  RETAIL
+  LOGISTICS
+  NGO
+  GOVERNMENT
   CONSULTING
   SERVICE_BUSINESS
   OTHER
@@ -34,6 +45,7 @@ enum Industry {
 enum SubscriptionPlan {
   FREE
   STARTER
+  BUSINESS
   PROFESSIONAL
   ENTERPRISE
 }
@@ -83,6 +95,31 @@ enum AppointmentStatus {
   CANCELLED
   COMPLETED
   NO_SHOW
+  MISSED
+}
+
+enum AppointmentNotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+  PUSH
+}
+
+enum AppointmentNotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_APPROVED
+  REMINDER_30_MIN
+  REMINDER_20_MIN
+  REMINDER_10_MIN
+  MISSED_APPOINTMENT
+  FOLLOW_UP_24H
+}
+
+enum AppointmentNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum DocumentType {
@@ -93,8 +130,10 @@ enum DocumentType {
 }
 
 enum DocumentStatus {
+  UPLOADED
   PENDING
   PROCESSING
+  INDEXING
   INDEXED
   FAILED
 }
@@ -105,6 +144,85 @@ enum NotificationType {
   TEAM
   SYSTEM
   BILLING
+  REMINDER
+  MISSED_APPOINTMENT
+  NEW_CUSTOMER
+  AI_ESCALATION
+  APPOINTMENT_APPROVED
+  APPOINTMENT_CANCELLED
+  CAMPAIGN_DELIVERED
+  CAMPAIGN_FAILED
+}
+
+enum CustomerType {
+  VIP
+  REGULAR
+  NEW_CUSTOMER
+  RETURNING
+  HIGH_VALUE
+  PREMIUM
+  INACTIVE
+  LEAD
+  PROSPECT
+}
+
+enum AppointmentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  WON
+  LOST
+}
+
+enum CampaignType {
+  PROMOTION
+  OFFER
+  ANNOUNCEMENT
+  REMINDER
+  FOLLOW_UP
+  HOLIDAY
+  MARKETING
+}
+
+enum CampaignSchedule {
+  ONE_TIME
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
 enum AuditAction {
@@ -125,6 +243,29 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
+enum WhatsAppStatus {
+  CONNECTED
+  NOT_CONNECTED
+}
+
+model BusinessTypeDefinition {
+  id          String   @id
+  label       String
+  icon        String   @default("📋")
+  category    String
+  industry    String
+  description String
+  keywords    String[] @default([])
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@map("business_type_definitions")
+}
+
 // ─── BUSINESS (TENANT) ───────────────────────────────────────────────────────
 
 model Business {
@@ -137,9 +278,21 @@ model Business {
   email       String?
   website     String?
   address     String?
+  country     String?
+  city        String?
+  whatsappNumber String?
   timezone    String   @default("UTC")
   logoUrl     String?
   isActive    Boolean  @default(true)
+  onboardingStep Int   @default(0)
+  onboardingCompletedAt DateTime?
+  onboardingData Json?
+  employeeRange String?
+  customerVolume String?
+  mainGoal    String?
+  businessType String?
+  businessCategory String?
+  whatsappStatus WhatsAppStatus @default(NOT_CONNECTED)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -149,6 +302,7 @@ model Business {
   customerTags      CustomerTag[]
   conversations     Conversation[]
   appointments      Appointment[]
+  appointmentNotifications AppointmentNotification[]
   services          Service[]
   knowledgeBases    KnowledgeBase[]
   whatsappAccounts  WhatsAppAccount[]
@@ -158,6 +312,10 @@ model Business {
   invoices          Invoice[]
   aiConfiguration   AIConfiguration?
   teamInvitations   TeamInvitation[]
+  customerSegments  CustomerSegment[]
+  campaigns         Campaign[]
+  messageTemplates  MessageTemplate[]
+  customerImportJobs CustomerImportJob[]
 
   @@index([slug])
   @@index([isActive])
@@ -176,10 +334,22 @@ model User {
   phone             String?
   isEmailVerified   Boolean   @default(false)
   emailVerifyToken  String?
+  emailVerifyExpires DateTime?
+  emailOtpHash      String?
+  emailOtpExpires   DateTime?
+  emailOtpAttempts  Int       @default(0)
   resetPasswordToken String?
   resetPasswordExpires DateTime?
+  resetOtpHash      String?
+  resetOtpExpires   DateTime?
+  resetOtpAttempts  Int       @default(0)
   lastLoginAt       DateTime?
   isActive          Boolean   @default(true)
+  isSuperAdmin      Boolean   @default(false)
+  totpSecret        String?
+  totpEnabled       Boolean   @default(false)
+  totpBackupCodes   String?
+  welcomeSeenAt     DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -188,6 +358,11 @@ model User {
   refreshTokens       RefreshToken[]
   sentMessages        Message[]          @relation("SentByUser")
   assignedConversations Conversation[]   @relation("AssignedAgent")
+  assignedAppointments Appointment[]     @relation("AssignedStaff")
+  appointmentNotes    AppointmentInternalNote[] @relation("AppointmentNoteAuthor")
+  createdAppointments Appointment[]           @relation("AppointmentCreator")
+  createdCampaigns    Campaign[]              @relation("CampaignCreator")
+  createdImportJobs   CustomerImportJob[]     @relation("ImportJobCreator")
   auditLogs           AuditLog[]
   notifications       Notification[]
 
@@ -252,25 +427,38 @@ model RefreshToken {
 // ─── CUSTOMERS (CRM) ─────────────────────────────────────────────────────────
 
 model Customer {
-  id           String   @id @default(uuid())
-  businessId   String
-  name         String
-  phone        String
-  email        String?
-  whatsappId   String?
-  notes        String?
-  source       String?
-  leadScore    Int      @default(0)
-  isActive     Boolean  @default(true)
+  id            String       @id @default(uuid())
+  businessId    String
+  name          String
+  phone         String
+  email         String?
+  whatsappId    String?
+  whatsappNumber String?
+  companyName   String?
+  address       String?
+  city          String?
+  country       String?
+  notes         String?
+  source        String?
+  customerType  CustomerType @default(REGULAR)
+  leadStatus    LeadStatus   @default(NEW)
+  leadScore     Int          @default(0)
+  customerValue Decimal?     @db.Decimal(12, 2)
+  aiSummary     Json?
+  isActive      Boolean      @default(true)
   lastContactAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business      Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
   tags          CustomerTagAssignment[]
   conversations Conversation[]
   appointments  Appointment[]
+  appointmentNotifications AppointmentNotification[]
   customerNotes CustomerNote[]
+  segmentMembers CustomerSegmentMember[]
+  campaignRecipients CampaignRecipient[]
+  targetedCampaigns Campaign[] @relation("CampaignTargetCustomer")
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -347,6 +535,8 @@ model Conversation {
   @@index([businessId])
   @@index([businessId, status])
   @@index([businessId, lastMessageAt])
+  @@index([businessId, assignedToId])
+  @@index([businessId, customerId, status])
   @@index([customerId])
   @@index([assignedToId])
   @@map("conversations")
@@ -399,29 +589,247 @@ model Service {
 }
 
 model Appointment {
-  id          String            @id @default(uuid())
-  businessId  String
-  customerId  String
-  serviceId   String?
-  title       String
-  description String?
-  startTime   DateTime
-  endTime     DateTime
-  status      AppointmentStatus @default(SCHEDULED)
-  notes       String?
-  reminderSent Boolean          @default(false)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id                     String              @id @default(uuid())
+  businessId             String
+  customerId             String
+  serviceId              String?
+  assignedToId           String?
+  createdById            String?
+  title                  String
+  description            String?
+  serviceRequested       String?
+  serviceCategory        String?
+  companyName            String?
+  additionalNotes        String?
+  requirementsCollected  Json?
+  aiConversationSummary  Json?
+  budget                 Decimal?            @db.Decimal(12, 2)
+  leadSource             String?             @default("WHATSAPP")
+  meetingLink            String?
+  priority               AppointmentPriority @default(MEDIUM)
+  startTime              DateTime
+  endTime                DateTime
+  status                 AppointmentStatus   @default(SCHEDULED)
+  rejectionReason        String?
+  notes                  String?
+  reminderSent           Boolean             @default(false)
+  reminder24hSent        Boolean             @default(false)
+  reminder1hSent         Boolean             @default(false)
+  reminder15mSent        Boolean             @default(false)
+  reminder30mSent        Boolean             @default(false)
+  reminder20mSent        Boolean             @default(false)
+  reminder10mSent        Boolean             @default(false)
+  followUp24hSent        Boolean             @default(false)
+  missedNotificationSent Boolean             @default(false)
+  confirmationSentAt     DateTime?
+  missedAt               DateTime?
+  canRebookAfter         DateTime?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  service  Service?  @relation(fields: [serviceId], references: [id])
+  business      Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service       Service?                  @relation(fields: [serviceId], references: [id])
+  assignedTo    User?                     @relation("AssignedStaff", fields: [assignedToId], references: [id])
+  createdBy     User?                     @relation("AppointmentCreator", fields: [createdById], references: [id])
+  internalNotes AppointmentInternalNote[]
+  notifications AppointmentNotification[]
 
   @@index([businessId])
   @@index([businessId, startTime])
   @@index([businessId, status])
   @@index([customerId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([priority])
   @@map("appointments")
+}
+
+model AppointmentInternalNote {
+  id            String   @id @default(uuid())
+  appointmentId String
+  content       String
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  createdBy   User?       @relation("AppointmentNoteAuthor", fields: [createdById], references: [id])
+
+  @@index([appointmentId])
+  @@map("appointment_internal_notes")
+}
+
+model AppointmentNotification {
+  id               String                       @id @default(uuid())
+  appointmentId    String
+  businessId       String
+  customerId       String
+  channel          AppointmentNotificationChannel
+  notificationType AppointmentNotificationType
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  status           AppointmentNotificationStatus @default(PENDING)
+  errorMessage     String?
+  createdAt        DateTime                     @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId, notificationType, channel])
+  @@index([appointmentId])
+  @@index([businessId, status])
+  @@index([scheduledAt, status])
+  @@map("appointment_notifications")
+}
+
+// ─── CUSTOMER SEGMENTS & CAMPAIGNS ───────────────────────────────────────────
+
+model CustomerSegment {
+  id          String   @id @default(uuid())
+  businessId  String
+  name        String
+  description String?
+  color       String   @default("#D97706")
+  customerType CustomerType?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business  Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  members   CustomerSegmentMember[]
+  campaigns Campaign[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("customer_segments")
+}
+
+model CustomerSegmentMember {
+  segmentId  String
+  customerId String
+  addedAt    DateTime @default(now())
+
+  segment  CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([segmentId, customerId])
+  @@index([customerId])
+  @@map("customer_segment_members")
+}
+
+model Campaign {
+  id             String           @id @default(uuid())
+  businessId     String
+  name           String
+  message        String
+  type           CampaignType     @default(MARKETING)
+  schedule       CampaignSchedule @default(ONE_TIME)
+  status         CampaignStatus   @default(DRAFT)
+  segmentId      String?
+  templateId     String?
+  customerTypes  CustomerType[]
+  sendToAll        Boolean          @default(false)
+  targetCustomerId String?
+  isSent           Boolean          @default(false)
+  runVersion       Int              @default(0)
+  scheduledAt      DateTime?
+  nextRunAt        DateTime?
+  lastRunAt        DateTime?
+  createdById      String?
+  sentCount      Int              @default(0)
+  deliveredCount Int              @default(0)
+  failedCount    Int              @default(0)
+  readCount      Int              @default(0)
+  responseCount  Int              @default(0)
+  linkClickCount Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  business       Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  segment        CustomerSegment?    @relation(fields: [segmentId], references: [id])
+  template       MessageTemplate?    @relation(fields: [templateId], references: [id])
+  targetCustomer Customer?           @relation("CampaignTargetCustomer", fields: [targetCustomerId], references: [id])
+  createdBy      User?               @relation("CampaignCreator", fields: [createdById], references: [id])
+  recipients     CampaignRecipient[]
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([scheduledAt])
+  @@index([nextRunAt])
+  @@index([templateId])
+  @@index([targetCustomerId])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id            String                  @id @default(uuid())
+  campaignId    String
+  customerId    String
+  phone         String
+  status        CampaignRecipientStatus @default(PENDING)
+  isSent        Boolean                 @default(false)
+  runVersion    Int                     @default(0)
+  whatsappMsgId String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  respondedAt   DateTime?
+  clickedAt     DateTime?
+  failedReason  String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([status])
+  @@map("campaign_recipients")
+}
+
+model MessageTemplate {
+  id          String       @id @default(uuid())
+  businessId  String
+  name        String
+  content     String
+  type        CampaignType @default(MARKETING)
+  isSystem    Boolean      @default(false)
+  variables   String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  business  Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("message_templates")
+}
+
+model CustomerImportJob {
+  id             String          @id @default(uuid())
+  businessId     String
+  fileName       String
+  fileType       String
+  status         ImportJobStatus @default(PENDING)
+  totalRows      Int             @default(0)
+  importedCount  Int             @default(0)
+  duplicateCount Int             @default(0)
+  invalidCount   Int             @default(0)
+  report         Json?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  completedAt    DateTime?
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("ImportJobCreator", fields: [createdById], references: [id])
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@map("customer_import_jobs")
 }
 
 // ─── KNOWLEDGE BASE ──────────────────────────────────────────────────────────
@@ -447,10 +855,11 @@ model KnowledgeDocument {
   knowledgeBaseId String
   title           String
   type            DocumentType
-  status          DocumentStatus @default(PENDING)
+  status          DocumentStatus @default(UPLOADED)
   fileUrl         String?
   fileSize        Int?
   content         String?
+  processingError String?
   category        String?
   question        String?
   answer          String?
@@ -477,6 +886,13 @@ model WhatsAppAccount {
   wabaId            String?
   accessToken       String?
   webhookVerified   Boolean  @default(false)
+  phoneNumberStatus String?  @default("unknown")
+  webhookStatus     String?  @default("pending")
+  lastWebhookReceivedAt DateTime?
+  lastSyncAt        DateTime?
+  lastGraphApiResponse Json?
+  lastGraphApiError    Json?
+  lastOutgoingAt       DateTime?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -487,6 +903,18 @@ model WhatsAppAccount {
   @@index([businessId])
   @@index([phoneNumberId])
   @@map("whatsapp_accounts")
+}
+
+model WhatsAppWebhookEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  eventType  String
+  businessId String?
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+  @@index([businessId])
+  @@map("whatsapp_webhook_events")
 }
 
 // ─── AI CONFIGURATION ────────────────────────────────────────────────────────

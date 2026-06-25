@@ -8,14 +8,32 @@ const router = Router();
 
 router.use(authenticate, requireBusiness);
 
+router.get('/', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.fullAnalytics(req, res, next)
+);
 router.get('/dashboard', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.dashboard(req, res, next)
+);
+router.get('/dashboard-bundle', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.dashboardBundle(req, res, next)
+);
+router.get('/revenue', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.revenue(req, res, next)
+);
+router.get('/customer-growth', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.customerGrowth(req, res, next)
+);
+router.get('/top-services', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.topServices(req, res, next)
 );
 router.get('/trends', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.trends(req, res, next)
 );
 router.get('/team-performance', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.teamPerformance(req, res, next)
+);
+router.get('/whatsapp', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.whatsapp(req, res, next)
 );
 
 export default router;

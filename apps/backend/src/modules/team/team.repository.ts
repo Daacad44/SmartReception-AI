@@ -76,6 +76,54 @@ export class TeamRepository {
     });
   }
 
+  async findInvitationByToken(token: string) {
+    return prisma.teamInvitation.findUnique({
+      where: { token },
+      include: { business: { select: { id: true, name: true } } },
+    });
+  }
+
+  async acceptInvitation(id: string) {
+    return prisma.teamInvitation.update({
+      where: { id },
+      data: { acceptedAt: new Date() },
+    });
+  }
+
+  async createMember(data: {
+    businessId: string;
+    userId: string;
+    role: UserRole;
+  }) {
+    return prisma.businessMember.upsert({
+      where: {
+        businessId_userId: { businessId: data.businessId, userId: data.userId },
+      },
+      create: {
+        businessId: data.businessId,
+        userId: data.userId,
+        role: data.role,
+        isActive: true,
+      },
+      update: { role: data.role, isActive: true },
+      include: {
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+      },
+    });
+  }
+
+  async updateInvitation(
+    id: string,
+    data: { token: string; expiresAt: Date; role: UserRole }
+  ) {
+    return prisma.teamInvitation.update({
+      where: { id },
+      data,
+    });
+  }
+
   async findUserByEmail(email: string) {
     return prisma.user.findUnique({ where: { email } });
   }

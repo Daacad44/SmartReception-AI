@@ -1,27 +1,87 @@
+import { OnboardingGate, OnboardingOnlyRoute } from '@/components/OnboardingGate';
+import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { HydrationGate } from '@/components/HydrationGate';
+import { RootRedirect } from '@/components/RootRedirect';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { ConversationsPage } from '@/pages/ConversationsPage';
-import { CustomersPage } from '@/pages/CustomersPage';
-import { AppointmentsPage } from '@/pages/AppointmentsPage';
-import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
-import { AnalyticsPage } from '@/pages/AnalyticsPage';
-import { TeamPage } from '@/pages/TeamPage';
-import { SettingsPage } from '@/pages/SettingsPage';
-import { BillingPage } from '@/pages/BillingPage';
+import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
+import { TwoFactorLoginPage } from '@/pages/TwoFactorLoginPage';
+import { CheckEmailPage } from '@/pages/CheckEmailPage';
+import { OnboardingPage } from '@/pages/OnboardingPage';
+import { WelcomePage } from '@/pages/WelcomePage';
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
+import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
+import { PermissionRoute } from '@/components/PermissionRoute';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth.store';
+import { ThemeProvider } from '@/components/ThemeProvider';
+
+const ConversationsPage = lazyWithRetry(() =>
+  import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
+);
+const CustomersPage = lazyWithRetry(() =>
+  import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
+);
+const CustomerImportPage = lazyWithRetry(() =>
+  import('@/pages/CustomerImportPage').then((m) => ({ default: m.CustomerImportPage }))
+);
+const AppointmentsPage = lazyWithRetry(() =>
+  import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
+);
+const KnowledgeBasePage = lazyWithRetry(() =>
+  import('@/pages/KnowledgeBasePage').then((m) => ({ default: m.KnowledgeBasePage }))
+);
+const AnalyticsPage = lazyWithRetry(() =>
+  import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
+);
+const TeamPage = lazyWithRetry(() =>
+  import('@/pages/TeamPage').then((m) => ({ default: m.TeamPage }))
+);
+const SettingsPage = lazyWithRetry(() =>
+  import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
+);
+const BillingPage = lazyWithRetry(() =>
+  import('@/pages/BillingPage').then((m) => ({ default: m.BillingPage }))
+);
+const NotificationsPage = lazyWithRetry(() =>
+  import('@/pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage }))
+);
+const AuditLogsPage = lazyWithRetry(() =>
+  import('@/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage }))
+);
+const SuperAdminPage = lazyWithRetry(() =>
+  import('@/pages/SuperAdminPage').then((m) => ({ default: m.SuperAdminPage }))
+);
+const BusinessManagementPage = lazyWithRetry(() =>
+  import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
+);
+const UserManagementPage = lazyWithRetry(() =>
+  import('@/pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
+);
+const CampaignsPage = lazyWithRetry(() =>
+  import('@/pages/CampaignsPage').then((m) => ({ default: m.CampaignsPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
-      retry: 1,
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      retry: (failureCount, error) => {
+        if (failureCount >= 3) return false;
+        if (axios.isAxiosError(error) && !error.response) return true;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
       refetchOnWindowFocus: false,
     },
   },
@@ -29,57 +89,221 @@ const queryClient = new QueryClient({
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  if (isAuthenticated && accessToken) {
+    return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <LoginPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <RegisterPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/conversations" element={<ConversationsPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/appointments" element={<AppointmentsPage />} />
-              <Route path="/knowledge" element={<KnowledgeBasePage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/team" element={<TeamPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/billing" element={<BillingPage />} />
-            </Route>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster position="top-right" richColors />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <HydrationGate>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<RootRedirect />} />
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <LoginPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <PublicRoute>
+                      <RegisterPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/verify-2fa" element={<TwoFactorLoginPage />} />
+                <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                <Route path="/check-email" element={<CheckEmailPage />} />
+                <Route
+                  path="/onboarding"
+                  element={
+                    <OnboardingOnlyRoute>
+                      <OnboardingPage />
+                    </OnboardingOnlyRoute>
+                  }
+                />
+                <Route
+                  path="/welcome"
+                  element={
+                    <ProtectedRoute>
+                      <WelcomePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/forgot-password"
+                  element={
+                    <PublicRoute>
+                      <ForgotPasswordPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/reset-password"
+                  element={
+                    <PublicRoute>
+                      <ResetPasswordPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  element={
+                    <OnboardingGate>
+                      <ProtectedRoute>
+                        <DashboardLayout />
+                      </ProtectedRoute>
+                    </OnboardingGate>
+                  }
+                >
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
+                        <DashboardPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/conversations"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['conversations:read']}>
+                        <ConversationsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/customers"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['customers:read']}>
+                        <CustomersPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/customers/import"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['customers:write']}>
+                        <CustomerImportPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/appointments"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['appointments:read']}>
+                        <AppointmentsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/campaigns"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['campaigns:read']}>
+                        <CampaignsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/knowledge"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
+                        <KnowledgeBasePage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/analytics"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
+                        <AnalyticsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/team"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['team:read']}>
+                        <TeamPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['settings:read']}>
+                        <SettingsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/billing"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['billing:read']}>
+                        <BillingPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['conversations:read']}>
+                        <NotificationsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/audit-logs"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['audit:read']}>
+                        <AuditLogsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/super-admin"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <SuperAdminPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/businesses"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <BusinessManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/users"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <UserManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                </Route>
+                <Route path="*" element={<RootRedirect />} />
+              </Routes>
+            </BrowserRouter>
+            <Toaster position="top-right" richColors />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </HydrationGate>
+    </ThemeProvider>
   );
 }

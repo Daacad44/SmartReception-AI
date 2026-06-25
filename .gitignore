@@ -1,13 +1,33 @@
 node_modules
 dist
 build
+
+# Environment variables — never commit real secrets
 .env
+.env.*
+!.env.example
+!**/.env.example
 .env.local
 .env.*.local
+.env.development
+.env.production
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+apps/frontend/api/_bundle/
+
+# Credential files
+credentials.json
+*.pem
+*.key
+secrets.json
+
 *.log
 .DS_Store
 coverage
+playwright-report
 .turbo
 .vite
 *.tsbuildinfo
 apps/backend/prisma/migrations/**/migration_lock.toml
+dump.rdb

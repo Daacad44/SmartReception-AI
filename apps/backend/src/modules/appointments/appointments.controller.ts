@@ -5,6 +5,8 @@ import {
   createAppointmentSchema,
   updateAppointmentSchema,
   paginationSchema,
+  appointmentActionSchema,
+  addInternalNoteSchema,
 } from '@smartreception/shared';
 import { z } from 'zod';
 
@@ -38,8 +40,55 @@ export class AppointmentsController {
 
   async get(req: Request, res: Response, next: NextFunction) {
     try {
-      const appointment = await appointmentsService.get(req.user!.businessId!, routeParam(req.params.id));
+      const detailed = req.query.detail === 'true';
+      const appointment = detailed
+        ? await appointmentsService.getDetail(req.user!.businessId!, routeParam(req.params.id))
+        : await appointmentsService.get(req.user!.businessId!, routeParam(req.params.id));
       res.json({ success: true, data: appointment });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async notifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await appointmentsService.getNotifications(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async performAction(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { action, assignedToId, startTime, endTime, internalNote } =
+        appointmentActionSchema.parse(req.body);
+      const appointment = await appointmentsService.performAction(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        action,
+        req.user!.userId,
+        { assignedToId, startTime, endTime, internalNote }
+      );
+      res.json({ success: true, data: appointment });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addNote(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { content } = addInternalNoteSchema.parse(req.body);
+      const note = await appointmentsService.addInternalNote(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        content,
+        req.user!.userId
+      );
+      res.status(201).json({ success: true, data: note });
     } catch (error) {
       next(error);
     }

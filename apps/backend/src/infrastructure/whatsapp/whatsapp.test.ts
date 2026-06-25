@@ -1,0 +1,164 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
+
+describe('WhatsApp webhook parser', () => {
+  it('parses inbound text messages', () => {
+    const body = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: '12345', display_phone_number: '+15551234' },
+                messages: [
+                  {
+                    from: '15559876543',
+                    id: 'wamid.abc',
+                    timestamp: '1710000000',
+                    type: 'text',
+                    text: { body: 'Hello' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseWebhookBody(body);
+    assert.equal(parsed.phoneNumberId, '12345');
+    assert.equal(parsed.messages.length, 1);
+    assert.equal(parsed.messages[0].text?.body, 'Hello');
+  });
+
+  it('parses contact profile names from value.contacts', () => {
+    const body = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: '12345' },
+                contacts: [{ wa_id: '252687716299', profile: { name: 'John Doe' } }],
+                messages: [
+                  {
+                    from: '252687716299',
+                    id: 'wamid.contact',
+                    timestamp: '1710000002',
+                    type: 'text',
+                    text: { body: 'Hello' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseWebhookBody(body);
+    assert.equal(parsed.contacts.length, 1);
+    assert.equal(resolveContactName(parsed.contacts, '252687716299'), 'John Doe');
+  });
+
+  it('parses delivery status updates', () => {
+    const body = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: '12345' },
+                statuses: [
+                  {
+                    id: 'wamid.out',
+                    status: 'delivered',
+                    timestamp: '1710000001',
+                    recipient_id: '15559876543',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseWebhookBody(body);
+    assert.equal(parsed.statuses.length, 1);
+    assert.equal(parsed.statuses[0].status, 'delivered');
+  });
+
+  it('extracts interactive button reply content', () => {
+    const extracted = extractMessageContent({
+      from: '1',
+      id: 'wamid.btn',
+      timestamp: '1',
+      type: 'interactive',
+      interactive: { type: 'button_reply', button_reply: { id: 'yes', title: 'Yes' } },
+    });
+    assert.equal(extracted.content, 'Yes');
+    assert.equal(extracted.type, 'INTERACTIVE');
+  });
+
+  it('extracts image media metadata', () => {
+    const extracted = extractMessageContent({
+      from: '1',
+      id: 'wamid.img',
+      timestamp: '1',
+      type: 'image',
+      image: { id: 'media123', mime_type: 'image/jpeg', caption: 'Photo' },
+    });
+    assert.equal(extracted.mediaId, 'media123');
+    assert.equal(extracted.content, 'Photo');
+    assert.equal(extracted.type, 'IMAGE');
+  });
+});
+
+describe('WhatsApp webhook verification', () => {
+  function verifyWebhook(
+    mode: string,
+    token: string,
+    challenge: string,
+    expectedToken: string
+  ): string | null {
+    if (mode === 'subscribe' && token === expectedToken && challenge) {
+      return challenge;
+    }
+    return null;
+  }
+
+  it('returns challenge when mode and token match', () => {
+    const result = verifyWebhook('subscribe', 'smartreception-verify', '123456', 'smartreception-verify');
+    assert.equal(result, '123456');
+  });
+
+  it('rejects wrong verify token', () => {
+    const result = verifyWebhook('subscribe', 'wrong-token', '123456', 'smartreception-verify');
+    assert.equal(result, null);
+  });
+
+  it('rejects non-subscribe mode', () => {
+    const result = verifyWebhook('unsubscribe', 'smartreception-verify', '123456', 'smartreception-verify');
+    assert.equal(result, null);
+  });
+});
+
+describe('WhatsApp webhook signature', () => {
+  it('validates X-Hub-Signature-256', () => {
+    const secret = 'test-secret';
+    const payload = Buffer.from('{"test":true}');
+    const hash = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const signature = `sha256=${hash}`;
+
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const received = signature.replace('sha256=', '');
+    assert.equal(
+      crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received)),
+      true
+    );
+  });
+});

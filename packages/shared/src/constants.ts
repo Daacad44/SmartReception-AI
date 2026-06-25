@@ -4,6 +4,8 @@ export const ROLES = {
   MANAGER: 'MANAGER',
   AGENT: 'AGENT',
   VIEWER: 'VIEWER',
+  RECEPTIONIST: 'RECEPTIONIST',
+  STAFF: 'STAFF',
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -27,13 +29,19 @@ export const PERMISSIONS = {
   'settings:read': 'settings:read',
   'settings:write': 'settings:write',
   'ai:configure': 'ai:configure',
+  'audit:read': 'audit:read',
+  'campaigns:read': 'campaigns:read',
+  'campaigns:write': 'campaigns:write',
+  'platform:admin': 'platform:admin',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  OWNER: Object.values(PERMISSIONS),
-  ADMIN: Object.values(PERMISSIONS).filter((p) => !p.startsWith('billing:write')),
+  OWNER: Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS['platform:admin']),
+  ADMIN: Object.values(PERMISSIONS).filter(
+    (p) => !p.startsWith('billing:write') && p !== PERMISSIONS['platform:admin']
+  ),
   MANAGER: [
     PERMISSIONS['business:read'],
     PERMISSIONS['team:read'],
@@ -47,6 +55,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['knowledge:write'],
     PERMISSIONS['analytics:read'],
     PERMISSIONS['settings:read'],
+    PERMISSIONS['audit:read'],
+    PERMISSIONS['campaigns:read'],
+    PERMISSIONS['campaigns:write'],
   ],
   AGENT: [
     PERMISSIONS['customers:read'],
@@ -55,6 +66,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['conversations:write'],
     PERMISSIONS['appointments:read'],
     PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+    PERMISSIONS['campaigns:read'],
+  ],
+  RECEPTIONIST: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['customers:write'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['conversations:write'],
+    PERMISSIONS['appointments:read'],
+    PERMISSIONS['appointments:write'],
+    PERMISSIONS['knowledge:read'],
+    PERMISSIONS['analytics:read'],
+    PERMISSIONS['campaigns:read'],
+    PERMISSIONS['campaigns:write'],
+  ],
+  STAFF: [
+    PERMISSIONS['customers:read'],
+    PERMISSIONS['conversations:read'],
+    PERMISSIONS['appointments:read'],
     PERMISSIONS['knowledge:read'],
   ],
   VIEWER: [
@@ -68,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 export const SUBSCRIPTION_PLANS = {
   FREE: 'FREE',
   STARTER: 'STARTER',
+  BUSINESS: 'BUSINESS',
   PROFESSIONAL: 'PROFESSIONAL',
   ENTERPRISE: 'ENTERPRISE',
 } as const;

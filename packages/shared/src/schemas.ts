@@ -1,13 +1,106 @@
 import { z } from 'zod';
 
-export const registerSchema = z.object({
+const strongPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128)
+  .regex(/[A-Z]/, 'Password must include an uppercase letter')
+  .regex(/[a-z]/, 'Password must include a lowercase letter')
+  .regex(/[0-9]/, 'Password must include a number')
+  .regex(/[^A-Za-z0-9]/, 'Password must include a special character');
+
+export const registerSchema = z
+  .object({
+    email: z.string().email(),
+    password: strongPasswordSchema,
+    confirmPassword: z.string().min(8).max(128),
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+export const checkEmailSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8).max(128),
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
-  businessName: z.string().min(1).max(200),
-  industry: z.string().optional(),
 });
+
+export const onboardingBusinessInfoSchema = z.object({
+  name: z.string().min(1).max(200),
+  industry: z.string().min(1),
+  businessType: z.string().min(1).max(200),
+  businessCategory: z.string().min(1).max(100),
+  phone: z.string().min(1).max(20),
+  whatsappNumber: z.string().min(1).max(20),
+  country: z.string().min(1).max(100),
+  city: z.string().min(1).max(100),
+  address: z.string().min(1).max(500),
+  website: z.string().url().optional().or(z.literal('')),
+});
+
+export const onboardingProfileSchema = z.object({
+  employeeRange: z.enum(['1-5', '5-20', '20-50', '50-100', '100+']),
+  customerVolume: z.enum(['1-50', '50-200', '200-1000', '1000+']),
+  mainGoal: z.enum([
+    'AI_RECEPTIONIST',
+    'WHATSAPP_AUTOMATION',
+    'APPOINTMENT_BOOKING',
+    'CRM',
+    'MARKETING_CAMPAIGNS',
+    'CUSTOMER_SUPPORT',
+    'LEAD_GENERATION',
+  ]),
+});
+
+export const onboardingDiscoverySchema = z.object({
+  referralSource: z.enum([
+    'FACEBOOK',
+    'TIKTOK',
+    'GOOGLE',
+    'WHATSAPP',
+    'YOUTUBE',
+    'FRIEND_REFERRAL',
+    'EXISTING_CUSTOMER',
+    'OTHER',
+  ]),
+  problemToSolve: z.string().min(10).max(2000),
+  biggestChallenge: z.string().min(10).max(2000),
+});
+
+export const onboardingPlanSchema = z.object({
+  plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+});
+
+export const onboardingWhatsAppSchema = z
+  .object({
+    wabaId: z.string().optional(),
+    phoneNumberId: z.string().optional(),
+    accessToken: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    displayName: z.string().optional(),
+    skipConnection: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.skipConnection) return;
+    if (!data.wabaId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'WABA ID is required', path: ['wabaId'] });
+    }
+    if (!data.phoneNumberId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone Number ID is required',
+        path: ['phoneNumberId'],
+      });
+    }
+    if (!data.accessToken?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Access token is required',
+        path: ['accessToken'],
+      });
+    }
+  });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -22,8 +115,18 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
+export const verifyOtpSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6).regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+
+export const resendOtpSchema = z.object({
+  email: z.string().email(),
+});
+
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1),
+  email: z.string().email(),
+  code: z.string().length(6).regex(/^\d{6}$/, 'Code must be 6 digits'),
   password: z.string().min(8).max(128),
 });
 
@@ -40,11 +143,33 @@ export const createBusinessSchema = z.object({
 
 export const updateBusinessSchema = createBusinessSchema.partial();
 
+export const CUSTOMER_TYPES = [
+  'VIP',
+  'REGULAR',
+  'NEW_CUSTOMER',
+  'RETURNING',
+  'HIGH_VALUE',
+  'PREMIUM',
+  'INACTIVE',
+  'LEAD',
+  'PROSPECT',
+] as const;
+
+export const customerTypeSchema = z.enum(CUSTOMER_TYPES);
+
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(1).max(20),
   email: z.string().email().optional().or(z.literal('')),
   notes: z.string().max(5000).optional(),
+  companyName: z.string().max(200).optional(),
+  address: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  country: z.string().max(100).optional(),
+  whatsappNumber: z.string().max(20).optional(),
+  customerType: customerTypeSchema.optional(),
+  leadStatus: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'WON', 'LOST']).optional(),
+  customerValue: z.number().min(0).optional(),
   tagIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -58,22 +183,88 @@ export const createAppointmentSchema = z.object({
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   notes: z.string().max(1000).optional(),
+  companyName: z.string().max(200).optional(),
+  serviceRequested: z.string().max(200).optional(),
+  additionalNotes: z.string().max(2000).optional(),
+  leadSource: z.enum(['WHATSAPP', 'WEBSITE', 'FORM', 'PHONE', 'REFERRAL', 'OTHER']).optional(),
+  assignedToId: z.string().uuid().optional(),
+  meetingLink: z.string().url().optional().or(z.literal('')),
+  customerEmail: z.string().email().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  serviceCategory: z.string().max(100).optional(),
+  budget: z.number().min(0).optional(),
 });
 
-export const updateAppointmentSchema = createAppointmentSchema.partial();
+export const updateAppointmentSchema = createAppointmentSchema.partial().extend({
+  status: z.enum(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'MISSED']).optional(),
+});
+
+export const appointmentActionSchema = z.object({
+  action: z.enum(['approve', 'reject', 'reschedule', 'cancel', 'complete', 'mark_missed', 'assign']),
+  assignedToId: z.string().uuid().optional(),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
+  internalNote: z.string().max(2000).optional(),
+  rejectionReason: z.string().max(1000).optional(),
+});
+
+export const addInternalNoteSchema = z.object({
+  content: z.string().min(1).max(2000),
+});
+
+export const twoFactorVerifySchema = z.object({
+  tempToken: z.string().min(1),
+  code: z.string().min(6).max(8),
+});
+
+export const twoFactorSetupVerifySchema = z.object({
+  code: z.string().length(6).regex(/^\d{6}$/),
+});
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1),
+  code: z.string().min(6).max(8),
+});
+
+export const acceptInviteSchema = z.object({
+  token: z.string().min(1),
+});
+
+export const changePlanSchema = z.object({
+  plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
+});
+
+export const checkoutSchema = z.object({
+  plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
+});
+
+export const connectWhatsAppSchema = z.object({
+  phoneNumberId: z.string().min(1).max(100),
+  phoneNumber: z.string().min(1).max(20),
+  displayName: z.string().max(200).optional(),
+  wabaId: z.string().max(100).optional(),
+  accessToken: z.string().min(1).max(500),
+});
+
+export const knowledgeSearchSchema = z.object({
+  q: z.string().min(1).max(500),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
 
 export const sendMessageSchema = z.object({
   content: z.string().min(1).max(4096),
-  type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO']).default('TEXT'),
+  type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO', 'TEMPLATE', 'INTERACTIVE']).default('TEXT'),
+  mediaUrl: z.string().url().optional(),
+  mediaFilename: z.string().max(255).optional(),
 });
 
 export const inviteTeamMemberSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']),
 });
 
 export const updateTeamMemberSchema = z.object({
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']),
 });
 
 export const createServiceSchema = z.object({
@@ -109,7 +300,96 @@ export const paginationSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
+export const createSegmentSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  color: z.string().max(20).optional(),
+  customerType: customerTypeSchema.optional(),
+  customerIds: z.array(z.string().uuid()).optional(),
+});
+
+export const updateSegmentSchema = createSegmentSchema.partial();
+
+export const createCampaignSchema = z.object({
+  name: z.string().min(1).max(200),
+  message: z.string().min(1).max(4096),
+  type: z
+    .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
+    .default('MARKETING'),
+  schedule: z.enum(['ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM']).default('ONE_TIME'),
+  segmentId: z.string().uuid().optional(),
+  templateId: z.string().uuid().optional(),
+  customerTypes: z.array(customerTypeSchema).optional(),
+  sendToAll: z.boolean().optional(),
+  targetCustomerId: z.string().uuid().optional(),
+  scheduledAt: z.string().datetime().optional(),
+  sendNow: z.boolean().optional(),
+});
+
+export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const createMessageTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  content: z.string().min(1).max(4096),
+  type: z
+    .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
+    .default('MARKETING'),
+  variables: z.array(z.string().max(50)).optional(),
+});
+
+export const updateMessageTemplateSchema = createMessageTemplateSchema.partial();
+
+export const superAdminCreateBusinessSchema = z.object({
+  name: z.string().min(1).max(200),
+  ownerEmail: z.string().email(),
+  ownerFirstName: z.string().min(1).max(100),
+  ownerLastName: z.string().min(1).max(100),
+  ownerPassword: z.string().min(8).max(128).optional(),
+  industry: z.string().optional(),
+  plan: z.enum(['FREE', 'STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
+  phone: z.string().max(20).optional(),
+});
+
+export const superAdminUpdateBusinessSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  industry: z.string().optional(),
+  phone: z.string().max(20).optional(),
+  email: z.string().email().optional(),
+  isActive: z.boolean().optional(),
+  plan: z.enum(['FREE', 'STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
+});
+
+export const superAdminCreateUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  isSuperAdmin: z.boolean().optional(),
+  businessId: z.string().uuid().optional(),
+  role: z.enum(['OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']).optional(),
+});
+
+export const superAdminUpdateUserSchema = z.object({
+  email: z.string().email().optional(),
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  isActive: z.boolean().optional(),
+  isSuperAdmin: z.boolean().optional(),
+  totpEnabled: z.boolean().optional(),
+  businessId: z.string().uuid().optional(),
+  role: z.enum(['OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']).optional(),
+});
+
+export const transferOwnershipSchema = z.object({
+  newOwnerUserId: z.string().uuid(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type OnboardingBusinessInfoInput = z.infer<typeof onboardingBusinessInfoSchema>;
+export type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>;
+export type OnboardingDiscoveryInput = z.infer<typeof onboardingDiscoverySchema>;
+export type OnboardingPlanInput = z.infer<typeof onboardingPlanSchema>;
+export type OnboardingWhatsAppInput = z.infer<typeof onboardingWhatsAppSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateBusinessInput = z.infer<typeof createBusinessSchema>;
 export type UpdateBusinessInput = z.infer<typeof updateBusinessSchema>;
@@ -124,3 +404,23 @@ export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type CreateFaqInput = z.infer<typeof createFaqSchema>;
 export type AiConfigInput = z.infer<typeof aiConfigSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
+export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;
+export type TwoFactorVerifyInput = z.infer<typeof twoFactorVerifySchema>;
+export type TwoFactorSetupVerifyInput = z.infer<typeof twoFactorSetupVerifySchema>;
+export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
+export type AppointmentActionInput = z.infer<typeof appointmentActionSchema>;
+export type AddInternalNoteInput = z.infer<typeof addInternalNoteSchema>;
+export type CreateSegmentInput = z.infer<typeof createSegmentSchema>;
+export type UpdateSegmentInput = z.infer<typeof updateSegmentSchema>;
+export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
+export type UpdateCampaignInput = z.infer<typeof updateCampaignSchema>;
+export type CreateMessageTemplateInput = z.infer<typeof createMessageTemplateSchema>;
+export type UpdateMessageTemplateInput = z.infer<typeof updateMessageTemplateSchema>;
+export type SuperAdminCreateBusinessInput = z.infer<typeof superAdminCreateBusinessSchema>;
+export type SuperAdminUpdateBusinessInput = z.infer<typeof superAdminUpdateBusinessSchema>;
+export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;
+export type SuperAdminUpdateUserInput = z.infer<typeof superAdminUpdateUserSchema>;
+export type TransferOwnershipInput = z.infer<typeof transferOwnershipSchema>;

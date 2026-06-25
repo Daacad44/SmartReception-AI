@@ -16,6 +16,42 @@ export class AnalyticsController {
     }
   }
 
+  async revenue(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getRevenueOverview(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async customerGrowth(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getCustomerGrowth(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async topServices(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getTopServices(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async fullAnalytics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getFullAnalytics(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async trends(req: Request, res: Response, next: NextFunction) {
     try {
       const { days } = trendsQuerySchema.parse(req.query);
@@ -30,6 +66,24 @@ export class AnalyticsController {
     try {
       const performance = await analyticsService.getTeamPerformance(req.user!.businessId!);
       res.json({ success: true, data: performance });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async dashboardBundle(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getDashboardBundle(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async whatsapp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getWhatsAppAnalytics(req.user!.businessId!);
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

@@ -3,6 +3,7 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   message?: string;
   error?: string;
+  code?: string;
   meta?: PaginationMeta;
 }
 
@@ -27,6 +28,19 @@ export interface DashboardStats {
   customerGrowth: number;
   appointmentGrowth: number;
   aiGrowth: number;
+}
+
+export interface DashboardBundle {
+  stats: DashboardStats;
+  revenue: RevenueOverview[];
+  customerGrowth: Array<{ month: string; customers: number }>;
+  trends: ConversationTrend[];
+  topServices: TopService[];
+  teamPerformance: TeamPerformance[];
+  conversationSummary?: {
+    unreadTotal: number;
+    aiHandlingCount: number;
+  };
 }
 
 export interface ConversationTrend {
@@ -61,10 +75,9 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
+  confirmPassword: string;
   firstName: string;
   lastName: string;
-  businessName: string;
-  industry: string;
 }
 
 export interface UserProfile {
@@ -79,5 +92,6 @@ export interface UserProfile {
     name: string;
     industry: string;
     plan: string;
+    role?: string;
   }>;
 }

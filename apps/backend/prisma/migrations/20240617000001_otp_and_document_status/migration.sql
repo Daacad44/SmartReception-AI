@@ -1,0 +1,13 @@
+-- Document status workflow + OTP authentication fields
+
+ALTER TYPE "DocumentStatus" ADD VALUE IF NOT EXISTS 'UPLOADED';
+ALTER TYPE "DocumentStatus" ADD VALUE IF NOT EXISTS 'INDEXING';
+
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailOtpHash" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailOtpExpires" TIMESTAMP(3);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailOtpAttempts" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "resetOtpHash" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "resetOtpExpires" TIMESTAMP(3);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "resetOtpAttempts" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "knowledge_documents" ADD COLUMN IF NOT EXISTS "processingError" TEXT;

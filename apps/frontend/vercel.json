@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && npm install --include=dev",
+  "buildCommand": "cd ../.. && bash scripts/vercel-build.sh",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "api/_bundle/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/webhook", "destination": "/api" },
+    { "source": "/api/webhook", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

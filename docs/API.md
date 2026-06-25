@@ -55,13 +55,20 @@ Requires auth. Revokes refresh token.
 { "email": "owner@clinic.com" }
 ```
 
-### POST /auth/reset-password
+### POST /auth/verify-otp
 ```json
-{ "token": "reset-token", "password": "NewSecurePass123" }
+{ "email": "owner@clinic.com", "code": "123456" }
 ```
 
-### GET /auth/verify-email?token=...
-Verify email address.
+### POST /auth/resend-otp
+```json
+{ "email": "owner@clinic.com" }
+```
+
+### POST /auth/reset-password
+```json
+{ "email": "owner@clinic.com", "code": "123456", "password": "NewSecurePass123" }
+```
 
 ### GET /auth/profile
 Returns user profile and business memberships.
@@ -325,6 +332,50 @@ Remove team member.
 List pending invitations.
 
 ---
+
+## Billing
+
+### GET /billing
+Subscription overview, usage, invoices. **Permission:** `billing:read`
+
+### POST /billing/checkout
+Create Stripe Checkout session. **Permission:** `billing:write`
+
+```json
+{ "plan": "PROFESSIONAL" }
+```
+
+### POST /billing/portal
+Open Stripe Customer Portal. **Permission:** `billing:write`
+
+### POST /billing/change-plan
+Admin plan change (no payment). **Permission:** `billing:write`
+
+### POST /billing/webhook
+Stripe webhook (public, raw body). Configure in Stripe Dashboard.
+
+---
+
+## Knowledge Base
+
+### GET /knowledge/search?q=...
+Semantic + keyword document search. **Permission:** `knowledge:read`
+
+---
+
+## WhatsApp
+
+### GET /whatsapp/accounts
+List connected WhatsApp accounts. **Permission:** `settings:read`
+
+### POST /whatsapp/accounts
+Connect a WhatsApp Business account. **Permission:** `settings:write`
+
+### DELETE /whatsapp/accounts/:id
+Disconnect account. **Permission:** `settings:write`
+
+### GET /whatsapp/webhook-info
+Returns webhook URL and verify token for Meta setup.
 
 ## WhatsApp Webhook
 

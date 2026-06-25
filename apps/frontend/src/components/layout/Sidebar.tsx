@@ -10,36 +10,77 @@ import {
   Settings,
   CreditCard,
   Bot,
+  Bell,
+  Shield,
   Sparkles,
+  Building2,
+  Megaphone,
+  Crown,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useConversations } from '@/hooks/useApi';
+import { useConversationSummary, useBilling, useAppointments } from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const },
   { to: '/customers', icon: Users, label: 'Customers' },
+  { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
+  { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
   { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const },
   { to: '/settings', icon: Settings, label: 'Settings' },
   { to: '/billing', icon: CreditCard, label: 'Billing' },
 ];
 
-export function Sidebar() {
-  const { data: conversations } = useConversations();
-  const unreadCount = conversations?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
+const adminNavItems = [
+  { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const },
+  { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const },
+  { to: '/admin/users', icon: UsersRound, label: 'User Management', permission: 'platform:admin' as const },
+];
+
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
+  const { data: summary } = useConversationSummary();
+  const { data: appointments } = useAppointments();
+  const { data: billing } = useBilling();
+  const { hasPermission } = usePermissions();
+  const unreadCount = summary?.unreadTotal ?? 0;
+  const upcomingAppointments =
+    appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
+
+  const conversationUsage = billing?.usage?.conversations;
+  const usagePercent =
+    conversationUsage && conversationUsage.limit > 0
+      ? Math.round((conversationUsage.used / conversationUsage.limit) * 100)
+      : 0;
 
   const badges: Record<string, number> = {
     conversations: unreadCount,
-    appointments: 3,
+    appointments: upcomingAppointments,
   };
 
+  const visibleItems = [...navItems, ...adminNavItems].filter((item) => {
+    const permission =
+      'permission' in item && item.permission
+        ? PERMISSIONS[item.permission]
+        : ROUTE_PERMISSIONS[item.to];
+    return permission ? hasPermission(permission) : true;
+  });
+
   return (
-    <aside className="flex h-screen w-64 flex-col bg-navy text-white">
+    <aside className="flex h-full w-64 flex-col bg-navy text-white">
       <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
           <Bot className="h-5 w-5 text-white" />
@@ -51,10 +92,11 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 scrollbar-thin">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -66,7 +108,7 @@ export function Sidebar() {
           >
             <item.icon className="h-4 w-4 shrink-0" />
             <span className="flex-1">{item.label}</span>
-            {item.badgeKey && badges[item.badgeKey] > 0 && (
+            {'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
               <Badge className="bg-accent text-white hover:bg-accent/90 h-5 min-w-5 justify-center px-1.5 text-[10px]">
                 {badges[item.badgeKey]}
               </Badge>
@@ -75,24 +117,29 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <div className="rounded-lg bg-white/5 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-accent" />
-            <span className="text-xs font-semibold">Professional Plan</span>
+      {hasPermission('billing:read') && (
+        <div className="border-t border-white/10 p-4">
+          <div className="rounded-lg bg-white/5 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold">{billing?.plan ?? 'Starter'} Plan</span>
+            </div>
+            <p className="mb-3 text-[11px] text-white/50">
+              {conversationUsage
+                ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
+                : 'Loading usage...'}
+            </p>
+            <Progress value={usagePercent} className="mb-3 h-1.5 bg-white/10" />
+            <Link
+              to="/billing"
+              onClick={onNavigate}
+              className="block text-center text-xs font-medium text-accent hover:text-accent/80"
+            >
+              Upgrade Plan
+            </Link>
           </div>
-          <p className="mb-3 text-[11px] text-white/50">
-            2,847 / 5,000 conversations used
-          </p>
-          <Progress value={57} className="mb-3 h-1.5 bg-white/10" />
-          <Link
-            to="/billing"
-            className="block text-center text-xs font-medium text-accent hover:text-accent/80"
-          >
-            Upgrade Plan
-          </Link>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

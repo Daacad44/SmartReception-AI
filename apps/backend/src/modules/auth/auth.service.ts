@@ -2,16 +2,22 @@ import { authRepository } from './auth.repository';
 import { passwordService } from '../../infrastructure/auth/password.service';
 import { tokenService } from '../../infrastructure/auth/token.service';
 import { emailService } from '../../infrastructure/email/email.service';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../../core/errors';
+import { otpService } from '../../infrastructure/auth/otp.service';
+import {
+  ConflictError,
+  UnauthorizedError,
+  NotFoundError,
+  EmailNotVerifiedError,
+  ValidationError,
+} from '../../core/errors';
 import { RegisterInput, LoginInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
+import {
+  assertLoginAllowed,
+  recordFailedLogin,
+  clearLoginAttempts,
+} from '../../infrastructure/auth/login-lockout.service';
+import { twoFactorService } from '../two-factor/two-factor.service';
 
 export class AuthService {
   async register(input: RegisterInput) {
@@ -21,46 +27,103 @@ export class AuthService {
     }
 
     const passwordHash = await passwordService.hash(input.password);
-    const emailVerifyToken = tokenService.generateSecureToken();
+    const otpCode = otpService.generateCode();
 
     const user = await authRepository.createUser({
       email: input.email,
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
-      emailVerifyToken,
+      emailOtpHash: otpService.hashCode(otpCode),
+      emailOtpExpires: otpService.getExpiry(),
+      emailOtpAttempts: 0,
     });
 
-    let slug = slugify(input.businessName);
-    const existingSlug = await prisma.business.findUnique({ where: { slug } });
-    if (existingSlug) {
-      slug = `${slug}-${Date.now()}`;
+    await emailService.sendOtpEmail(user.email, otpCode, user.firstName, 'verification');
+
+    return {
+      message: 'Registration successful. Please verify your email to continue.',
+      email: user.email,
+      requiresVerification: true,
+    };
+  }
+
+  async checkEmailAvailability(email: string) {
+    const existing = await authRepository.findUserByEmail(email);
+    return { available: !existing };
+  }
+
+  async login(input: LoginInput, ipAddress?: string) {
+    assertLoginAllowed(input.email, ipAddress);
+
+    const user = await authRepository.findUserByEmail(input.email);
+    if (!user || !user.isActive) {
+      recordFailedLogin(input.email, ipAddress);
+      throw new UnauthorizedError('Invalid credentials');
     }
 
-    const { business } = await authRepository.createBusinessWithOwner(user.id, {
-      name: input.businessName,
-      slug,
-      industry: input.industry,
-    });
+    const valid = await passwordService.compare(input.password, user.passwordHash);
+    if (!valid) {
+      recordFailedLogin(input.email, ipAddress);
+      throw new UnauthorizedError('Invalid credentials');
+    }
 
-    await emailService.sendVerificationEmail(user.email, emailVerifyToken);
+    clearLoginAttempts(input.email, ipAddress);
+
+    if (!user.isEmailVerified) {
+      throw new EmailNotVerifiedError();
+    }
+
+    const memberships = await authRepository.getUserBusinesses(user.id);
+    const primaryMembership = memberships[0];
+
+    const mustVerify2fa = twoFactorService.requiresTwoFactor(
+      primaryMembership?.role,
+      user.totpEnabled,
+      user.isSuperAdmin
+    );
+
+    if (mustVerify2fa && user.totpEnabled) {
+      const tempToken = twoFactorService.createTempToken(user.id, user.email);
+      return {
+        requiresTwoFactor: true,
+        tempToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+    }
+
+    await authRepository.updateUser(user.id, { lastLoginAt: new Date() });
 
     const tokens = await tokenService.createTokenPair(
       user.id,
       user.email,
-      business.id,
-      'OWNER'
+      primaryMembership?.businessId,
+      primaryMembership?.role
     );
 
     await prisma.auditLog.create({
       data: {
-        businessId: business.id,
+        businessId: primaryMembership?.businessId,
         userId: user.id,
-        action: 'CREATE',
+        action: 'LOGIN',
         entity: 'User',
         entityId: user.id,
+        ipAddress,
+        newData: { event: 'login' },
       },
     });
+
+    emailService
+      .sendLoginAlert(user.email, { firstName: user.firstName, ipAddress })
+      .catch(() => undefined);
+
+    const needsOnboarding =
+      memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt;
 
     return {
       user: {
@@ -68,27 +131,24 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
       },
-      business: {
-        id: business.id,
-        name: business.name,
-        slug: business.slug,
-      },
+      businesses: memberships.map((m) => ({
+        id: m.business.id,
+        name: m.business.name,
+        slug: m.business.slug,
+        role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'FREE',
+      })),
+      isSuperAdmin: user.isSuperAdmin,
+      requiresOnboarding: needsOnboarding,
       ...tokens,
     };
   }
 
-  async login(input: LoginInput) {
-    const user = await authRepository.findUserByEmail(input.email);
-    if (!user || !user.isActive) {
-      throw new UnauthorizedError('Invalid credentials');
-    }
-
-    const valid = await passwordService.compare(input.password, user.passwordHash);
-    if (!valid) {
-      throw new UnauthorizedError('Invalid credentials');
-    }
-
+  async verifyTwoFactorLogin(tempToken: string, code: string, ipAddress?: string) {
+    const user = await twoFactorService.verifyLogin(tempToken, code);
     const memberships = await authRepository.getUserBusinesses(user.id);
     const primaryMembership = memberships[0];
 
@@ -108,6 +168,8 @@ export class AuthService {
         action: 'LOGIN',
         entity: 'User',
         entityId: user.id,
+        ipAddress,
+        newData: { event: 'login_2fa' },
       },
     });
 
@@ -124,6 +186,123 @@ export class AuthService {
         name: m.business.name,
         slug: m.business.slug,
         role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'FREE',
+      })),
+      isSuperAdmin: user.isSuperAdmin,
+      requiresOnboarding:
+        memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
+      ...tokens,
+    };
+  }
+
+  async resendOtp(email: string) {
+    const user = await authRepository.findUserByEmail(email);
+    if (!user || user.isEmailVerified) {
+      return { message: 'If the account exists and is unverified, a new code has been sent' };
+    }
+
+    const otpCode = otpService.generateCode();
+
+    await authRepository.updateUser(user.id, {
+      emailOtpHash: otpService.hashCode(otpCode),
+      emailOtpExpires: otpService.getExpiry(),
+      emailOtpAttempts: 0,
+    });
+
+    await emailService.sendOtpEmail(user.email, otpCode, user.firstName, 'verification');
+
+    return { message: 'If the account exists and is unverified, a new code has been sent' };
+  }
+
+  async verifyOtp(email: string, code: string) {
+    const user = await authRepository.findUserByEmail(email);
+    if (!user) {
+      throw new NotFoundError('Invalid verification code');
+    }
+
+    if (user.isEmailVerified) {
+      const memberships = await authRepository.getUserBusinesses(user.id);
+      const tokens = await tokenService.createTokenPair(
+        user.id,
+        user.email,
+        memberships[0]?.businessId,
+        memberships[0]?.role
+      );
+      return {
+        message: 'Email already verified.',
+        requiresOnboarding:
+          memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        businesses: memberships.map((m) => ({
+          id: m.business.id,
+          name: m.business.name,
+          slug: m.business.slug,
+          role: m.role,
+          industry: m.business.industry,
+          plan: m.business.subscription?.plan ?? 'FREE',
+        })),
+        ...tokens,
+      };
+    }
+
+    if ((user.emailOtpAttempts ?? 0) >= otpService.maxAttempts) {
+      throw new ValidationError('Too many failed attempts. Request a new code.');
+    }
+
+    if (otpService.isExpired(user.emailOtpExpires) || !otpService.verifyCode(code, user.emailOtpHash)) {
+      await authRepository.updateUser(user.id, {
+        emailOtpAttempts: (user.emailOtpAttempts ?? 0) + 1,
+      });
+      throw new ValidationError('Invalid or expired verification code');
+    }
+
+    await authRepository.updateUser(user.id, {
+      isEmailVerified: true,
+      emailOtpHash: null,
+      emailOtpExpires: null,
+      emailOtpAttempts: 0,
+    });
+
+    const memberships = await authRepository.getUserBusinesses(user.id);
+    const businessName = memberships[0]?.business.name ?? 'your business';
+
+    await emailService.sendWelcomeEmail(user.email, {
+      firstName: user.firstName,
+      businessName,
+    });
+
+    const tokens = await tokenService.createTokenPair(
+      user.id,
+      user.email,
+      memberships[0]?.businessId,
+      memberships[0]?.role
+    );
+
+    const needsOnboarding =
+      memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt;
+
+    return {
+      message: 'Email verified successfully.',
+      requiresOnboarding: needsOnboarding,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      businesses: memberships.map((m) => ({
+        id: m.business.id,
+        name: m.business.name,
+        slug: m.business.slug,
+        role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'FREE',
       })),
       ...tokens,
     };
@@ -141,6 +320,10 @@ export class AuthService {
       throw new UnauthorizedError('User not found');
     }
 
+    if (!user.isEmailVerified) {
+      throw new EmailNotVerifiedError();
+    }
+
     await tokenService.revokeRefreshToken(refreshToken);
 
     const memberships = await authRepository.getUserBusinesses(user.id);
@@ -154,7 +337,7 @@ export class AuthService {
     );
   }
 
-  async logout(refreshToken: string, userId?: string) {
+  async logout(refreshToken?: string, userId?: string) {
     if (refreshToken) {
       await tokenService.revokeRefreshToken(refreshToken);
     }
@@ -174,50 +357,46 @@ export class AuthService {
     const user = await authRepository.findUserByEmail(email);
     if (!user) return;
 
-    const resetToken = tokenService.generateSecureToken();
-    const expires = new Date(Date.now() + 60 * 60 * 1000);
+    const otpCode = otpService.generateCode();
 
     await authRepository.updateUser(user.id, {
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: expires,
+      resetOtpHash: otpService.hashCode(otpCode),
+      resetOtpExpires: otpService.getExpiry(),
+      resetOtpAttempts: 0,
     });
 
-    await emailService.sendPasswordResetEmail(email, resetToken);
+    await emailService.sendOtpEmail(email, otpCode, user.firstName, 'password_reset');
   }
 
-  async resetPassword(token: string, password: string) {
-    const user = await prisma.user.findFirst({
-      where: {
-        resetPasswordToken: token,
-        resetPasswordExpires: { gt: new Date() },
-      },
-    });
-
+  async resetPassword(email: string, code: string, password: string) {
+    const user = await authRepository.findUserByEmail(email);
     if (!user) {
-      throw new NotFoundError('Invalid or expired reset token');
+      throw new NotFoundError('Invalid or expired reset code');
+    }
+
+    if ((user.resetOtpAttempts ?? 0) >= otpService.maxAttempts) {
+      throw new ValidationError('Too many failed attempts. Request a new code.');
+    }
+
+    if (otpService.isExpired(user.resetOtpExpires) || !otpService.verifyCode(code, user.resetOtpHash)) {
+      await authRepository.updateUser(user.id, {
+        resetOtpAttempts: (user.resetOtpAttempts ?? 0) + 1,
+      });
+      throw new ValidationError('Invalid or expired reset code');
     }
 
     const passwordHash = await passwordService.hash(password);
     await authRepository.updateUser(user.id, {
       passwordHash,
+      resetOtpHash: null,
+      resetOtpExpires: null,
+      resetOtpAttempts: 0,
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
-  }
 
-  async verifyEmail(token: string) {
-    const user = await prisma.user.findFirst({
-      where: { emailVerifyToken: token },
-    });
-
-    if (!user) {
-      throw new NotFoundError('Invalid verification token');
-    }
-
-    await authRepository.updateUser(user.id, {
-      isEmailVerified: true,
-      emailVerifyToken: null,
-    });
+    await tokenService.revokeAllUserTokens(user.id);
+    await emailService.sendPasswordChangedEmail(user.email, user.firstName);
   }
 
   async switchBusiness(userId: string, businessId: string) {
@@ -251,11 +430,17 @@ export class AuthService {
       lastName: user.lastName,
       avatarUrl: user.avatarUrl,
       isEmailVerified: user.isEmailVerified,
+      isSuperAdmin: user.isSuperAdmin,
+      welcomeSeen: Boolean(user.welcomeSeenAt),
+      needsOnboarding: memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt,
+      onboardingCompleted: memberships.length > 0 && Boolean(memberships[0]?.business.onboardingCompletedAt),
       businesses: memberships.map((m) => ({
         id: m.business.id,
         name: m.business.name,
         slug: m.business.slug,
         role: m.role,
+        industry: m.business.industry,
+        plan: m.business.subscription?.plan ?? 'FREE',
       })),
     };
   }

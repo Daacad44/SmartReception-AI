@@ -5,25 +5,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number): string {
+function toNumber(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+export function formatCurrency(amount: unknown): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(toNumber(amount));
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('en-US').format(num);
+export function formatNumber(num: unknown): string {
+  return new Intl.NumberFormat('en-US').format(toNumber(num));
 }
 
-export function formatPercent(value: number): string {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
+export function formatPercent(value: unknown): string {
+  const n = toNumber(value);
+  const sign = n >= 0 ? '+' : '';
+  return `${sign}${n.toFixed(1)}%`;
 }
 
-export function getInitials(name: string): string {
+export function getInitials(name: string | null | undefined): string {
+  if (!name?.trim()) return '?';
   return name
     .split(' ')
     .map((n) => n[0])

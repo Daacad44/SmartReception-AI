@@ -43,5 +43,14 @@ router.get('/:id/notes', authorize(PERMISSIONS['customers:read']), (req, res, ne
 router.post('/:id/notes', authorize(PERMISSIONS['customers:write']), (req, res, next) =>
   customersController.addNote(req, res, next)
 );
+router.get('/:id/timeline', authorize(PERMISSIONS['customers:read']), (req, res, next) =>
+  customersController.getTimeline(req, res, next)
+);
+router.get('/:id/insights', authorize(PERMISSIONS['customers:read']), (req, res, next) =>
+  customersController.getInsights(req, res, next)
+);
+router.get('/:id/profile', authorize(PERMISSIONS['customers:read']), (req, res, next) =>
+  customersController.getProfile(req, res, next)
+);
 
 export default router;

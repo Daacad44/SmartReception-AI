@@ -4,7 +4,9 @@ import { InviteTeamMemberInput, UpdateTeamMemberInput } from '@smartreception/sh
 import { tokenService } from '../../infrastructure/auth/token.service';
 import { emailService } from '../../infrastructure/email/email.service';
 import { prisma } from '../../infrastructure/database/prisma';
+import { billingService } from '../billing/billing.service';
 import { UserRole } from '@prisma/client';
+import { notifyTeam } from '../../infrastructure/notifications/notification-helper';
 
 export class TeamService {
   async listMembers(businessId: string) {
@@ -19,6 +21,8 @@ export class TeamService {
   }
 
   async inviteMember(businessId: string, input: InviteTeamMemberInput, invitedBy: string) {
+    await billingService.assertWithinLimit(businessId, 'teamMembers');
+
     const existingMember = await teamRepository.findUserByEmail(input.email);
     if (existingMember) {
       const membership = await teamRepository.findMemberByUserId(businessId, existingMember.id);
@@ -29,7 +33,22 @@ export class TeamService {
 
     const existingInvite = await teamRepository.findInvitationByEmail(businessId, input.email);
     if (existingInvite) {
-      throw new ConflictError('Invitation already sent to this email');
+      const token = tokenService.generateSecureToken();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const invitation = await teamRepository.updateInvitation(existingInvite.id, {
+        token,
+        expiresAt,
+        role: input.role as UserRole,
+      });
+      const business = await prisma.business.findUnique({ where: { id: businessId } });
+      const inviter = await prisma.user.findUnique({ where: { id: invitedBy } });
+      await emailService.sendTeamInvitation(input.email, {
+        businessName: business?.name || 'SmartReception',
+        inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : 'A team member',
+        role: input.role,
+        token,
+      });
+      return invitation;
     }
 
     const token = tokenService.generateSecureToken();
@@ -44,8 +63,14 @@ export class TeamService {
     });
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
+    const inviter = await prisma.user.findUnique({ where: { id: invitedBy } });
 
-    await emailService.sendTeamInvitation(input.email, business?.name || 'SmartReception', token);
+    await emailService.sendTeamInvitation(input.email, {
+      businessName: business?.name || 'SmartReception',
+      inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : 'A team member',
+      role: input.role,
+      token,
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -57,6 +82,16 @@ export class TeamService {
         newData: { email: input.email, role: input.role },
       },
     });
+
+    const existingUser = await teamRepository.findUserByEmail(input.email);
+    if (existingUser) {
+      await notifyTeam(
+        businessId,
+        existingUser.id,
+        'Team invitation',
+        `You have been invited to join ${business?.name || 'the team'} as ${input.role}`
+      );
+    }
 
     return invitation;
   }
@@ -143,6 +178,44 @@ export class TeamService {
 
   async listInvitations(businessId: string) {
     return teamRepository.findInvitations(businessId);
+  }
+
+  async acceptInvite(token: string, userId: string) {
+    const invitation = await teamRepository.findInvitationByToken(token);
+    if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) {
+      throw new NotFoundError('Invalid or expired invitation');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+      throw new ForbiddenError('Invitation email does not match your account');
+    }
+
+    const member = await teamRepository.createMember({
+      businessId: invitation.businessId,
+      userId,
+      role: invitation.role,
+    });
+
+    await teamRepository.acceptInvitation(invitation.id);
+
+    await prisma.auditLog.create({
+      data: {
+        businessId: invitation.businessId,
+        userId,
+        action: 'CREATE',
+        entity: 'BusinessMember',
+        entityId: member.id,
+        newData: { email: invitation.email, role: invitation.role, via: 'invitation' },
+      },
+    });
+
+    return {
+      businessId: invitation.businessId,
+      businessName: invitation.business.name,
+      role: invitation.role,
+      member,
+    };
   }
 }
 

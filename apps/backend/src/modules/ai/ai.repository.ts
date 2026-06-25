@@ -1,5 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { Prisma } from '@prisma/client';
+import { invalidateAiConfigCache } from './ai-config.service';
 
 export class AIRepository {
   async findByBusinessId(businessId: string) {
@@ -9,7 +10,7 @@ export class AIRepository {
   }
 
   async upsert(businessId: string, data: Prisma.AIConfigurationUpdateInput) {
-    return prisma.aIConfiguration.upsert({
+    const result = await prisma.aIConfiguration.upsert({
       where: { businessId },
       create: {
         businessId,
@@ -25,6 +26,8 @@ export class AIRepository {
       },
       update: data,
     });
+    invalidateAiConfigCache(businessId);
+    return result;
   }
 }
 

@@ -4,6 +4,7 @@ import { updateBusinessSchema } from '@smartreception/shared';
 import { z } from 'zod';
 
 const updateSettingsSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
   timezone: z.string().optional(),
   phone: z.string().max(20).optional(),
   email: z.string().email().optional().or(z.literal('')),

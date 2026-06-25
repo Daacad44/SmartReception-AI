@@ -1,0 +1,42 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "github": {
+    "autoJobCancelation": false
+  },
+  "installCommand": "npm install --include=dev",
+  "buildCommand": "bash scripts/vercel-build.sh",
+  "outputDirectory": "apps/frontend/dist",
+  "framework": null,
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "apps/backend/{dist,prisma}/**"
+    },
+    "api/webhook.js": {
+      "maxDuration": 30,
+      "includeFiles": "apps/backend/{dist,prisma}/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/webhook", "destination": "/api/webhook" },
+    { "source": "/webhook/(.*)", "destination": "/api/webhook" },
+    { "source": "/api/webhook", "destination": "/api/webhook" },
+    { "source": "/api/v1/whatsapp/webhook", "destination": "/api/webhook" },
+    { "source": "/api/v1/webhooks/whatsapp", "destination": "/api/webhook" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

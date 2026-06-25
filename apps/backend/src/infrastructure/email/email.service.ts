@@ -1,8 +1,20 @@
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
+import * as templates from './templates';
 
-const transporter = config.email.host
+let resendClient: Resend | null = null;
+
+function getResend(): Resend | null {
+  if (!config.resend.apiKey) return null;
+  if (!resendClient) {
+    resendClient = new Resend(config.resend.apiKey);
+  }
+  return resendClient;
+}
+
+const smtpTransporter = config.email.host
   ? nodemailer.createTransport({
       host: config.email.host,
       port: config.email.port,
@@ -15,52 +27,118 @@ const transporter = config.email.host
   : null;
 
 export class EmailService {
+  private get fromAddress(): string {
+    return `${config.email.fromName} <${config.email.fromEmail}>`;
+  }
+
   async send(to: string, subject: string, html: string): Promise<void> {
-    if (!transporter) {
-      logger.info(`[Email Dev] To: ${to}, Subject: ${subject}`);
+    const resend = getResend();
+
+    if (resend) {
+      const { error } = await resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject,
+        html,
+      });
+
+      if (error) {
+        logger.error('Resend email failed:', error);
+        throw new Error(`Failed to send email: ${error.message}`);
+      }
+      logger.info(`Email sent via Resend to ${to}: ${subject}`);
       return;
     }
 
-    await transporter.sendMail({
-      from: config.email.from,
-      to,
-      subject,
-      html,
+    if (smtpTransporter) {
+      await smtpTransporter.sendMail({
+        from: this.fromAddress,
+        to,
+        subject,
+        html,
+      });
+      logger.info(`Email sent via SMTP to ${to}: ${subject}`);
+      return;
+    }
+
+    logger.info(`[Email Dev] From: ${this.fromAddress}, To: ${to}, Subject: ${subject}`);
+  }
+
+  async sendOtpEmail(
+    email: string,
+    code: string,
+    firstName: string,
+    purpose: 'verification' | 'password_reset'
+  ): Promise<void> {
+    const { subject, html } = templates.otpEmail({
+      firstName,
+      code,
+      expiryMinutes: 10,
+      purpose,
     });
+    await this.send(email, subject, html);
   }
 
-  async sendVerificationEmail(email: string, token: string): Promise<void> {
-    const url = `${config.frontendUrl}/verify-email?token=${token}`;
-    await this.send(
-      email,
-      'Verify your SmartReception AI account',
-      `<h1>Welcome to SmartReception AI</h1>
-       <p>Click the link below to verify your email:</p>
-       <a href="${url}">Verify Email</a>`
-    );
+  async sendWelcomeEmail(
+    email: string,
+    data: { firstName: string; businessName: string }
+  ): Promise<void> {
+    const dashboardUrl = `${config.frontendUrl}/dashboard`;
+    const { subject, html } = templates.welcomeEmail({
+      firstName: data.firstName,
+      businessName: data.businessName,
+      dashboardUrl,
+    });
+    await this.send(email, subject, html);
   }
 
-  async sendPasswordResetEmail(email: string, token: string): Promise<void> {
-    const url = `${config.frontendUrl}/reset-password?token=${token}`;
-    await this.send(
-      email,
-      'Reset your SmartReception AI password',
-      `<h1>Password Reset</h1>
-       <p>Click the link below to reset your password:</p>
-       <a href="${url}">Reset Password</a>
-       <p>This link expires in 1 hour.</p>`
-    );
+  async sendAccountActivatedEmail(
+    email: string,
+    data: { firstName: string; businessName: string }
+  ): Promise<void> {
+    const dashboardUrl = `${config.frontendUrl}/dashboard`;
+    const { subject, html } = templates.accountActivatedEmail({
+      firstName: data.firstName,
+      businessName: data.businessName,
+      dashboardUrl,
+    });
+    await this.send(email, subject, html);
   }
 
-  async sendTeamInvitation(email: string, businessName: string, token: string): Promise<void> {
-    const url = `${config.frontendUrl}/accept-invite?token=${token}`;
-    await this.send(
-      email,
-      `You've been invited to join ${businessName}`,
-      `<h1>Team Invitation</h1>
-       <p>You've been invited to join <strong>${businessName}</strong> on SmartReception AI.</p>
-       <a href="${url}">Accept Invitation</a>`
-    );
+  async sendPasswordResetEmail(email: string, token: string, firstName: string): Promise<void> {
+    const resetUrl = `${config.frontendUrl}/reset-password?token=${token}`;
+    const { subject, html } = templates.passwordResetEmail({ firstName, resetUrl });
+    await this.send(email, subject, html);
+  }
+
+  async sendPasswordChangedEmail(email: string, firstName: string): Promise<void> {
+    const loginUrl = `${config.frontendUrl}/login`;
+    const { subject, html } = templates.passwordChangedEmail({ firstName, loginUrl });
+    await this.send(email, subject, html);
+  }
+
+  async sendLoginAlert(email: string, data: { firstName: string; ipAddress?: string }): Promise<void> {
+    const loginTime = new Date().toUTCString();
+    const { subject, html } = templates.loginAlertEmail({
+      firstName: data.firstName,
+      loginTime,
+      ipAddress: data.ipAddress,
+    });
+    await this.send(email, subject, html);
+  }
+
+  async sendTeamInvitation(
+    email: string,
+    data: { businessName: string; inviterName: string; role: string; token: string }
+  ): Promise<void> {
+    const inviteUrl = `${config.frontendUrl}/accept-invite?token=${data.token}`;
+    const { subject, html } = templates.teamInvitationEmail({
+      businessName: data.businessName,
+      inviterName: data.inviterName,
+      role: data.role,
+      inviteUrl,
+    });
+    await this.send(email, subject, html);
   }
 }
 

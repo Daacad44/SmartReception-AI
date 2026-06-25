@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { routeParam } from '../../core/utils';
 import { knowledgeService } from './knowledge.service';
-import { createFaqSchema } from '@smartreception/shared';
+import { createFaqSchema, knowledgeSearchSchema } from '@smartreception/shared';
 
 export class KnowledgeController {
   async listBases(req: Request, res: Response, next: NextFunction) {
@@ -88,6 +88,30 @@ export class KnowledgeController {
     }
   }
 
+  async processDocument(req: Request, res: Response, next: NextFunction) {
+    try {
+      const document = await knowledgeService.processDocument(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: document });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDocumentStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = await knowledgeService.getDocumentStatus(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: status });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
       await knowledgeService.deleteDocument(
@@ -96,6 +120,16 @@ export class KnowledgeController {
         req.user!.userId
       );
       res.json({ success: true, message: 'Document deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async search(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { q, limit } = knowledgeSearchSchema.parse(req.query);
+      const results = await knowledgeService.searchDocuments(req.user!.businessId!, q, limit);
+      res.json({ success: true, data: results });
     } catch (error) {
       next(error);
     }

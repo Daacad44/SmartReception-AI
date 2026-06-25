@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Send,
-  Paperclip,
   MoreVertical,
   Bot,
   User,
@@ -10,6 +10,8 @@ import {
   Tag,
   CheckCheck,
   Calendar,
+  ArrowLeft,
+  Info,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,9 +26,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversations, useMessages } from '@/hooks/useApi';
+import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
+import { useConversationRealtime } from '@/hooks/useRealtime';
+import { LoadingState } from '@/components/LoadingState';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { cn, getInitials, formatRelativeTime } from '@/lib/utils';
-import type { Conversation } from '@/lib/mock-data';
+import { isNetworkOrTimeoutError } from '@/lib/api';
+import type { Message } from '@/lib/entities';
+
+function messageStatusLabel(status: Message['status']): string {
+  switch (status) {
+    case 'read':
+      return 'Message read';
+    case 'delivered':
+      return 'Message delivered';
+    default:
+      return 'Message sent';
+  }
+}
+import type { Conversation } from '@/lib/entities';
 
 const statusColors: Record<string, string> = {
   open: 'bg-warning/10 text-warning border-warning/20',
@@ -38,35 +59,75 @@ const statusColors: Record<string, string> = {
 const statusFilters = ['all', 'open', 'pending', 'ai_handling', 'resolved'] as const;
 
 export function ConversationsPage() {
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'list' | 'chat' | 'details'>('list');
 
-  const { data: conversations } = useConversations();
-  const { data: messages } = useMessages(selectedId);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const filtered = conversations?.filter((c) => {
-    const matchesSearch =
-      !search ||
-      c.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: conversations, isLoading, isError, refetch } = useConversations({
+    status: statusFilter,
+    search: debouncedSearch || undefined,
   });
+  const { data: messages, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
+  const sendMessage = useSendMessage();
+  const takeover = useTakeoverConversation();
+  const transferToAi = useTransferToAi();
+  const markRead = useMarkConversationRead();
+
+  useConversationRealtime(selectedId);
+
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId(id);
+    setMobilePane('chat');
+    markRead.mutate(id);
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!message.trim()) {
+      setIsTyping(false);
+      return;
+    }
+    setIsTyping(true);
+    const t = setTimeout(() => setIsTyping(false), 1500);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  const handleSend = () => {
+    if (!selectedId || !message.trim()) return;
+    sendMessage.mutate(
+      { conversationId: selectedId, content: message.trim() },
+      { onSuccess: () => setMessage('') }
+    );
+  };
+
+  const filtered = conversations;
 
   const selected = conversations?.find((c) => c.id === selectedId) ?? null;
 
   useEffect(() => {
     if (!selectedId && filtered && filtered.length > 0) {
-      setSelectedId(filtered[0].id);
+      handleSelect(filtered[0].id);
     }
-  }, [filtered, selectedId]);
+  }, [filtered, selectedId, handleSelect]);
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] -m-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-7rem)] -m-4 md:-m-6 overflow-hidden">
       {/* Left pane - conversation list */}
-      <div className="flex w-80 flex-col border-r bg-white">
+      <div
+        className={cn(
+          'flex w-full md:w-80 flex-col border-r bg-card',
+          mobilePane !== 'list' && 'hidden md:flex'
+        )}
+      >
         <div className="border-b p-4 space-y-3">
           <h2 className="text-lg font-semibold">Conversations</h2>
           <div className="relative">
@@ -96,23 +157,45 @@ export function ConversationsPage() {
           </div>
         </div>
         <ScrollArea className="flex-1">
-          {filtered?.map((conv) => (
+          {isLoading ? (
+            <LoadingState rows={4} />
+          ) : isError ? (
+            <ErrorState message="Failed to load conversations" onRetry={() => refetch()} />
+          ) : filtered?.length === 0 ? (
+            <EmptyState title="No conversations" description="New WhatsApp messages will appear here." />
+          ) : (
+            filtered?.map((conv) => (
             <ConversationItem
               key={conv.id}
               conversation={conv}
               isSelected={conv.id === selectedId}
-              onClick={() => setSelectedId(conv.id)}
+              onClick={() => handleSelect(conv.id)}
             />
-          ))}
+          ))
+          )}
         </ScrollArea>
       </div>
 
       {/* Center pane - messages */}
-      <div className="flex flex-1 flex-col bg-[#E5DDD5]">
+      <div
+        className={cn(
+          'flex flex-1 flex-col bg-muted/40 dark:bg-muted/20',
+          mobilePane !== 'chat' && 'hidden md:flex'
+        )}
+      >
         {selected ? (
           <>
-            <div className="flex items-center justify-between border-b bg-white px-4 py-3">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between border-b bg-card px-4 py-3">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden shrink-0"
+                  onClick={() => setMobilePane('list')}
+                  aria-label="Back to conversations"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="bg-accent/10 text-accent text-sm">
                     {getInitials(selected.customerName)}
@@ -127,6 +210,9 @@ export function ConversationsPage() {
                 <Badge className={statusColors[selected.status]}>
                   {selected.status.replace('_', ' ')}
                 </Badge>
+                {isTyping && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Agent typing...</span>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -134,17 +220,49 @@ export function ConversationsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Assign to agent</DropdownMenuItem>
-                    <DropdownMenuItem>Mark as resolved</DropdownMenuItem>
-                    <DropdownMenuItem>Transfer to AI</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => selectedId && takeover.mutate(selectedId)}>
+                      Take over from AI
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="md:hidden"
+                      onClick={() => setMobilePane('details')}
+                    >
+                      View contact details
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">Block contact</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => setMobilePane('details')}
+                  aria-label="Contact details"
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
             <ScrollArea className="flex-1 p-4">
+              {messagesLoading && !messages ? (
+                <LoadingState rows={6} />
+              ) : messagesError ? (
+                <ErrorState
+                  message={
+                    isNetworkOrTimeoutError(messagesError)
+                      ? 'Connection lost. Retrying messages...'
+                      : 'Failed to load messages.'
+                  }
+                  onRetry={() => refetchMessages()}
+                />
+              ) : (
               <div className="space-y-3">
+                {messagesFetching && messages && (
+                  <p className="text-center text-xs text-muted-foreground animate-pulse">
+                    Syncing messages...
+                  </p>
+                )}
                 {messages?.map((msg) => (
                   <div
                     key={msg.id}
@@ -157,10 +275,10 @@ export function ConversationsPage() {
                       className={cn(
                         'max-w-[70%] rounded-lg px-3 py-2 shadow-sm',
                         msg.sender === 'customer'
-                          ? 'bg-white'
+                          ? 'bg-card border border-border'
                           : msg.sender === 'ai'
-                            ? 'bg-[#DCF8C6] border border-success/20'
-                            : 'bg-[#DCF8C6]'
+                            ? 'bg-success/10 border border-success/20 dark:bg-success/20'
+                            : 'bg-accent/10 border border-accent/20 dark:bg-accent/20'
                       )}
                     >
                       {msg.sender !== 'customer' && (
@@ -175,26 +293,72 @@ export function ConversationsPage() {
                           </span>
                         </div>
                       )}
-                      <p className="text-sm">{msg.content}</p>
+                      {msg.mediaUrl && (
+                        <div className="mb-2">
+                          {(msg.type === 'IMAGE' || msg.mediaUrl.match(/\.(jpe?g|png|gif|webp)(\?|$)/i)) && (
+                            <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={msg.mediaUrl}
+                                alt={msg.content || 'Image'}
+                                className="max-h-48 rounded-md object-cover"
+                              />
+                            </a>
+                          )}
+                          {(msg.type === 'VIDEO' || msg.mediaUrl.match(/\.(mp4|webm)(\?|$)/i)) && (
+                            <video src={msg.mediaUrl} controls className="max-h-48 rounded-md" />
+                          )}
+                          {(msg.type === 'AUDIO' || msg.mediaUrl.match(/\.(mp3|ogg|wav|m4a)(\?|$)/i)) && (
+                            <audio src={msg.mediaUrl} controls className="w-full" />
+                          )}
+                          {(msg.type === 'DOCUMENT' ||
+                            (!msg.type?.match(/IMAGE|VIDEO|AUDIO/) &&
+                              !msg.mediaUrl.match(/\.(jpe?g|png|gif|webp|mp4|webm|mp3|ogg|wav|m4a)(\?|$)/i))) && (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-accent underline"
+                            >
+                              {msg.content || 'Download document'}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {msg.content && <p className="text-sm">{msg.content}</p>}
                       <div className="mt-1 flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {msg.sender !== 'customer' && (
-                          <CheckCheck className="h-3 w-3 text-success" />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <CheckCheck
+                                  className={cn(
+                                    'h-3 w-3',
+                                    msg.status === 'read'
+                                      ? 'text-success'
+                                      : msg.status === 'delivered'
+                                        ? 'text-muted-foreground'
+                                        : 'text-muted-foreground/60'
+                                  )}
+                                  aria-label={messageStatusLabel(msg.status)}
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{messageStatusLabel(msg.status)}</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+              )}
             </ScrollArea>
 
-            <div className="border-t bg-white p-3">
+            <div className="border-t bg-card p-3">
               <div className="flex items-end gap-2">
-                <Button variant="ghost" size="icon" className="shrink-0">
-                  <Paperclip className="h-4 w-4" />
-                </Button>
                 <Textarea
                   placeholder="Type a message..."
                   className="min-h-[40px] max-h-24 resize-none"
@@ -203,11 +367,16 @@ export function ConversationsPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      setMessage('');
+                      handleSend();
                     }
                   }}
                 />
-                <Button size="icon" className="shrink-0 bg-accent hover:bg-accent/90">
+                <Button
+                  size="icon"
+                  className="shrink-0 bg-accent hover:bg-accent/90"
+                  disabled={sendMessage.isPending || !message.trim()}
+                  onClick={handleSend}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
@@ -221,9 +390,23 @@ export function ConversationsPage() {
       </div>
 
       {/* Right pane - contact details */}
-      <div className="flex w-72 flex-col border-l bg-white">
+      <div
+        className={cn(
+          'flex w-full md:w-72 flex-col border-l bg-card',
+          mobilePane !== 'details' && 'hidden md:flex'
+        )}
+      >
         {selected ? (
           <ScrollArea className="flex-1 p-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4 md:hidden"
+              onClick={() => setMobilePane('chat')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to chat
+            </Button>
             <div className="text-center">
               <Avatar className="mx-auto h-16 w-16">
                 <AvatarFallback className="bg-accent/10 text-accent text-lg">
@@ -281,15 +464,31 @@ export function ConversationsPage() {
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Quick Actions</p>
                 <div className="space-y-2">
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/appointments?customer=${selected.customerId}`)}
+                  >
                     <Calendar className="mr-2 h-4 w-4" />
                     Schedule Appointment
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/customers?highlight=${selected.customerId}`)}
+                  >
                     <User className="mr-2 h-4 w-4" />
                     View Customer Profile
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => selectedId && transferToAi.mutate(selectedId)}
+                    disabled={selected.status === 'ai_handling'}
+                  >
                     <Bot className="mr-2 h-4 w-4" />
                     Transfer to AI
                   </Button>

@@ -15,7 +15,11 @@ export class AuthRepository {
     passwordHash: string;
     firstName: string;
     lastName: string;
-    emailVerifyToken?: string;
+    emailOtpHash?: string;
+    emailOtpExpires?: Date;
+    emailOtpAttempts?: number;
+    isEmailVerified?: boolean;
+    isSuperAdmin?: boolean;
   }): Promise<User> {
     return prisma.user.create({ data });
   }
@@ -33,7 +37,13 @@ export class AuthRepository {
 
   async createBusinessWithOwner(
     userId: string,
-    businessData: { name: string; slug: string; industry?: string }
+    businessData: {
+      name: string;
+      slug: string;
+      industry?: string;
+      phone?: string;
+      onboardingStep?: number;
+    }
   ): Promise<{ business: Business; membership: BusinessMember }> {
     return prisma.$transaction(async (tx) => {
       const business = await tx.business.create({
@@ -41,6 +51,8 @@ export class AuthRepository {
           name: businessData.name,
           slug: businessData.slug,
           industry: (businessData.industry as never) || 'OTHER',
+          phone: businessData.phone,
+          onboardingStep: businessData.onboardingStep ?? 1,
         },
       });
 
@@ -55,7 +67,7 @@ export class AuthRepository {
       await tx.subscription.create({
         data: {
           businessId: business.id,
-          plan: 'PROFESSIONAL',
+          plan: 'FREE',
           status: 'TRIALING',
           currentPeriodStart: new Date(),
           currentPeriodEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -80,7 +92,11 @@ export class AuthRepository {
   async getUserBusinesses(userId: string) {
     return prisma.businessMember.findMany({
       where: { userId, isActive: true },
-      include: { business: true },
+      include: {
+        business: {
+          include: { subscription: true },
+        },
+      },
     });
   }
 }

@@ -1,6 +1,7 @@
 import type { AIConfiguration, Business, KnowledgeBase, WhatsAppAccount } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { NotFoundError } from '../../core/errors';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { knowledgeRepository } from '../knowledge/knowledge.repository';
 import type { WebhookMetadata, WhatsAppTenantContext } from './whatsapp-tenant.types';
 
@@ -29,7 +30,8 @@ export class WhatsAppTenantResolver {
       throw new NotFoundError(`WhatsApp account not found for phone_number_id: ${phoneNumberId}`);
     }
 
-    if (!account.accessToken?.trim()) {
+    const accessToken = resolveStoredToken(account.accessToken);
+    if (!accessToken) {
       throw new NotFoundError(
         `WhatsApp access token not configured for phone_number_id: ${phoneNumberId}`
       );
@@ -43,7 +45,7 @@ export class WhatsAppTenantResolver {
     return this.buildContext({
       phoneNumberId,
       account,
-      accessToken: account.accessToken.trim(),
+      accessToken,
       aiConfiguration,
       knowledgeBase,
     });

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserProfile } from '@/lib/types';
-import type { Business } from '@/lib/mock-data';
+import type { Business } from '@/lib/entities';
 
 interface AuthState {
   accessToken: string | null;
@@ -10,12 +10,19 @@ interface AuthState {
   businesses: Business[];
   currentBusinessId: string | null;
   isAuthenticated: boolean;
+  isSuperAdmin: boolean;
+  hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: UserProfile) => void;
   setBusinesses: (businesses: Business[]) => void;
   setCurrentBusiness: (businessId: string) => void;
-  login: (accessToken: string, refreshToken: string, user: UserProfile) => void;
+  login: (accessToken: string, refreshToken: string, user: UserProfile, isSuperAdmin?: boolean) => void;
   logout: () => void;
+}
+
+function markHydrated() {
+  useAuthStore.getState().setHasHydrated(true);
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -27,6 +34,10 @@ export const useAuthStore = create<AuthState>()(
       businesses: [],
       currentBusinessId: null,
       isAuthenticated: false,
+      isSuperAdmin: false,
+      hasHydrated: false,
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken, isAuthenticated: true }),
@@ -41,22 +52,25 @@ export const useAuthStore = create<AuthState>()(
 
       setCurrentBusiness: (businessId) => set({ currentBusinessId: businessId }),
 
-      login: (accessToken, refreshToken, user) =>
+      login: (accessToken, refreshToken, user, isSuperAdmin = false) =>
         set({
           accessToken,
           refreshToken,
           user,
-          businesses: user.businesses.map((b) => ({
+          businesses: (user.businesses ?? []).map((b) => ({
             id: b.id,
             name: b.name,
             industry: b.industry,
             plan: b.plan,
+            role: b.role,
           })),
-          currentBusinessId: user.businesses[0]?.id ?? null,
+          currentBusinessId: user.businesses?.[0]?.id ?? null,
           isAuthenticated: true,
+          isSuperAdmin,
+          hasHydrated: true,
         }),
 
-      logout: () =>
+      logout: () => {
         set({
           accessToken: null,
           refreshToken: null,
@@ -64,7 +78,10 @@ export const useAuthStore = create<AuthState>()(
           businesses: [],
           currentBusinessId: null,
           isAuthenticated: false,
-        }),
+          isSuperAdmin: false,
+          hasHydrated: true,
+        });
+      },
     }),
     {
       name: 'smartreception-auth',
@@ -75,7 +92,20 @@ export const useAuthStore = create<AuthState>()(
         businesses: state.businesses,
         currentBusinessId: state.currentBusinessId,
         isAuthenticated: state.isAuthenticated,
+        isSuperAdmin: state.isSuperAdmin,
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (!error && state?.isAuthenticated && !state.accessToken) {
+          useAuthStore.getState().logout();
+        }
+        markHydrated();
+      },
     }
   )
 );
+
+useAuthStore.persist.onFinishHydration(markHydrated);
+
+if (useAuthStore.persist.hasHydrated()) {
+  markHydrated();
+}

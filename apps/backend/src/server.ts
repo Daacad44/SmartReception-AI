@@ -1,9 +1,10 @@
 import { createApp } from './app';
-import { config } from './config';
+import { config, validateProductionConfig } from './config';
 import { connectDatabase, disconnectDatabase } from './infrastructure/database/prisma';
 import { logger } from './core/logger';
 
 async function startServer(): Promise<void> {
+  validateProductionConfig();
   await connectDatabase();
 
   const app = createApp();

@@ -1,16 +1,20 @@
 import { knowledgeRepository } from './knowledge.repository';
-import { NotFoundError } from '../../core/errors';
+import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateFaqInput } from '@smartreception/shared';
-import { storageService } from '../../infrastructure/storage/r2.service';
-import { documentQueue } from '../../infrastructure/queue/queues';
+import { storageService } from '../../infrastructure/storage';
+import { scheduleDocumentProcessing } from '../../infrastructure/documents/document-processing.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
+import { notifyKnowledge } from '../../infrastructure/notifications/notification-helper';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  'application/msword': 'DOCX',
   'text/plain': 'TXT',
 };
+
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt'];
 
 export class KnowledgeService {
   async listBases(businessId: string) {
@@ -31,6 +35,15 @@ export class KnowledgeService {
     title?: string,
     knowledgeBaseId?: string
   ) {
+    if (!file?.buffer?.length) {
+      throw new ValidationError('File is empty');
+    }
+
+    const ext = file.originalname.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
+    }
+
     const base =
       knowledgeBaseId
         ? await knowledgeRepository.findBaseById(businessId, knowledgeBaseId)
@@ -40,15 +53,15 @@ export class KnowledgeService {
       throw new NotFoundError('Knowledge base not found');
     }
 
-    const docType = MIME_TO_TYPE[file.mimetype];
+    const docType = MIME_TO_TYPE[file.mimetype] ?? MIME_TO_TYPE[this.mimeFromExtension(ext)];
     if (!docType) {
-      throw new NotFoundError('Unsupported file type. Allowed: PDF, DOCX, TXT');
+      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
     }
 
-    const { url } = await storageService.upload(
+    const { key, url } = await storageService.upload(
       file.buffer,
       file.originalname,
-      file.mimetype,
+      file.mimetype || 'application/octet-stream',
       `knowledge/${businessId}`
     );
 
@@ -56,18 +69,52 @@ export class KnowledgeService {
       knowledgeBaseId: base.id,
       title: title || file.originalname,
       type: docType,
-      fileUrl: url,
+      fileUrl: url.includes('http') ? url : `supabase://knowledge-documents/${key}`,
       fileSize: file.size,
-      content: docType === 'TXT' ? file.buffer.toString('utf-8') : undefined,
+      status: 'UPLOADED',
     });
 
-    await documentQueue.add('process-document', {
-      documentId: document.id,
-      knowledgeBaseId: base.id,
-      businessId,
-    });
+    scheduleDocumentProcessing(document.id, base.id, businessId);
 
     return document;
+  }
+
+  async processDocument(businessId: string, documentId: string) {
+    const document = await knowledgeRepository.findDocument(businessId, documentId);
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    if (document.status === 'INDEXED') {
+      return document;
+    }
+
+    scheduleDocumentProcessing(documentId, document.knowledgeBaseId, businessId);
+    return knowledgeRepository.findDocument(businessId, documentId);
+  }
+
+  async getDocumentStatus(businessId: string, documentId: string) {
+    const document = await knowledgeRepository.findDocument(businessId, documentId);
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    return {
+      id: document.id,
+      status: document.status,
+      processingError: document.processingError,
+      updatedAt: document.updatedAt,
+    };
+  }
+
+  private mimeFromExtension(ext: string): string {
+    const map: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+      '.txt': 'text/plain',
+    };
+    return map[ext] ?? '';
   }
 
   async listFaqs(businessId: string, knowledgeBaseId?: string) {
@@ -88,9 +135,8 @@ export class KnowledgeService {
       answer: input.answer,
       category: input.category,
       content: `Q: ${input.question}\nA: ${input.answer}`,
+      status: 'INDEXED',
     });
-
-    await knowledgeRepository.updateDocument(document.id, { status: 'INDEXED' });
 
     await prisma.auditLog.create({
       data: {
@@ -148,6 +194,13 @@ export class KnowledgeService {
 
     await knowledgeRepository.deleteDocument(id);
 
+    await notifyKnowledge(
+      businessId,
+      'FAQ removed',
+      `"${document.title}" was removed from the knowledge base.`,
+      id
+    );
+
     await prisma.auditLog.create({
       data: {
         businessId,
@@ -175,6 +228,13 @@ export class KnowledgeService {
 
     await knowledgeRepository.deleteDocument(id);
 
+    await notifyKnowledge(
+      businessId,
+      'Document removed',
+      `"${document.title}" was removed from the knowledge base.`,
+      id
+    );
+
     await prisma.auditLog.create({
       data: {
         businessId,
@@ -184,6 +244,96 @@ export class KnowledgeService {
         entityId: id,
       },
     });
+  }
+
+  async searchDocuments(businessId: string, query: string, limit = 10) {
+    const { generateEmbedding, cosineSimilarity } = await import(
+      '../../infrastructure/ai/embedding.service'
+    );
+
+    const queryEmbedding = await generateEmbedding(query);
+    const documents = await prisma.knowledgeDocument.findMany({
+      where: {
+        status: 'INDEXED',
+        knowledgeBase: { businessId },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        embedding: true,
+        content: true,
+      },
+      take: 100,
+    });
+
+    type ScoredResult = {
+      documentId: string;
+      title: string;
+      type: string;
+      snippet: string;
+      score: number;
+    };
+
+    const results: ScoredResult[] = [];
+
+    for (const doc of documents) {
+      if (!doc.embedding) {
+        if (doc.title.toLowerCase().includes(query.toLowerCase())) {
+          results.push({
+            documentId: doc.id,
+            title: doc.title,
+            type: doc.type,
+            snippet: (doc.content ?? '').slice(0, 200),
+            score: 0.5,
+          });
+        }
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(doc.embedding) as {
+          chunks?: Array<{ text: string; embedding?: number[] | null } | string>;
+        };
+
+        const chunks = parsed.chunks ?? [];
+        for (const chunk of chunks) {
+          const text = typeof chunk === 'string' ? chunk : chunk.text;
+          const embedding = typeof chunk === 'string' ? null : chunk.embedding;
+
+          let score = 0;
+          if (queryEmbedding && embedding?.length) {
+            score = cosineSimilarity(queryEmbedding, embedding);
+          } else if (text.toLowerCase().includes(query.toLowerCase())) {
+            score = 0.4;
+          }
+
+          if (score > 0.3) {
+            results.push({
+              documentId: doc.id,
+              title: doc.title,
+              type: doc.type,
+              snippet: text.slice(0, 300),
+              score,
+            });
+          }
+        }
+      } catch {
+        if (doc.title.toLowerCase().includes(query.toLowerCase())) {
+          results.push({
+            documentId: doc.id,
+            title: doc.title,
+            type: doc.type,
+            snippet: (doc.content ?? '').slice(0, 200),
+            score: 0.5,
+          });
+        }
+      }
+    }
+
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 }
 

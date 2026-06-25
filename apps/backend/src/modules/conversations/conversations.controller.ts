@@ -20,6 +20,15 @@ export class ConversationsController {
     }
   }
 
+  async summary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await conversationsService.getSummary(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async get(req: Request, res: Response, next: NextFunction) {
     try {
       const conversation = await conversationsService.get(
@@ -60,6 +69,18 @@ export class ConversationsController {
     }
   }
 
+  async getMessages(req: Request, res: Response, next: NextFunction) {
+    try {
+      const messages = await conversationsService.getMessages(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: messages });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async markAsRead(req: Request, res: Response, next: NextFunction) {
     try {
       const conversation = await conversationsService.markAsRead(
@@ -67,6 +88,43 @@ export class ConversationsController {
         routeParam(req.params.id)
       );
       res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async transferToAi(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.transferToAi(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async handoffToHuman(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.handoffToHuman(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendTyping(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await conversationsService.sendTypingIndicator(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

@@ -275,6 +275,26 @@ async function main() {
   console.log('  Email:    demo@smartreception.ai');
   console.log('  Password: Demo1234!');
   console.log('  Business: Demo Wellness Clinic (demo-clinic)');
+
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+  if (superAdminEmail && superAdminPassword) {
+    const superHash = await bcrypt.hash(superAdminPassword, 12);
+    await prisma.user.upsert({
+      where: { email: superAdminEmail },
+      update: { isSuperAdmin: true, passwordHash: superHash, isEmailVerified: true },
+      create: {
+        email: superAdminEmail,
+        passwordHash: superHash,
+        firstName: 'Super',
+        lastName: 'Admin',
+        isEmailVerified: true,
+        isSuperAdmin: true,
+      },
+    });
+    console.log('');
+    console.log('Super Admin seeded from environment variables.');
+  }
 }
 
 main()

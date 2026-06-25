@@ -1,6 +1,4 @@
 import { Job } from 'bullmq';
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
 import {
   createWorker,
   QUEUE_NAMES,
@@ -8,10 +6,18 @@ import {
   DocumentJobData,
   ReminderJobData,
   WhatsAppJobData,
+  CampaignJobData,
 } from './infrastructure/queue/queues';
+import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
-import { aiService } from './infrastructure/ai/openai.service';
-import { whatsappService } from './infrastructure/whatsapp/whatsapp.service';
+import { resolveStoredToken } from './infrastructure/crypto/token-crypto';
+import {
+  processReminderJob,
+  processMissedAppointments,
+} from './infrastructure/appointments/appointment-notification.service';
+import { processAndSendAiReply } from './modules/ai/ai-reply.service';
+import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.service';
+import { executeCampaignSend } from './modules/campaigns/campaigns.service';
 import { logger } from './core/logger';
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
@@ -19,247 +25,116 @@ async function processAIJob(job: Job<AIJobData>): Promise<void> {
 
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId, businessId },
-    include: {
-      customer: true,
-      whatsappAccount: true,
-    },
+    include: { customer: true, whatsappAccount: true },
   });
 
-  if (!conversation || !conversation.isAiEnabled) {
+  if (!conversation?.whatsappAccount) {
     logger.debug(`Skipping AI job for conversation ${conversationId}`);
     return;
   }
 
-  const aiResponse = await aiService.generateResponse(
+  await processAndSendAiReply({
     businessId,
     conversationId,
-    customerMessage
-  );
-
-  const outboundMessage = await prisma.message.create({
-    data: {
-      conversationId,
-      direction: 'OUTBOUND',
-      content: aiResponse.content,
-      type: 'TEXT',
-      isAiGenerated: true,
-      status: 'PENDING',
-    },
-  });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { lastMessageAt: new Date() },
-  });
-
-  if (!conversation.whatsappAccount?.accessToken?.trim()) {
-    logger.error('Cannot send AI reply: WhatsApp credentials missing for tenant', {
-      businessId,
-      conversationId,
-      phoneNumberId: conversation.whatsappAccount?.phoneNumberId,
-    });
-    await prisma.message.update({
-      where: { id: outboundMessage.id },
-      data: { status: 'FAILED' },
-    });
-    return;
-  }
-
-  const whatsappMsgId = await whatsappService.sendMessage({
+    inboundMessageId: messageId,
+    customerMessage,
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
-    to: conversation.customer.phone,
-    message: aiResponse.content,
-    accessToken: conversation.whatsappAccount.accessToken.trim(),
+    customerPhone: conversation.customer.phone,
+    accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
   });
-
-  await prisma.message.update({
-    where: { id: outboundMessage.id },
-    data: {
-      status: whatsappMsgId ? 'SENT' : 'FAILED',
-      whatsappMsgId,
-    },
-  });
-
-  if (aiResponse.actions.some((a) => a.type === 'escalate')) {
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { isAiEnabled: false, status: 'PENDING' },
-    });
-  }
-
-  logger.info(`AI response sent for conversation ${conversationId}, inbound message ${messageId}`);
 }
 
 async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
-  const { businessId, conversationId, messageId, phoneNumber, content } = job.data;
+  const { businessId, conversationId, messageId, phoneNumber, content, type, mediaUrl, mediaFilename } =
+    job.data;
 
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId, businessId },
     include: { whatsappAccount: true },
   });
 
-  if (!conversation?.whatsappAccount?.accessToken?.trim()) {
+  if (!conversation?.whatsappAccount) {
     await prisma.message.update({
       where: { id: messageId },
       data: { status: 'FAILED' },
     });
-    logger.error('Cannot send agent reply: WhatsApp credentials missing for tenant', {
-      businessId,
-      conversationId,
-    });
     return;
   }
 
-  const whatsappMsgId = await whatsappService.sendMessage({
+  await sendConversationMessage({
+    businessId,
+    conversationId,
+    messageId,
+    phoneNumber,
     phoneNumberId: conversation.whatsappAccount.phoneNumberId,
-    to: phoneNumber,
-    message: content,
-    accessToken: conversation.whatsappAccount.accessToken.trim(),
-  });
-
-  await prisma.message.update({
-    where: { id: messageId },
-    data: {
-      status: whatsappMsgId ? 'SENT' : 'FAILED',
-      whatsappMsgId,
-    },
+    content,
+    type,
+    mediaUrl,
+    mediaFilename,
+    accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
   });
 }
 
 async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
   const { documentId, businessId } = job.data;
-
-  const document = await prisma.knowledgeDocument.findFirst({
-    where: {
-      id: documentId,
-      knowledgeBase: { businessId },
-    },
-  });
-
-  if (!document) {
-    logger.warn(`Document ${documentId} not found`);
-    return;
-  }
-
-  await prisma.knowledgeDocument.update({
-    where: { id: documentId },
-    data: { status: 'PROCESSING' },
-  });
-
-  try {
-    let content = document.content || '';
-
-    if (!content && document.fileUrl) {
-      const response = await fetch(document.fileUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch document: ${response.statusText}`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-
-      switch (document.type) {
-        case 'PDF': {
-          const parsed = await pdfParse(buffer);
-          content = parsed.text;
-          break;
-        }
-        case 'DOCX': {
-          const result = await mammoth.extractRawText({ buffer });
-          content = result.value;
-          break;
-        }
-        case 'TXT':
-          content = buffer.toString('utf-8');
-          break;
-        default:
-          throw new Error(`Unsupported document type: ${document.type}`);
-      }
-    }
-
-    await prisma.knowledgeDocument.update({
-      where: { id: documentId },
-      data: {
-        content: content.slice(0, 50000),
-        status: 'INDEXED',
-      },
-    });
-
-    logger.info(`Document ${documentId} processed and indexed`);
-  } catch (error) {
-    logger.error(`Document processing failed for ${documentId}:`, error);
-    await prisma.knowledgeDocument.update({
-      where: { id: documentId },
-      data: { status: 'FAILED' },
-    });
-  }
+  await processDocumentById(documentId, businessId);
 }
 
-async function processReminderJob(job: Job<ReminderJobData>): Promise<void> {
-  const { appointmentId, businessId, customerPhone } = job.data;
+async function processReminderJobHandler(job: Job<ReminderJobData>): Promise<void> {
+  const { appointmentId, businessId, interval = '30m' } = job.data;
+  await processReminderJob(appointmentId, businessId, interval);
+}
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId, businessId },
-    include: {
-      customer: true,
-      service: true,
-      business: {
-        include: {
-          whatsappAccounts: {
-            where: { isActive: true },
-            orderBy: { createdAt: 'asc' },
-            take: 1,
-          },
-        },
-      },
-    },
-  });
-
-  if (!appointment || appointment.status === 'CANCELLED' || appointment.reminderSent) {
-    return;
-  }
-
-  const whatsappAccount = appointment.business.whatsappAccounts[0];
-  if (!whatsappAccount?.accessToken?.trim()) {
-    logger.warn(`No WhatsApp credentials for reminder on appointment ${appointmentId}`, {
-      businessId,
-    });
-    return;
-  }
-
-  const startTime = appointment.startTime.toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-
-  const message = `Reminder: You have an appointment "${appointment.title}"${
-    appointment.service ? ` for ${appointment.service.name}` : ''
-  } scheduled on ${startTime}. Reply to confirm or reschedule.`;
-
-  const whatsappMsgId = await whatsappService.sendMessage({
-    phoneNumberId: whatsappAccount.phoneNumberId,
-    to: customerPhone,
-    message,
-    accessToken: whatsappAccount.accessToken.trim(),
-  });
-
-  if (whatsappMsgId) {
-    await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { reminderSent: true },
-    });
-    logger.info(`Reminder sent for appointment ${appointmentId}`);
-  }
+async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
+  const { campaignId, businessId } = job.data;
+  await executeCampaignSend(campaignId, businessId);
 }
 
 async function startWorkers(): Promise<void> {
   await connectDatabase();
 
-  createWorker<AIJobData>(QUEUE_NAMES.AI_PROCESSING, processAIJob, 3);
-  createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5);
-  createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2);
-  createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJob, 3);
+  const workers = [
+    createWorker<AIJobData>(QUEUE_NAMES.AI_PROCESSING, processAIJob, 3),
+    createWorker<WhatsAppJobData>(QUEUE_NAMES.WHATSAPP_MESSAGE, processWhatsAppJob, 5),
+    createWorker<DocumentJobData>(QUEUE_NAMES.DOCUMENT_PROCESSING, processDocumentJob, 2),
+    createWorker<ReminderJobData>(QUEUE_NAMES.APPOINTMENT_REMINDER, processReminderJobHandler, 3),
+    createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2),
+  ].filter(Boolean);
 
-  logger.info('BullMQ workers started');
+  if (workers.length === 0) {
+    logger.error('No workers started — REDIS_URL is not configured');
+    process.exit(1);
+  }
+
+  // Retry failed jobs on startup (stale failures from crashed workers).
+  const { getAiQueue, getWhatsappQueue } = await import('./infrastructure/queue/queues');
+  for (const queue of [getAiQueue(), getWhatsappQueue()]) {
+    if (!queue) continue;
+    try {
+      const failed = await queue.getJobs(['failed'], 0, 50);
+      for (const job of failed) {
+        await job.retry().catch((error) => {
+          logger.warn('Failed to retry job on worker startup', { jobId: job.id, error });
+        });
+      }
+      if (failed.length > 0) {
+        logger.info(`Retried ${failed.length} failed jobs in queue ${queue.name}`);
+      }
+    } catch (error) {
+      logger.warn('Failed to recover failed jobs on startup', { error, queue: queue.name });
+    }
+  }
+
+  logger.info('BullMQ workers started', { count: workers.length });
+
+  // Fallback missed-appointment scan when delayed jobs were lost (every 5 minutes).
+  const MISSED_SCAN_MS = 5 * 60 * 1000;
+  setInterval(() => {
+    void processMissedAppointments().catch((error) => {
+      logger.warn('Periodic missed appointment scan failed', { error });
+    });
+  }, MISSED_SCAN_MS);
+  void processMissedAppointments().catch(() => undefined);
 }
 
 const shutdown = async (signal: string) => {
