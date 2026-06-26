@@ -7,14 +7,16 @@ import {
   MoreHorizontal,
   Trash2,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -29,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useKnowledgeDocs, useKnowledgeBases, useFaqs, useKnowledgeSearch, isInitialLoading } from '@/hooks/useApi';
-import { useUploadDocument, useDeleteDocument, useCreateFaq } from '@/hooks/useMutations';
+import { useUploadDocument, useDeleteDocument, useCreateFaq, useClearKnowledgeBase } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
@@ -96,7 +98,10 @@ export function KnowledgeBasePage() {
   const [faqOpen, setFaqOpen] = useState(false);
   const [faqForm, setFaqForm] = useState({ question: '', answer: '', category: '' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deleteConfirmed = confirmText.trim().toUpperCase() === 'DELETE';
 
   const { data: bases, isError: basesError } = useKnowledgeBases();
   const baseId = bases?.[0]?.id;
@@ -112,6 +117,7 @@ export function KnowledgeBasePage() {
   const docsLoading = isInitialLoading(isPending, isFetching, documents);
   const uploadDocument = useUploadDocument();
   const deleteDocument = useDeleteDocument();
+  const clearKnowledgeBase = useClearKnowledgeBase();
   const { data: searchResults, isFetching: searchFetching } = useKnowledgeSearch(search);
 
   const filtered = documents?.filter(
@@ -462,6 +468,81 @@ export function KnowledgeBasePage() {
               }}
             >
               Create FAQ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Delete all Knowledge Base documents and FAQs for your business only. This does not
+            affect your Business Profile, conversations, or other settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setClearDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Clear Knowledge Base
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={clearDialogOpen}
+        onOpenChange={(open) => {
+          setClearDialogOpen(open);
+          if (!open) setConfirmText('');
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear Knowledge Base?</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This permanently removes all uploaded documents and FAQs from your knowledge base.
+              Your Business Profile and conversations will not be deleted.
+            </p>
+            <p className="text-sm">
+              Type <strong>DELETE</strong> to confirm:
+            </p>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setClearDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!deleteConfirmed || clearKnowledgeBase.isPending}
+              onClick={async () => {
+                await clearKnowledgeBase.mutateAsync();
+                setClearDialogOpen(false);
+                setConfirmText('');
+              }}
+            >
+              {clearKnowledgeBase.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -134,6 +134,18 @@ export class KnowledgeController {
       next(error);
     }
   }
+
+  async clearKnowledgeBase(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await knowledgeService.clearKnowledgeBase(
+        req.user!.businessId!,
+        req.user!.userId
+      );
+      res.json({ success: true, data, message: 'Knowledge base cleared successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const knowledgeController = new KnowledgeController();
