@@ -32,6 +32,10 @@ export const PERMISSIONS = {
   'audit:read': 'audit:read',
   'campaigns:read': 'campaigns:read',
   'campaigns:write': 'campaigns:write',
+  'employees:read': 'employees:read',
+  'employees:write': 'employees:write',
+  'employee-comms:read': 'employee-comms:read',
+  'employee-comms:write': 'employee-comms:write',
   'platform:admin': 'platform:admin',
 } as const;
 
@@ -58,6 +62,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['audit:read'],
     PERMISSIONS['campaigns:read'],
     PERMISSIONS['campaigns:write'],
+    PERMISSIONS['employees:read'],
+    PERMISSIONS['employees:write'],
+    PERMISSIONS['employee-comms:read'],
+    PERMISSIONS['employee-comms:write'],
   ],
   AGENT: [
     PERMISSIONS['customers:read'],
@@ -68,6 +76,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['appointments:write'],
     PERMISSIONS['knowledge:read'],
     PERMISSIONS['campaigns:read'],
+    PERMISSIONS['employees:read'],
+    PERMISSIONS['employee-comms:read'],
   ],
   RECEPTIONIST: [
     PERMISSIONS['customers:read'],
@@ -80,6 +90,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS['analytics:read'],
     PERMISSIONS['campaigns:read'],
     PERMISSIONS['campaigns:write'],
+    PERMISSIONS['employees:read'],
+    PERMISSIONS['employee-comms:read'],
   ],
   STAFF: [
     PERMISSIONS['customers:read'],

@@ -21,6 +21,8 @@ export const QUEUE_NAMES = {
   CAMPAIGN: 'campaign',
   CAMPAIGN_BATCH: 'campaign-batch',
   CAMPAIGN_JOURNEY: 'campaign-journey',
+  EMPLOYEE_BROADCAST: 'employee-broadcast',
+  EMPLOYEE_BROADCAST_BATCH: 'employee-broadcast-batch',
 } as const;
 
 let whatsappQueue: Queue | null = null;
@@ -31,6 +33,8 @@ let emailQueue: Queue | null = null;
 let campaignQueue: Queue | null = null;
 let campaignBatchQueue: Queue | null = null;
 let campaignJourneyQueue: Queue | null = null;
+let employeeBroadcastQueue: Queue | null = null;
+let employeeBroadcastBatchQueue: Queue | null = null;
 
 export function getWhatsappQueue(): Queue | null {
   const conn = getConnection();
@@ -88,6 +92,21 @@ export function getCampaignJourneyQueue(): Queue | null {
   return campaignJourneyQueue;
 }
 
+export function getEmployeeBroadcastQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!employeeBroadcastQueue) employeeBroadcastQueue = new Queue(QUEUE_NAMES.EMPLOYEE_BROADCAST, conn);
+  return employeeBroadcastQueue;
+}
+
+export function getEmployeeBroadcastBatchQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!employeeBroadcastBatchQueue)
+    employeeBroadcastBatchQueue = new Queue(QUEUE_NAMES.EMPLOYEE_BROADCAST_BATCH, conn);
+  return employeeBroadcastBatchQueue;
+}
+
 export interface WhatsAppJobData {
   businessId: string;
   conversationId: string;
@@ -139,6 +158,18 @@ export interface CampaignBatchJobData {
 
 export interface CampaignJourneyJobData {
   enrollmentId: string;
+}
+
+export interface EmployeeBroadcastJobData {
+  broadcastId: string;
+  businessId: string;
+}
+
+export interface EmployeeBroadcastBatchJobData {
+  broadcastId: string;
+  businessId: string;
+  recipientIds: string[];
+  runVersion: number;
 }
 
 export function createWorker<T>(

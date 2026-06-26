@@ -298,6 +298,13 @@ export class WhatsAppModuleService {
           timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
           errorMessage: status.errors?.[0]?.title,
         }).catch(() => undefined);
+        const { syncEmployeeRecipientFromWebhook } = await import('../employee-comms/employee-inbox.service');
+        void syncEmployeeRecipientFromWebhook({
+          whatsappMsgId: status.id,
+          status: status.status.toLowerCase() as 'sent' | 'delivered' | 'read' | 'failed',
+          timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
+          errorMessage: status.errors?.[0]?.title,
+        }).catch(() => undefined);
         console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
       }
 

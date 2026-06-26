@@ -70,6 +70,9 @@ const UserManagementPage = lazyWithRetry(() =>
 const CampaignsPage = lazyWithRetry(() =>
   import('@/pages/CampaignsPage').then((m) => ({ default: m.CampaignsPage }))
 );
+const EmployeeCommunicationPage = lazyWithRetry(() =>
+  import('@/pages/EmployeeCommunicationPage').then((m) => ({ default: m.EmployeeCommunicationPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -213,6 +216,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['campaigns:read']}>
                         <CampaignsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee-comms"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['employee-comms:read']}>
+                        <EmployeeCommunicationPage />
                       </PermissionRoute>
                     }
                   />

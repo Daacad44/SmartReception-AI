@@ -44,4 +44,14 @@ router.get('/campaigns', (req, res, next) => superAdminController.listCampaigns(
 router.get('/campaigns/stats', (req, res, next) => superAdminController.campaignStats(req, res, next));
 router.post('/campaigns/:id/pause', (req, res, next) => superAdminController.pauseCampaign(req, res, next));
 
+router.get('/employee-comms/broadcasts', (req, res, next) =>
+  superAdminController.listEmployeeBroadcasts(req, res, next)
+);
+router.get('/employee-comms/stats', (req, res, next) =>
+  superAdminController.employeeCommsStats(req, res, next)
+);
+router.post('/employee-comms/broadcasts/:id/pause', (req, res, next) =>
+  superAdminController.pauseEmployeeBroadcast(req, res, next)
+);
+
 export default router;

@@ -9,6 +9,8 @@ import {
   CampaignJobData,
   CampaignBatchJobData,
   CampaignJourneyJobData,
+  EmployeeBroadcastJobData,
+  EmployeeBroadcastBatchJobData,
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
@@ -22,6 +24,8 @@ import { sendConversationMessage } from './modules/whatsapp/whatsapp-outbound.se
 import { executeCampaignSend } from './modules/campaigns/campaigns.service';
 import { sendCampaignBatch } from './modules/campaigns/campaign-batch.service';
 import { scheduleJourneyStep } from './modules/campaigns/campaign-journey.service';
+import { executeEmployeeBroadcastSend } from './modules/employee-comms/employee-broadcasts.service';
+import { sendEmployeeBroadcastBatch } from './modules/employee-comms/employee-broadcast-batch.service';
 import { logger } from './core/logger';
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
@@ -102,6 +106,15 @@ async function processCampaignJourneyJob(job: Job<CampaignJourneyJobData>): Prom
   await scheduleJourneyStep(job.data.enrollmentId);
 }
 
+async function processEmployeeBroadcastJob(job: Job<EmployeeBroadcastJobData>): Promise<void> {
+  const { broadcastId, businessId } = job.data;
+  await executeEmployeeBroadcastSend(broadcastId, businessId);
+}
+
+async function processEmployeeBroadcastBatchJob(job: Job<EmployeeBroadcastBatchJobData>): Promise<void> {
+  await sendEmployeeBroadcastBatch(job.data);
+}
+
 async function startWorkers(): Promise<void> {
   await connectDatabase();
 
@@ -113,6 +126,12 @@ async function startWorkers(): Promise<void> {
     createWorker<CampaignJobData>(QUEUE_NAMES.CAMPAIGN, processCampaignJob, 2),
     createWorker<CampaignBatchJobData>(QUEUE_NAMES.CAMPAIGN_BATCH, processCampaignBatchJob, 5),
     createWorker<CampaignJourneyJobData>(QUEUE_NAMES.CAMPAIGN_JOURNEY, processCampaignJourneyJob, 3),
+    createWorker<EmployeeBroadcastJobData>(QUEUE_NAMES.EMPLOYEE_BROADCAST, processEmployeeBroadcastJob, 2),
+    createWorker<EmployeeBroadcastBatchJobData>(
+      QUEUE_NAMES.EMPLOYEE_BROADCAST_BATCH,
+      processEmployeeBroadcastBatchJob,
+      5
+    ),
   ].filter(Boolean);
 
   if (workers.length === 0) {
@@ -127,6 +146,8 @@ async function startWorkers(): Promise<void> {
     getCampaignQueue,
     getCampaignBatchQueue,
     getCampaignJourneyQueue,
+    getEmployeeBroadcastQueue,
+    getEmployeeBroadcastBatchQueue,
   } = await import('./infrastructure/queue/queues');
   for (const queue of [
     getAiQueue(),
@@ -134,6 +155,8 @@ async function startWorkers(): Promise<void> {
     getCampaignQueue(),
     getCampaignBatchQueue(),
     getCampaignJourneyQueue(),
+    getEmployeeBroadcastQueue(),
+    getEmployeeBroadcastBatchQueue(),
   ]) {
     if (!queue) continue;
     try {

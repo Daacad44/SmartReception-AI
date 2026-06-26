@@ -361,6 +361,11 @@ model Business {
   campaignJourneys  CampaignJourney[]
   campaignOptOuts   CustomerCampaignOptOut[]
   businessProfile   BusinessProfile?
+  employees         Employee[]
+  employeeGroups    EmployeeGroup[]
+  employeeBroadcasts EmployeeBroadcast[]
+  employeeTemplates EmployeeTemplate[]
+  employeeConversations EmployeeConversation[]
 
   @@index([slug])
   @@index([isActive])
@@ -407,6 +412,8 @@ model User {
   appointmentNotes    AppointmentInternalNote[] @relation("AppointmentNoteAuthor")
   createdAppointments Appointment[]           @relation("AppointmentCreator")
   createdCampaigns    Campaign[]              @relation("CampaignCreator")
+  createdEmployeeBroadcasts EmployeeBroadcast[] @relation("EmployeeBroadcastCreator")
+  employees           Employee[]
   createdImportJobs   CustomerImportJob[]     @relation("ImportJobCreator")
   auditLogs           AuditLog[]
   notifications       Notification[]
@@ -1184,6 +1191,285 @@ model AuditLog {
   @@index([entity])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─── EMPLOYEE COMMUNICATION CENTER ───────────────────────────────────────────
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  TEMPORARY
+}
+
+enum EmployeeBroadcastType {
+  ANNOUNCEMENT
+  NOTIFICATION
+  EMERGENCY
+  MEETING
+  HOLIDAY
+  POLICY
+  TRAINING
+  MOTIVATION
+  PAYROLL
+  SHIFT
+  CUSTOM
+}
+
+enum EmployeeBroadcastSchedule {
+  ONE_TIME
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+  RECURRING
+}
+
+enum EmployeeBroadcastStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+  FAILED
+  ARCHIVED
+}
+
+enum EmployeeDeliveryStatus {
+  PENDING
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Employee {
+  id              String          @id @default(uuid())
+  businessId      String
+  employeeCode    String?
+  fullName        String
+  jobTitle        String?
+  department      String?
+  role            String?
+  phone           String
+  whatsappNumber  String?
+  email           String?
+  status          EmployeeStatus  @default(ACTIVE)
+  profilePhotoUrl String?
+  branch          String?
+  managerId       String?
+  hireDate        DateTime?
+  employmentType  EmploymentType  @default(FULL_TIME)
+  permissions     Json?
+  language        String          @default("so")
+  timezone        String?
+  lastActiveAt    DateTime?
+  userId          String?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  business            Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  manager             Employee?                   @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports       Employee[]                  @relation("EmployeeManager")
+  user                User?                       @relation(fields: [userId], references: [id])
+  groupMembers        EmployeeGroupMember[]
+  broadcastRecipients EmployeeBroadcastRecipient[]
+  conversations       EmployeeConversation[]
+
+  @@unique([businessId, phone])
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([businessId, department])
+  @@index([businessId, branch])
+  @@index([businessId, fullName])
+  @@index([businessId, email])
+  @@map("employees")
+}
+
+model EmployeeGroup {
+  id          String   @id @default(uuid())
+  businessId  String
+  name        String
+  description String?
+  color       String   @default("#651147")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business   Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  members    EmployeeGroupMember[]
+  broadcasts EmployeeBroadcast[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("employee_groups")
+}
+
+model EmployeeGroupMember {
+  employeeId String
+  groupId    String
+  addedAt    DateTime @default(now())
+
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  group    EmployeeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([employeeId, groupId])
+  @@index([groupId])
+  @@map("employee_group_members")
+}
+
+model EmployeeTemplate {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  content    String
+  category   String   @default("GENERAL")
+  variables  String[] @default([])
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  broadcasts EmployeeBroadcast[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@index([businessId, category])
+  @@map("employee_templates")
+}
+
+model EmployeeBroadcast {
+  id             String                    @id @default(uuid())
+  businessId     String
+  name           String
+  message        String
+  type           EmployeeBroadcastType     @default(ANNOUNCEMENT)
+  schedule       EmployeeBroadcastSchedule @default(ONE_TIME)
+  status         EmployeeBroadcastStatus   @default(DRAFT)
+  messageType    CampaignMessageType       @default(TEXT)
+  groupId        String?
+  department     String?
+  branch         String?
+  employeeIds    String[]                  @default([])
+  sendToAll      Boolean                   @default(false)
+  templateId     String?
+  mediaUrl       String?
+  mediaFilename  String?
+  timezone       String?
+  cronExpression String?
+  scheduleConfig Json?
+  repeatCount    Int?
+  repeatUntil    DateTime?
+  runsCompleted  Int                       @default(0)
+  scheduledAt    DateTime?
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  isEmergency    Boolean                   @default(false)
+  createdById    String?
+  sentCount      Int                       @default(0)
+  deliveredCount Int                       @default(0)
+  failedCount    Int                       @default(0)
+  readCount      Int                       @default(0)
+  responseCount  Int                       @default(0)
+  archivedAt     DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  business   Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  group      EmployeeGroup?               @relation(fields: [groupId], references: [id])
+  template   EmployeeTemplate?            @relation(fields: [templateId], references: [id])
+  createdBy  User?                        @relation("EmployeeBroadcastCreator", fields: [createdById], references: [id])
+  recipients EmployeeBroadcastRecipient[]
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([scheduledAt])
+  @@index([nextRunAt])
+  @@map("employee_broadcasts")
+}
+
+model EmployeeBroadcastRecipient {
+  id            String                 @id @default(uuid())
+  broadcastId   String
+  employeeId    String
+  phone         String
+  status        EmployeeDeliveryStatus @default(PENDING)
+  isSent        Boolean                @default(false)
+  runVersion    Int                    @default(0)
+  whatsappMsgId String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  respondedAt   DateTime?
+  failedReason  String?
+  retryCount    Int                    @default(0)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  broadcast EmployeeBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  employee  Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, employeeId])
+  @@index([broadcastId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("employee_broadcast_recipients")
+}
+
+model EmployeeConversation {
+  id                String   @id @default(uuid())
+  businessId        String
+  employeeId        String
+  whatsappAccountId String?
+  status            String   @default("OPEN")
+  unreadCount       Int      @default(0)
+  lastMessageAt     DateTime?
+  labels            String[] @default([])
+  isArchived        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  business  Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  employee  Employee                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  messages  EmployeeConversationMessage[]
+
+  @@unique([businessId, employeeId])
+  @@index([businessId, status])
+  @@index([businessId, lastMessageAt])
+  @@map("employee_conversations")
+}
+
+model EmployeeConversationMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  direction      String
+  content        String
+  type           String   @default("TEXT")
+  mediaUrl       String?
+  mediaFilename  String?
+  whatsappMsgId  String?
+  status         String   @default("PENDING")
+  isAiGenerated  Boolean  @default(false)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  conversation EmployeeConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([whatsappMsgId])
+  @@map("employee_conversation_messages")
 }
 
 // ─── BILLING ─────────────────────────────────────────────────────────────────

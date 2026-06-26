@@ -372,6 +372,91 @@ export const generateCampaignAiSchema = z.object({
   versions: z.number().int().min(1).max(4).optional(),
 });
 
+export const EMPLOYEE_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'TERMINATED'] as const;
+export const EMPLOYMENT_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'TEMPORARY'] as const;
+export const EMPLOYEE_BROADCAST_TYPES = [
+  'ANNOUNCEMENT', 'NOTIFICATION', 'EMERGENCY', 'MEETING', 'HOLIDAY', 'POLICY',
+  'TRAINING', 'MOTIVATION', 'PAYROLL', 'SHIFT', 'CUSTOM',
+] as const;
+export const EMPLOYEE_BROADCAST_SCHEDULES = [
+  'ONE_TIME', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'RECURRING',
+] as const;
+
+export const createEmployeeSchema = z.object({
+  employeeCode: z.string().max(50).optional(),
+  fullName: z.string().min(1).max(200),
+  jobTitle: z.string().max(200).optional(),
+  department: z.string().max(100).optional(),
+  role: z.string().max(100).optional(),
+  phone: z.string().min(5).max(20),
+  whatsappNumber: z.string().min(5).max(20).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  status: z.enum(EMPLOYEE_STATUSES).optional(),
+  profilePhotoUrl: z.string().url().optional(),
+  branch: z.string().max(100).optional(),
+  managerId: z.string().uuid().optional(),
+  hireDate: z.string().datetime().optional(),
+  employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
+  language: z.string().max(10).optional(),
+  timezone: z.string().max(64).optional(),
+  groupIds: z.array(z.string().uuid()).optional(),
+});
+
+export const updateEmployeeSchema = createEmployeeSchema.partial();
+
+export const createEmployeeGroupSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  color: z.string().max(20).optional(),
+  employeeIds: z.array(z.string().uuid()).optional(),
+});
+
+export const updateEmployeeGroupSchema = createEmployeeGroupSchema.partial();
+
+export const createEmployeeBroadcastSchema = z.object({
+  name: z.string().min(1).max(200),
+  message: z.string().min(1).max(4096),
+  type: z.enum(EMPLOYEE_BROADCAST_TYPES).default('ANNOUNCEMENT'),
+  schedule: z.enum(EMPLOYEE_BROADCAST_SCHEDULES).default('ONE_TIME'),
+  messageType: z.enum(CAMPAIGN_MESSAGE_TYPES).default('TEXT'),
+  groupId: z.string().uuid().optional(),
+  department: z.string().max(100).optional(),
+  branch: z.string().max(100).optional(),
+  employeeIds: z.array(z.string().uuid()).optional(),
+  sendToAll: z.boolean().optional(),
+  templateId: z.string().uuid().optional(),
+  scheduledAt: z.string().datetime().optional(),
+  sendNow: z.boolean().optional(),
+  timezone: z.string().max(64).optional(),
+  cronExpression: z.string().max(100).optional(),
+  scheduleConfig: scheduleConfigSchema,
+  repeatCount: z.number().int().positive().optional(),
+  repeatUntil: z.string().datetime().optional(),
+  mediaUrl: z.string().url().optional(),
+  mediaFilename: z.string().max(255).optional(),
+  isEmergency: z.boolean().optional(),
+});
+
+export const createEmployeeTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  content: z.string().min(1).max(4096),
+  category: z.string().max(64).optional(),
+  variables: z.array(z.string().max(50)).optional(),
+});
+
+export const updateEmployeeTemplateSchema = createEmployeeTemplateSchema.partial();
+
+export const generateEmployeeMessageSchema = z.object({
+  prompt: z.string().min(5).max(2000),
+  tone: z.string().max(100).optional(),
+  type: z.string().max(64).optional(),
+  language: z.enum(['so', 'en']).optional(),
+});
+
+export const sendEmployeeReplySchema = z.object({
+  content: z.string().min(1).max(4096),
+});
+
 export const createJourneySchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
@@ -524,3 +609,11 @@ export type SuperAdminUpdateBusinessInput = z.infer<typeof superAdminUpdateBusin
 export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;
 export type SuperAdminUpdateUserInput = z.infer<typeof superAdminUpdateUserSchema>;
 export type TransferOwnershipInput = z.infer<typeof transferOwnershipSchema>;
+export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
+export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
+export type CreateEmployeeGroupInput = z.infer<typeof createEmployeeGroupSchema>;
+export type UpdateEmployeeGroupInput = z.infer<typeof updateEmployeeGroupSchema>;
+export type CreateEmployeeBroadcastInput = z.infer<typeof createEmployeeBroadcastSchema>;
+export type CreateEmployeeTemplateInput = z.infer<typeof createEmployeeTemplateSchema>;
+export type UpdateEmployeeTemplateInput = z.infer<typeof updateEmployeeTemplateSchema>;
+export type GenerateEmployeeMessageInput = z.infer<typeof generateEmployeeMessageSchema>;

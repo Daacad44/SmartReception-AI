@@ -494,6 +494,86 @@ export class SuperAdminService {
     });
   }
 
+  async listEmployeeBroadcasts(page = 1, limit = 20, businessId?: string) {
+    const skip = (page - 1) * limit;
+    const where = businessId ? { businessId } : {};
+    const [data, total] = await Promise.all([
+      prisma.employeeBroadcast.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          business: { select: { id: true, name: true } },
+          _count: { select: { recipients: true } },
+        },
+      }),
+      prisma.employeeBroadcast.count({ where }),
+    ]);
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getEmployeeCommsStats() {
+    const [
+      totalEmployees,
+      totalBroadcasts,
+      activeBroadcasts,
+      scheduledBroadcasts,
+      failedBroadcasts,
+      messagesSent,
+      deliveryHealth,
+    ] = await Promise.all([
+      prisma.employee.count({ where: { isActive: true } }),
+      prisma.employeeBroadcast.count(),
+      prisma.employeeBroadcast.count({ where: { status: 'RUNNING' } }),
+      prisma.employeeBroadcast.count({ where: { status: 'SCHEDULED' } }),
+      prisma.employeeBroadcast.count({ where: { status: 'FAILED' } }),
+      prisma.employeeBroadcast.aggregate({ _sum: { sentCount: true } }),
+      prisma.employeeBroadcastRecipient.groupBy({
+        by: ['status'],
+        _count: true,
+      }),
+    ]);
+
+    const employeesByBusiness = await prisma.employee.groupBy({
+      by: ['businessId'],
+      where: { isActive: true },
+      _count: true,
+    });
+
+    return {
+      totalEmployees,
+      businessesWithEmployees: employeesByBusiness.length,
+      totalBroadcasts,
+      activeBroadcasts,
+      scheduledBroadcasts,
+      failedBroadcasts,
+      messagesSent: messagesSent._sum.sentCount ?? 0,
+      deliveryHealth: deliveryHealth.map((d) => ({ status: d.status, count: d._count })),
+      topBusinessesByEmployees: employeesByBusiness
+        .sort((a, b) => b._count - a._count)
+        .slice(0, 10),
+    };
+  }
+
+  async pauseEmployeeBroadcast(broadcastId: string, adminUserId: string) {
+    const broadcast = await prisma.employeeBroadcast.findUnique({ where: { id: broadcastId } });
+    if (!broadcast) throw new NotFoundError('Employee broadcast not found');
+    const { removeEmployeeBroadcastQueueJobs } = await import('../employee-comms/employee-broadcast-queue.utils');
+    await removeEmployeeBroadcastQueueJobs(broadcastId);
+    await prisma.employeeBroadcast.update({ where: { id: broadcastId }, data: { status: 'PAUSED' } });
+    await prisma.auditLog.create({
+      data: {
+        businessId: broadcast.businessId,
+        userId: adminUserId,
+        action: 'UPDATE',
+        entity: 'EmployeeBroadcast',
+        entityId: broadcastId,
+        newData: { superAdminPause: true },
+      },
+    });
+  }
+
   async getBusinessProfile(businessId: string) {
     const business = await prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundError('Business not found');
