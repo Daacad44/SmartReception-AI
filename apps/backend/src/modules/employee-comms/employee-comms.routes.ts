@@ -1,10 +1,15 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { employeeCommsController } from './employee-comms.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 router.use(authenticate, requireBusiness);
 
@@ -14,6 +19,24 @@ router.get('/employees', authorize(PERMISSIONS['employees:read']), (req, res, ne
 );
 router.post('/employees', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
   employeeCommsController.createEmployee(req, res, next)
+);
+router.post('/employees/export', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
+  employeeCommsController.exportEmployees(req, res, next)
+);
+router.post('/employees/bulk-delete', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.bulkDeleteEmployees(req, res, next)
+);
+router.post('/employees/bulk-status', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.bulkUpdateEmployeeStatus(req, res, next)
+);
+router.post('/employees/bulk-assign-groups', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.bulkAssignGroups(req, res, next)
+);
+router.post('/employees/bulk-remove-groups', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.bulkRemoveGroups(req, res, next)
+);
+router.post('/employees/move-group', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.moveEmployeesGroup(req, res, next)
 );
 router.get('/employees/:id', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
   employeeCommsController.getEmployee(req, res, next)
@@ -25,6 +48,23 @@ router.delete('/employees/:id', authorize(PERMISSIONS['employees:write']), (req,
   employeeCommsController.deleteEmployee(req, res, next)
 );
 
+// Import
+router.get('/import/jobs', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
+  employeeCommsController.listImportJobs(req, res, next)
+);
+router.get('/import/jobs/:id', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
+  employeeCommsController.getImportJob(req, res, next)
+);
+router.post(
+  '/import/upload',
+  authorize(PERMISSIONS['employees:write']),
+  upload.single('file'),
+  (req, res, next) => employeeCommsController.uploadImport(req, res, next)
+);
+router.post('/import/paste', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.pasteImport(req, res, next)
+);
+
 // Groups
 router.get('/groups', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
   employeeCommsController.listGroups(req, res, next)
@@ -32,11 +72,38 @@ router.get('/groups', authorize(PERMISSIONS['employees:read']), (req, res, next)
 router.post('/groups', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
   employeeCommsController.createGroup(req, res, next)
 );
+router.post('/groups/merge', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.mergeGroups(req, res, next)
+);
+router.get('/groups/:id', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
+  employeeCommsController.getGroup(req, res, next)
+);
 router.patch('/groups/:id', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
   employeeCommsController.updateGroup(req, res, next)
 );
 router.delete('/groups/:id', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
   employeeCommsController.deleteGroup(req, res, next)
+);
+router.post('/groups/:id/archive', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.archiveGroup(req, res, next)
+);
+router.post('/groups/:id/duplicate', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.duplicateGroup(req, res, next)
+);
+router.post('/groups/:id/members', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.addGroupMembers(req, res, next)
+);
+router.post('/groups/:id/members/remove', authorize(PERMISSIONS['employees:write']), (req, res, next) =>
+  employeeCommsController.removeGroupMembers(req, res, next)
+);
+router.get('/groups/:id/analytics', authorize(PERMISSIONS['employee-comms:read']), (req, res, next) =>
+  employeeCommsController.groupAnalytics(req, res, next)
+);
+router.get('/groups/:id/inbox', authorize(PERMISSIONS['employee-comms:read']), (req, res, next) =>
+  employeeCommsController.groupInbox(req, res, next)
+);
+router.get('/groups/:id/export', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
+  employeeCommsController.exportGroup(req, res, next)
 );
 
 // Broadcasts
@@ -48,6 +115,9 @@ router.get('/broadcasts/analytics', authorize(PERMISSIONS['employee-comms:read']
 );
 router.get('/broadcasts/deliveries', authorize(PERMISSIONS['employee-comms:read']), (req, res, next) =>
   employeeCommsController.deliveries(req, res, next)
+);
+router.post('/broadcasts/preview-recipients', authorize(PERMISSIONS['employee-comms:read']), (req, res, next) =>
+  employeeCommsController.previewRecipients(req, res, next)
 );
 router.post('/broadcasts/generate-ai', authorize(PERMISSIONS['employee-comms:write']), (req, res, next) =>
   employeeCommsController.generateAi(req, res, next)
