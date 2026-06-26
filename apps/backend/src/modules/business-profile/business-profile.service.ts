@@ -7,6 +7,7 @@ import {
 } from '../../infrastructure/ai/business-profile-cache.service';
 import { processBusinessProfilePdf } from '../../infrastructure/ai/business-profile-extraction.service';
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
+import { syncBusinessIdentity } from '../../infrastructure/ai/business-identity-sync.service';
 import { storageService } from '../../infrastructure/storage';
 import type { Prisma } from '@prisma/client';
 
@@ -146,6 +147,9 @@ export class BusinessProfileService {
     await prisma.businessProfile.delete({ where: { businessId } });
     invalidateBusinessProfileCache(businessId);
     invalidateBusinessTenantCache(businessId);
+
+    await ensureBusinessProfile(businessId);
+    await syncBusinessIdentity(businessId);
 
     return { deleted: true };
   }

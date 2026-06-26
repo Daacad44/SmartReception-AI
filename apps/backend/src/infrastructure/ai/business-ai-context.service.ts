@@ -7,6 +7,7 @@ import {
   isSmartReceptionBusiness,
   isSmartReceptionStoredContent,
 } from './smartreception-tenant';
+import { isPredominantlyEnglish } from './business-language.util';
 
 export interface BusinessAIContext {
   businessId: string;
@@ -39,6 +40,9 @@ function buildBusinessSystemPrompt(
 ): string {
   const stored = aiConfig.systemPrompt?.trim();
   if (stored) {
+    if (isLegacyEnglishSystemPrompt(stored)) {
+      return buildDefaultSystemPrompt(business.name);
+    }
     if (isSmartReceptionBusiness(business) || !isSmartReceptionStoredContent(stored)) {
       return stored;
     }
@@ -47,15 +51,26 @@ function buildBusinessSystemPrompt(
   return buildDefaultSystemPrompt(business.name);
 }
 
+function isLegacyEnglishSystemPrompt(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    isPredominantlyEnglish(text) &&
+    (lower.includes('botandev') || lower.includes('botan dev'))
+  );
+}
+
 function buildBusinessFallbackMessage(
   business: Pick<Business, 'name'>,
   aiConfig: AIConfiguration
 ): string {
   if (aiConfig.fallbackMessage?.trim()) {
-    return aiConfig.fallbackMessage.trim();
+    const fallback = aiConfig.fallbackMessage.trim();
+    if (!isPredominantlyEnglish(fallback)) {
+      return fallback;
+    }
   }
 
-  return `Thank you for contacting ${business.name}. A team member will assist you shortly.`;
+  return `Mahadsanid. Kooxda ${business.name} waxay kula soo xiriiri doontaa dhawaan.`;
 }
 
 /** Hot-path prompt load — cached profile only, no KB document scan (searchKnowledgeContext handles retrieval). */

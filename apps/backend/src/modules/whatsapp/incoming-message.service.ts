@@ -356,10 +356,11 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
       businessId: params.businessId,
       isPlatformBusiness,
     });
+    const greetingParams = { ...base, preferEnglish: false as const };
     if (isPlatformBusiness) {
       await sendServiceMenu(base);
     } else {
-      await sendProfileWelcome({ ...base, preferEnglish: params.preferEnglish });
+      await sendProfileWelcome(greetingParams);
     }
     logPipelineStep(params.pipelineKey, 'profile_welcome_sent');
     return;
@@ -368,7 +369,7 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
   // First contact: introduce company from Business Profile only (not Knowledge Base).
   if (params.isNewConversation && !isPlatformBusiness) {
     console.log('[AI] New conversation — Business Profile welcome', { businessId: params.businessId });
-    await sendProfileWelcome({ ...base, preferEnglish: params.preferEnglish });
+    await sendProfileWelcome({ ...base, preferEnglish: false });
     logPipelineStep(params.pipelineKey, 'new_conversation_profile_welcome');
     return;
   }

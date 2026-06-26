@@ -4,6 +4,7 @@ import { UpdateBusinessInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
 import { Industry } from '@prisma/client';
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
+import { syncBusinessIdentity } from '../../infrastructure/ai/business-identity-sync.service';
 
 export class BusinessService {
   async getBusiness(businessId: string) {
@@ -42,7 +43,11 @@ export class BusinessService {
       },
     });
 
-    invalidateBusinessTenantCache(businessId);
+    if (input.name && input.name !== existing.name) {
+      await syncBusinessIdentity(businessId, existing.name);
+    } else {
+      invalidateBusinessTenantCache(businessId);
+    }
     return business;
   }
 
@@ -91,7 +96,11 @@ export class BusinessService {
       },
     });
 
-    invalidateBusinessTenantCache(businessId);
+    if (input.name && input.name !== existing.name) {
+      await syncBusinessIdentity(businessId, existing.name);
+    } else {
+      invalidateBusinessTenantCache(businessId);
+    }
     return business;
   }
 }
