@@ -173,7 +173,7 @@ const MENU_KEYWORDS: Record<number, RegExp[]> = {
 };
 
 const GREETING_ONLY =
-  /^(hi|hello|hey|yo|salaam|asc|asalamu|waad salaaman|waan salaaman|subax wanaagsan|galab wanaagsan|habeen wanaagsan|menu|adeeg|adeegyada|start|bilow)[\s!.?]*$/i;
+  /^(hi|hello|hey|yo|salaam|salaamu|asc|ascc|as\s*wr|asc\s*wr|asalamu|assalamu|asalamu\s*calaykum|assalamu\s*alaikum|waad\s*salaaman|waan\s*salaaman|subax\s*wanaagsan|galab\s*wanaagsan|habeen\s*wanaagsan|menu|adeeg|adeegyada|start|bilow)[\s!.?]*$/i;
 
 const ENGLISH_EXPLICIT =
   /\b(in english|english please|speak english|ingiriis|af ingiriis)\b/i;

@@ -10,7 +10,7 @@ import {
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { logger } from '../../core/logger';
 import { buildDynamicBusinessWelcome } from '../../infrastructure/ai/business-welcome.service';
-import { buildBusinessProfileWelcome } from '../../infrastructure/ai/business-profile-prompt.service';
+import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
 import { getMenuOptionContent } from '../../infrastructure/ai/somali-menu';
 
 export interface SendAutomatedReplyParams {
@@ -103,12 +103,21 @@ export interface SendMenuParams {
 export async function sendProfileWelcome(
   params: SendMenuParams & { preferEnglish?: boolean }
 ): Promise<boolean> {
-  const content = await buildBusinessProfileWelcome(params.businessId, params.preferEnglish);
-  console.log('[AI] Sending Business Profile welcome', { businessId: params.businessId });
+  const profile = await getCachedBusinessProfile(params.businessId);
+  const preferEnglish = params.preferEnglish === true;
+  const content = await buildDynamicBusinessWelcome(
+    params.businessId,
+    preferEnglish
+  );
+  console.log('[AI] Sending Business Profile welcome', {
+    businessId: params.businessId,
+    language: preferEnglish ? 'en' : 'so',
+    businessName: profile.business.name,
+  });
   return sendAutomatedReply({
     ...params,
     content,
-    metadata: { type: 'business_profile_welcome', language: params.preferEnglish ? 'en' : 'so' },
+    metadata: { type: 'business_profile_welcome', language: preferEnglish ? 'en' : 'so' },
   });
 }
 

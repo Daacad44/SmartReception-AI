@@ -1,5 +1,37 @@
 import type { BusinessProfile } from '@prisma/client';
+import { prisma } from '../database/prisma';
 import { ensureBusinessProfile, getCachedBusinessProfileRecord } from './business-profile-cache.service';
+import { isPredominantlyEnglish } from './business-language.util';
+
+function resolveDisplayName(profile: BusinessProfile, businessName?: string): string {
+  const profileName = profile.businessName?.trim();
+  const workspaceName = businessName?.trim();
+  if (!profileName) return workspaceName || 'ganacsigeena';
+  if (!workspaceName) return profileName;
+  if (profileName.toLowerCase() !== workspaceName.toLowerCase()) {
+    return workspaceName;
+  }
+  return profileName;
+}
+
+function pickIntroduction(profile: BusinessProfile, preferEnglish: boolean): string | null {
+  const fields = [
+    profile.longIntroduction,
+    profile.companyIntroduction,
+    profile.companySummary,
+    profile.shortIntroduction,
+    profile.aboutUs,
+    profile.businessDescription,
+  ];
+
+  for (const field of fields) {
+    if (!field?.trim()) continue;
+    if (!preferEnglish && isPredominantlyEnglish(field)) continue;
+    return field.trim();
+  }
+
+  return null;
+}
 
 function formatJsonList(value: unknown): string {
   if (!value) return '';
@@ -13,24 +45,33 @@ function formatJsonList(value: unknown): string {
 }
 
 /** Build structured context for AI from Business Profile ONLY. */
-export function formatBusinessProfileContext(profile: BusinessProfile): string {
+export function formatBusinessProfileContext(
+  profile: BusinessProfile,
+  workspaceName?: string
+): string {
   const sections: string[] = [];
 
   const push = (label: string, value?: string | null) => {
     if (value?.trim()) sections.push(`${label}: ${value.trim()}`);
   };
 
-  push('Business Name', profile.businessName);
+  const pushSomaliText = (label: string, value?: string | null) => {
+    if (!value?.trim()) return;
+    if (isPredominantlyEnglish(value)) return;
+    sections.push(`${label}: ${value.trim()}`);
+  };
+
+  push('Business Name', resolveDisplayName(profile, workspaceName));
   push('Category', profile.businessCategory);
   push('Industry', profile.industryLabel);
-  push('Overview', profile.companyOverview ?? profile.businessDescription);
-  push('About Us', profile.aboutUs);
-  push('Mission', profile.mission);
-  push('Vision', profile.vision);
-  push('Core Values', formatJsonList(profile.coreValues));
-  push('Why Choose Us', profile.whyChooseUs);
-  push('Company Introduction', profile.companyIntroduction ?? profile.longIntroduction);
-  push('Company Summary', profile.companySummary ?? profile.shortIntroduction);
+  pushSomaliText('Overview', profile.companyOverview ?? profile.businessDescription);
+  pushSomaliText('About Us', profile.aboutUs);
+  pushSomaliText('Mission', profile.mission);
+  pushSomaliText('Vision', profile.vision);
+  pushSomaliText('Core Values', formatJsonList(profile.coreValues));
+  pushSomaliText('Why Choose Us', profile.whyChooseUs);
+  pushSomaliText('Company Introduction', profile.companyIntroduction ?? profile.longIntroduction);
+  pushSomaliText('Company Summary', profile.companySummary ?? profile.shortIntroduction);
   push('Founder', profile.founder);
   push('Website', profile.website);
   push('Email', profile.email);
@@ -53,17 +94,18 @@ export function formatBusinessProfileContext(profile: BusinessProfile): string {
 }
 
 /** Dynamic Somali/English welcome from Business Profile — never from Knowledge Base. */
-export function buildProfileWelcomeMessage(profile: BusinessProfile, preferEnglish = false): string {
-  const name = profile.businessName?.trim() || 'our business';
+export function buildProfileWelcomeMessage(
+  profile: BusinessProfile,
+  preferEnglish = false,
+  workspaceName?: string
+): string {
+  const name = preferEnglish
+    ? resolveDisplayName(profile, workspaceName) || 'our business'
+    : resolveDisplayName(profile, workspaceName) || 'ganacsigeena';
 
   if (preferEnglish) {
     const intro =
-      profile.longIntroduction?.trim() ||
-      profile.companyIntroduction?.trim() ||
-      profile.companySummary?.trim() ||
-      profile.shortIntroduction?.trim() ||
-      profile.aboutUs?.trim() ||
-      profile.businessDescription?.trim() ||
+      pickIntroduction(profile, true) ||
       `We are ${name}. We are ready to help you with our services.`;
 
     const lines = [`Welcome to ${name}.`, '', intro];
@@ -81,12 +123,7 @@ export function buildProfileWelcomeMessage(profile: BusinessProfile, preferEngli
   }
 
   const intro =
-    profile.longIntroduction?.trim() ||
-    profile.companyIntroduction?.trim() ||
-    profile.companySummary?.trim() ||
-    profile.shortIntroduction?.trim() ||
-    profile.aboutUs?.trim() ||
-    profile.businessDescription?.trim() ||
+    pickIntroduction(profile, false) ||
     `Waxaan nahay ${name}. Waxaan diyaar u nahay inaan kaa caawinno wixii la xiriira adeegyadayada.`;
 
   const lines = [`Ku soo dhawoow ${name}.`, '', intro];
@@ -104,14 +141,23 @@ export function buildProfileWelcomeMessage(profile: BusinessProfile, preferEngli
 }
 
 export async function getBusinessProfileContext(businessId: string): Promise<string> {
-  const profile = (await getCachedBusinessProfileRecord(businessId)) ?? (await ensureBusinessProfile(businessId));
-  return formatBusinessProfileContext(profile);
+  const [profile, business] = await Promise.all([
+    getCachedBusinessProfileRecord(businessId).then(
+      (row) => row ?? ensureBusinessProfile(businessId)
+    ),
+    prisma.business.findUnique({
+      where: { id: businessId },
+      select: { name: true },
+    }),
+  ]);
+  return formatBusinessProfileContext(profile, business?.name);
 }
 
 export async function buildBusinessProfileWelcome(
   businessId: string,
-  preferEnglish = false
+  preferEnglish = false,
+  workspaceName?: string
 ): Promise<string> {
   const profile = (await getCachedBusinessProfileRecord(businessId)) ?? (await ensureBusinessProfile(businessId));
-  return buildProfileWelcomeMessage(profile, preferEnglish);
+  return buildProfileWelcomeMessage(profile, preferEnglish, workspaceName);
 }

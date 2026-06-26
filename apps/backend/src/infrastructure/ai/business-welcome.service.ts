@@ -5,6 +5,10 @@ import {
   isSmartReceptionStoredContent,
 } from './smartreception-tenant';
 import { buildBusinessProfileWelcome } from './business-profile-prompt.service';
+import {
+  isGenericEnglishGreeting,
+  isPredominantlyEnglish,
+} from './business-language.util';
 
 /**
  * Build welcome for WhatsApp — Business Profile for tenants, platform menu for SmartReception.
@@ -22,11 +26,15 @@ export async function buildDynamicBusinessWelcome(
   }
 
   const customGreeting = aiConfiguration?.greetingMessage?.trim();
-  if (customGreeting && !isSmartReceptionStoredContent(customGreeting)) {
+  if (
+    customGreeting &&
+    !isSmartReceptionStoredContent(customGreeting) &&
+    (preferEnglish || (!isGenericEnglishGreeting(customGreeting) && !isPredominantlyEnglish(customGreeting)))
+  ) {
     return customGreeting;
   }
 
-  return buildBusinessProfileWelcome(businessId, preferEnglish);
+  return buildBusinessProfileWelcome(businessId, preferEnglish, business.name);
 }
 
 /** Reply when a tenant customer selects a numbered menu option (operational — from services). */
