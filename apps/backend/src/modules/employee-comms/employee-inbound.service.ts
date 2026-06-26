@@ -1,5 +1,9 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { normalizePhone } from '../../core/utils/phone';
+import {
+  isMenuOnlyTrigger,
+  parseMenuSelection,
+} from '../../infrastructure/ai/somali-menu';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
 
 export interface HandleEmployeeInboundParams {
@@ -30,11 +34,33 @@ async function findEmployeeByPhone(businessId: string, from: string) {
   });
 }
 
+function isCustomerFacingMenuMessage(content: string): boolean {
+  const text = content.trim();
+  if (!text) return true;
+  return isMenuOnlyTrigger(text) || parseMenuSelection(text) !== null;
+}
+
 export async function tryHandleEmployeeInbound(
   params: HandleEmployeeInboundParams
 ): Promise<boolean> {
   const employee = await findEmployeeByPhone(params.businessId, params.msg.from);
   if (!employee) return false;
+
+  const recentRecipient = await prisma.employeeBroadcastRecipient.findFirst({
+    where: {
+      employeeId: employee.id,
+      broadcast: { businessId: params.businessId },
+      isSent: true,
+      respondedAt: null,
+    },
+    orderBy: { sentAt: 'desc' },
+  });
+
+  // Employees often test the customer bot from their own phone — don't swallow greetings
+  // or menu picks unless they are replying to an active employee broadcast.
+  if (isCustomerFacingMenuMessage(params.extracted.content) && !recentRecipient) {
+    return false;
+  }
 
   const conversation = await prisma.employeeConversation.upsert({
     where: {
@@ -74,15 +100,6 @@ export async function tryHandleEmployeeInbound(
     data: { lastActiveAt: new Date() },
   });
 
-  const recentRecipient = await prisma.employeeBroadcastRecipient.findFirst({
-    where: {
-      employeeId: employee.id,
-      broadcast: { businessId: params.businessId },
-      isSent: true,
-      respondedAt: null,
-    },
-    orderBy: { sentAt: 'desc' },
-  });
   if (recentRecipient) {
     await prisma.$transaction([
       prisma.employeeBroadcastRecipient.update({

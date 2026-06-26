@@ -1,6 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  isMenuOnlyTrigger,
+  parseMenuSelection,
+} from '../../infrastructure/ai/somali-menu';
 import { personalizeEmployeeMessage } from './employee-personalization.service';
+
+function isCustomerFacingMenuMessage(content: string): boolean {
+  const text = content.trim();
+  if (!text) return true;
+  return isMenuOnlyTrigger(text) || parseMenuSelection(text) !== null;
+}
+
+test('isCustomerFacingMenuMessage detects Asc and menu picks', () => {
+  assert.equal(isCustomerFacingMenuMessage('Asc'), true);
+  assert.equal(isCustomerFacingMenuMessage('asc'), true);
+  assert.equal(isCustomerFacingMenuMessage('1'), true);
+  assert.equal(isCustomerFacingMenuMessage('dooro 3'), true);
+  assert.equal(isCustomerFacingMenuMessage('Waxaan rabaa website'), true);
+  assert.equal(isCustomerFacingMenuMessage('Waan imaanayaa berri'), false);
+});
 
 test('personalizeEmployeeMessage replaces employee and business variables', () => {
   const result = personalizeEmployeeMessage(
