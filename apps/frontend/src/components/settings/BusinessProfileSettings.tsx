@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Loader2, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import api, { extractData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { LoadingState } from '@/components/LoadingState';
 import { toast } from 'sonner';
 
@@ -40,6 +43,8 @@ export function BusinessProfileSettings() {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Partial<BusinessProfile>>({});
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['business-profile'],
@@ -83,6 +88,27 @@ export function BusinessProfileSettings() {
     },
   });
 
+  const deletePdfMutation = useMutation({
+    mutationFn: async () => api.delete('/business-profile/pdf'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-profile'] });
+      toast.success('Business Profile PDF removed');
+    },
+    onError: () => toast.error('Failed to remove PDF'),
+  });
+
+  const clearProfileMutation = useMutation({
+    mutationFn: async () => extractData(await api.delete('/business-profile')),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-profile'] });
+      setForm({});
+      setClearDialogOpen(false);
+      setConfirmText('');
+      toast.success('Business Profile cleared. You can start fresh.');
+    },
+    onError: () => toast.error('Failed to clear Business Profile'),
+  });
+
   const set = (key: keyof BusinessProfile, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -119,16 +145,28 @@ export function BusinessProfileSettings() {
               Upload Business Profile PDF
             </Button>
             {profile?.profilePdfFilename && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => reprocessMutation.mutate()}
-                disabled={reprocessMutation.isPending}
-              >
-                <RefreshCw className="mr-1 h-3 w-3" />
-                Re-extract
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => reprocessMutation.mutate()}
+                  disabled={reprocessMutation.isPending}
+                >
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Re-extract
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deletePdfMutation.mutate()}
+                  disabled={deletePdfMutation.isPending}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Remove PDF
+                </Button>
+              </>
             )}
           </div>
           {profile?.profilePdfFilename && (
@@ -217,6 +255,67 @@ export function BusinessProfileSettings() {
           </Button>
         </CardContent>
       </Card>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Delete all Business Profile data for your business only. This removes company identity,
+            introductions, contact info in this section, and any uploaded PDF. Your Knowledge Base,
+            conversations, and other settings are not affected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setClearDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Business Profile
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Business Profile?</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This permanently removes all Business Profile data for your business. Knowledge Base
+              documents, campaigns, employees, and conversations will not be deleted.
+            </p>
+            <p className="text-sm">
+              Type <strong>DELETE</strong> to confirm:
+            </p>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={confirmText !== 'DELETE' || clearProfileMutation.isPending}
+              onClick={() => clearProfileMutation.mutate()}
+            >
+              {clearProfileMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

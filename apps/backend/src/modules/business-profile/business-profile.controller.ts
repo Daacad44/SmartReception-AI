@@ -56,6 +56,15 @@ export class BusinessProfileController {
       next(error);
     }
   }
+
+  async clearProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await businessProfileService.clearProfile(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const businessProfileController = new BusinessProfileController();
