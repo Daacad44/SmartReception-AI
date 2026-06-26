@@ -10,6 +10,7 @@ import {
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { logger } from '../../core/logger';
 import { buildDynamicBusinessWelcome } from '../../infrastructure/ai/business-welcome.service';
+import { buildTenantWelcomeMenu } from '../../infrastructure/ai/tenant-welcome-menu.service';
 import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
 import { getMenuOptionContent } from '../../infrastructure/ai/somali-menu';
 
@@ -118,6 +119,17 @@ export async function sendProfileWelcome(
     ...params,
     content,
     metadata: { type: 'business_profile_welcome', language: preferEnglish ? 'en' : 'so' },
+  });
+}
+
+/** Send Somali welcome + company profile + services menu for tenant businesses. */
+export async function sendTenantWelcomeMenu(params: SendMenuParams): Promise<boolean> {
+  const content = await buildTenantWelcomeMenu(params.businessId);
+  console.log('[AI] Sending tenant welcome menu', { businessId: params.businessId });
+  return sendAutomatedReply({
+    ...params,
+    content,
+    metadata: { type: 'tenant_welcome_menu', language: 'so' },
   });
 }
 

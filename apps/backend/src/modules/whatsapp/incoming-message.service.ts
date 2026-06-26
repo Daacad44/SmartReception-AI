@@ -23,7 +23,7 @@ import {
 import type { SalesFlowContext } from '../../infrastructure/ai/sales-flow.types';
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { sendAutomatedReply, sendServiceMenu, sendProfileWelcome } from '../ai/menu-reply.service';
+import { sendAutomatedReply, sendServiceMenu, sendTenantWelcomeMenu } from '../ai/menu-reply.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
@@ -294,7 +294,9 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
   };
 
   if (isPlatformBusiness) {
-    const menuReset = /^(menu|adeegyada|bilow|start)$/i.test(params.customerMessage.trim());
+    const menuReset = /^(menu|adeegyada|bilow|start|asc|salaam|salaamu)$/i.test(
+      params.customerMessage.trim()
+    );
     const activeFlow = menuReset
       ? null
       : await getActiveSalesFlow(params.conversationId, params.businessId);
@@ -340,36 +342,33 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
   const tenantMenuOption = !isPlatformBusiness ? parseMenuSelection(params.customerMessage) : null;
   if (tenantMenuOption !== null) {
     const reply = await buildTenantMenuOptionReply(params.businessId, tenantMenuOption);
-    if (reply) {
-      await sendAutomatedReply({
-        ...base,
-        content: reply,
-        metadata: { type: 'tenant_menu_option', option: tenantMenuOption },
-      });
-      logPipelineStep(params.pipelineKey, 'tenant_menu_option', { option: tenantMenuOption });
-      return;
-    }
+    await sendAutomatedReply({
+      ...base,
+      content: reply,
+      metadata: { type: 'tenant_menu_option', option: tenantMenuOption },
+    });
+    logPipelineStep(params.pipelineKey, 'tenant_menu_option', { option: tenantMenuOption });
+    return;
   }
 
   if (isMenuOnlyTrigger(params.customerMessage)) {
-    console.log('[AI] Greeting — sending business profile welcome', {
+    console.log('[AI] Greeting — sending welcome menu', {
       businessId: params.businessId,
       isPlatformBusiness,
     });
-    const greetingParams = { ...base, preferEnglish: false as const };
     if (isPlatformBusiness) {
       await sendServiceMenu(base);
     } else {
-      await sendProfileWelcome(greetingParams);
+      await sendTenantWelcomeMenu(base);
     }
     logPipelineStep(params.pipelineKey, 'profile_welcome_sent');
     return;
   }
 
-  // First contact: introduce company from Business Profile only (not Knowledge Base).
+  // First contact: introduce company from Business Profile + services menu.
   if (params.isNewConversation && !isPlatformBusiness) {
-    console.log('[AI] New conversation — Business Profile welcome', { businessId: params.businessId });
-    await sendProfileWelcome({ ...base, preferEnglish: false });
+    console.log('[AI] New conversation — tenant welcome menu', { businessId: params.businessId });
+    await sendTenantWelcomeMenu(base);
     logPipelineStep(params.pipelineKey, 'new_conversation_profile_welcome');
     return;
   }
