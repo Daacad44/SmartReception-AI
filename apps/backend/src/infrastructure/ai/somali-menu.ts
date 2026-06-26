@@ -196,7 +196,10 @@ export function isMenuOnlyTrigger(text: string): boolean {
  * Parse menu selection 1-9 from customer message.
  * Accepts: "1", "2", "option 3", "dooro 4", emoji numbers, etc.
  */
-export function parseMenuSelection(text: string): number | null {
+export function parseMenuSelection(
+  text: string,
+  options?: { keywordMatch?: boolean }
+): number | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
@@ -217,10 +220,12 @@ export function parseMenuSelection(text: string): number | null {
     if (trimmed.includes(emoji)) return num;
   }
 
-  for (const [option, patterns] of Object.entries(MENU_KEYWORDS)) {
-    for (const pattern of patterns) {
-      if (pattern.test(trimmed) && trimmed.length < 80) {
-        return Number(option);
+  if (options?.keywordMatch !== false) {
+    for (const [option, patterns] of Object.entries(MENU_KEYWORDS)) {
+      for (const pattern of patterns) {
+        if (pattern.test(trimmed) && trimmed.length < 80) {
+          return Number(option);
+        }
       }
     }
   }
