@@ -6,6 +6,8 @@ import { scheduleDocumentProcessing } from '../../infrastructure/documents/docum
 import { prisma } from '../../infrastructure/database/prisma';
 import { DocumentType } from '@prisma/client';
 import { notifyKnowledge } from '../../infrastructure/notifications/notification-helper';
+import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
+import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
@@ -244,6 +246,55 @@ export class KnowledgeService {
         entityId: id,
       },
     });
+  }
+
+  /** Delete all Knowledge Base documents and FAQs for this business only. */
+  async clearKnowledgeBase(businessId: string, userId: string) {
+    const documents = await prisma.knowledgeDocument.findMany({
+      where: { knowledgeBase: { businessId } },
+      select: { id: true, title: true, fileUrl: true },
+    });
+
+    if (!documents.length) {
+      return { deleted: 0 };
+    }
+
+    for (const document of documents) {
+      if (document.fileUrl) {
+        try {
+          await storageService.delete(document.fileUrl);
+        } catch {
+          // Best-effort storage cleanup
+        }
+      }
+    }
+
+    const result = await prisma.knowledgeDocument.deleteMany({
+      where: { knowledgeBase: { businessId } },
+    });
+
+    invalidateKnowledgeCache(businessId);
+    invalidateBusinessTenantCache(businessId);
+
+    await prisma.auditLog.create({
+      data: {
+        businessId,
+        userId,
+        action: 'DELETE',
+        entity: 'KnowledgeBase',
+        entityId: businessId,
+        newData: { documentsRemoved: result.count },
+      },
+    });
+
+    await notifyKnowledge(
+      businessId,
+      'Knowledge base cleared',
+      `${result.count} document(s) were removed from the knowledge base.`,
+      businessId
+    );
+
+    return { deleted: result.count };
   }
 
   async searchDocuments(businessId: string, query: string, limit = 10) {

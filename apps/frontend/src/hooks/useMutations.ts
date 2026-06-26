@@ -496,6 +496,26 @@ export function useDeleteDocument() {
   });
 }
 
+export function useClearKnowledgeBase() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => extractData<{ deleted: number }>(await api.delete('/knowledge/clear')),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledge-search'] });
+      toast.success(
+        data.deleted > 0
+          ? `Knowledge base cleared (${data.deleted} item${data.deleted === 1 ? '' : 's'} removed)`
+          : 'Knowledge base is already empty'
+      );
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
 export function useInviteTeamMember() {
   const queryClient = useQueryClient();
 

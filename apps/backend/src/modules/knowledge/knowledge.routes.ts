@@ -46,6 +46,9 @@ router.delete('/faqs/:id', authorize(PERMISSIONS['knowledge:write']), (req, res,
 router.get('/search', authorize(PERMISSIONS['knowledge:read']), (req, res, next) =>
   knowledgeController.search(req, res, next)
 );
+router.delete('/clear', authorize(PERMISSIONS['knowledge:write']), (req, res, next) =>
+  knowledgeController.clearKnowledgeBase(req, res, next)
+);
 router.delete('/documents/:id', authorize(PERMISSIONS['knowledge:write']), (req, res, next) =>
   knowledgeController.deleteDocument(req, res, next)
 );

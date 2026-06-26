@@ -45,6 +45,7 @@ export function BusinessProfileSettings() {
   const [form, setForm] = useState<Partial<BusinessProfile>>({});
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const deleteConfirmed = confirmText.trim().toUpperCase() === 'DELETE';
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['business-profile'],
@@ -264,8 +265,8 @@ export function BusinessProfileSettings() {
           </CardTitle>
           <CardDescription>
             Delete all Business Profile data for your business only. This removes company identity,
-            introductions, contact info in this section, and any uploaded PDF. Your Knowledge Base,
-            conversations, and other settings are not affected.
+            introductions, contact info in this section, and any uploaded PDF. Conversations and
+            other settings are not affected.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -280,15 +281,21 @@ export function BusinessProfileSettings() {
         </CardContent>
       </Card>
 
-      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+      <Dialog
+        open={clearDialogOpen}
+        onOpenChange={(open) => {
+          setClearDialogOpen(open);
+          if (!open) setConfirmText('');
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Business Profile?</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This permanently removes all Business Profile data for your business. Knowledge Base
-              documents, campaigns, employees, and conversations will not be deleted.
+              This permanently removes all Business Profile data for your business. Campaigns,
+              employees, and conversations will not be deleted.
             </p>
             <p className="text-sm">
               Type <strong>DELETE</strong> to confirm:
@@ -297,13 +304,18 @@ export function BusinessProfileSettings() {
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="DELETE"
+              autoComplete="off"
+              spellCheck={false}
             />
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setClearDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
+              type="button"
               variant="destructive"
-              disabled={confirmText !== 'DELETE' || clearProfileMutation.isPending}
+              disabled={!deleteConfirmed || clearProfileMutation.isPending}
               onClick={() => clearProfileMutation.mutate()}
             >
               {clearProfileMutation.isPending ? (
