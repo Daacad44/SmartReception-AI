@@ -191,6 +191,35 @@ export class SuperAdminController {
     }
   }
 
+  async listEmployeeBroadcasts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { page, limit } = paginationSchema.parse(req.query);
+      const businessId = typeof req.query.businessId === 'string' ? req.query.businessId : undefined;
+      const result = await superAdminService.listEmployeeBroadcasts(page, limit, businessId);
+      res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async employeeCommsStats(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.getEmployeeCommsStats();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async pauseEmployeeBroadcast(req: Request, res: Response, next: NextFunction) {
+    try {
+      await superAdminService.pauseEmployeeBroadcast(routeParam(req.params.id), req.user!.userId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getBusinessProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await superAdminService.getBusinessProfile(routeParam(req.params.businessId));

@@ -65,6 +65,19 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     pipelineKey,
     extracted,
   } = params;
+
+  const { tryHandleEmployeeInbound } = await import('../employee-comms/employee-inbound.service');
+  const handledAsEmployee = await tryHandleEmployeeInbound({
+    businessId,
+    whatsappAccountId,
+    msg,
+    extracted,
+  });
+  if (handledAsEmployee) {
+    logPipelineStep(pipelineKey, 'deferred_tasks_done');
+    return;
+  }
+
   const startedAt = Date.now();
   const timings: Record<string, number> = {};
 

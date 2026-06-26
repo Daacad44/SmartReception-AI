@@ -17,6 +17,7 @@ import {
   Megaphone,
   Crown,
   Upload,
+  Radio,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,7 @@ const navItems = [
   { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
+  { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const },
   { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
