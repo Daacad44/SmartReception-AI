@@ -8,6 +8,7 @@ import { CONTACT_FOOTER_SO, requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { searchKnowledgeContext } from './knowledge-search.service';
 import { withAiTimeout } from './gemini-timeout';
+import { parseGeminiAiResponse } from './gemini-json-parse';
 import { loadBusinessAIPrompt } from './business-ai-context.service';
 import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import { isSmartReceptionBusiness } from './smartreception-tenant';
@@ -239,18 +240,10 @@ export async function generateResponse(
 
     const responseText = result.response.text()?.trim() || '{}';
 
-    let parsed: AIResponse;
-    try {
-      parsed = JSON.parse(responseText) as AIResponse;
-    } catch {
-      logger.warn('Gemini JSON parse failed, using raw text', { preview: responseText.slice(0, 200) });
-      return {
-        content: responseText.slice(0, 2000) || GEMINI_ERROR_MESSAGE_SO,
-        intent: 'general',
-        actions: [{ type: 'none' }],
-        confidence: 0.5,
-        language,
-      };
+    const parsed = parseGeminiAiResponse(responseText, language);
+    if (!parsed) {
+      logger.warn('Gemini JSON parse failed, using fallback', { preview: responseText.slice(0, 200) });
+      return fallback;
     }
 
     if (!parsed.content?.trim()) {

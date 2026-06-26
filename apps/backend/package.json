@@ -13,7 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/infrastructure/whatsapp/whatsapp.test.ts src/infrastructure/whatsapp/whatsapp-tenant.test.ts src/infrastructure/ai/smartreception-tenant.test.ts src/infrastructure/ai/business-welcome.test.ts src/infrastructure/ai/ai-intent-router.test.ts src/core/utils/appointment-datetime.test.ts src/modules/campaigns/campaign-automation.test.ts src/modules/employee-comms/employee-comms.test.ts"
+    "test": "tsx --test src/infrastructure/whatsapp/whatsapp.test.ts src/infrastructure/whatsapp/whatsapp-tenant.test.ts src/infrastructure/ai/smartreception-tenant.test.ts src/infrastructure/ai/business-welcome.test.ts src/infrastructure/ai/ai-intent-router.test.ts src/infrastructure/ai/gemini-json-parse.test.ts src/core/utils/appointment-datetime.test.ts src/modules/campaigns/campaign-automation.test.ts src/modules/employee-comms/employee-comms.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

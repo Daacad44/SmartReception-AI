@@ -339,7 +339,9 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     }
   }
 
-  const tenantMenuOption = !isPlatformBusiness ? parseMenuSelection(params.customerMessage) : null;
+  const tenantMenuOption = !isPlatformBusiness
+    ? parseMenuSelection(params.customerMessage, { keywordMatch: false })
+    : null;
   if (tenantMenuOption !== null) {
     const reply = await buildTenantMenuOptionReply(params.businessId, tenantMenuOption);
     await sendAutomatedReply({
