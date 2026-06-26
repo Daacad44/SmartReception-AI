@@ -366,6 +366,7 @@ model Business {
   employeeBroadcasts EmployeeBroadcast[]
   employeeTemplates EmployeeTemplate[]
   employeeConversations EmployeeConversation[]
+  employeeImportJobs EmployeeImportJob[]
 
   @@index([slug])
   @@index([isActive])
@@ -415,6 +416,8 @@ model User {
   createdEmployeeBroadcasts EmployeeBroadcast[] @relation("EmployeeBroadcastCreator")
   employees           Employee[]
   createdImportJobs   CustomerImportJob[]     @relation("ImportJobCreator")
+  createdEmployeeImportJobs EmployeeImportJob[] @relation("EmployeeImportJobCreator")
+  ownedEmployeeGroups EmployeeGroup[]         @relation("EmployeeGroupOwner")
   auditLogs           AuditLog[]
   notifications       Notification[]
 
@@ -1272,6 +1275,9 @@ model Employee {
   hireDate        DateTime?
   employmentType  EmploymentType  @default(FULL_TIME)
   permissions     Json?
+  tags            String[]        @default([])
+  notes           String?
+  emergencyContact String?
   language        String          @default("so")
   timezone        String?
   lastActiveAt    DateTime?
@@ -1299,21 +1305,28 @@ model Employee {
 }
 
 model EmployeeGroup {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   businessId  String
   name        String
   description String?
-  color       String   @default("#651147")
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  color       String    @default("#651147")
+  department  String?
+  status      String    @default("ACTIVE")
+  ownerId     String?
+  notes       String?
+  isSystem    Boolean   @default(false)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   business   Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  owner      User?                 @relation("EmployeeGroupOwner", fields: [ownerId], references: [id])
   members    EmployeeGroupMember[]
   broadcasts EmployeeBroadcast[]
 
   @@unique([businessId, name])
   @@index([businessId])
+  @@index([businessId, status])
   @@map("employee_groups")
 }
 
@@ -1360,8 +1373,12 @@ model EmployeeBroadcast {
   status         EmployeeBroadcastStatus   @default(DRAFT)
   messageType    CampaignMessageType       @default(TEXT)
   groupId        String?
+  groupIds       String[]                  @default([])
   department     String?
   branch         String?
+  roles          String[]                  @default([])
+  tags           String[]                  @default([])
+  audienceFilter Json?
   employeeIds    String[]                  @default([])
   sendToAll      Boolean                   @default(false)
   templateId     String?
@@ -1470,6 +1487,29 @@ model EmployeeConversationMessage {
   @@index([conversationId])
   @@index([whatsappMsgId])
   @@map("employee_conversation_messages")
+}
+
+model EmployeeImportJob {
+  id             String          @id @default(uuid())
+  businessId     String
+  fileName       String
+  fileType       String
+  status         ImportJobStatus @default(PENDING)
+  totalRows      Int             @default(0)
+  importedCount  Int             @default(0)
+  duplicateCount Int             @default(0)
+  invalidCount   Int             @default(0)
+  report         Json?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  completedAt    DateTime?
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("EmployeeImportJobCreator", fields: [createdById], references: [id])
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@map("employee_import_jobs")
 }
 
 // ─── BILLING ─────────────────────────────────────────────────────────────────

@@ -12,9 +12,11 @@ export class EmployeesService {
       branch?: string;
       status?: string;
       groupId?: string;
+      role?: string;
+      tag?: string;
     }
   ) {
-    const { page, limit, search, sortBy, sortOrder, department, branch, status, groupId } = params;
+    const { page, limit, search, sortBy, sortOrder, department, branch, status, groupId, role, tag } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.EmployeeWhereInput = {
@@ -23,6 +25,8 @@ export class EmployeesService {
       ...(department && { department }),
       ...(branch && { branch }),
       ...(status && { status: status as never }),
+      ...(role && { role }),
+      ...(tag && { tags: { has: tag } }),
       ...(groupId && { groupMembers: { some: { groupId } } }),
       ...(search && {
         OR: [
@@ -32,6 +36,8 @@ export class EmployeesService {
           { jobTitle: { contains: search, mode: 'insensitive' } },
           { department: { contains: search, mode: 'insensitive' } },
           { employeeCode: { contains: search, mode: 'insensitive' } },
+          { role: { contains: search, mode: 'insensitive' } },
+          { branch: { contains: search, mode: 'insensitive' } },
         ],
       }),
     };
@@ -48,7 +54,7 @@ export class EmployeesService {
         orderBy,
         include: {
           manager: { select: { id: true, fullName: true } },
-          groupMembers: { include: { group: { select: { id: true, name: true } } } },
+          groupMembers: { include: { group: { select: { id: true, name: true, color: true } } } },
         },
       }),
       prisma.employee.count({ where }),
@@ -91,6 +97,9 @@ export class EmployeesService {
         employmentType: input.employmentType ?? 'FULL_TIME',
         language: input.language ?? 'so',
         timezone: input.timezone,
+        tags: input.tags ?? [],
+        notes: input.notes,
+        emergencyContact: input.emergencyContact,
         groupMembers: input.groupIds?.length
           ? { create: input.groupIds.map((groupId) => ({ groupId })) }
           : undefined,
@@ -107,6 +116,7 @@ export class EmployeesService {
       if (input.groupIds.length) {
         await prisma.employeeGroupMember.createMany({
           data: input.groupIds.map((groupId) => ({ employeeId: id, groupId })),
+          skipDuplicates: true,
         });
       }
     }
@@ -129,6 +139,9 @@ export class EmployeesService {
         employmentType: input.employmentType as never,
         language: input.language,
         timezone: input.timezone,
+        tags: input.tags,
+        notes: input.notes,
+        emergencyContact: input.emergencyContact,
       },
       include: { groupMembers: { include: { group: true } } },
     });
@@ -140,6 +153,61 @@ export class EmployeesService {
       where: { id },
       data: { isActive: false, status: 'TERMINATED' },
     });
+  }
+
+  async bulkDelete(businessId: string, employeeIds: string[]) {
+    await prisma.employee.updateMany({
+      where: { businessId, id: { in: employeeIds } },
+      data: { isActive: false, status: 'TERMINATED' },
+    });
+    return { deleted: employeeIds.length };
+  }
+
+  async bulkUpdateStatus(businessId: string, employeeIds: string[], status: string) {
+    await prisma.employee.updateMany({
+      where: { businessId, id: { in: employeeIds } },
+      data: { status: status as never },
+    });
+    return { updated: employeeIds.length };
+  }
+
+  async addToGroups(businessId: string, employeeIds: string[], groupIds: string[]) {
+    const employees = await prisma.employee.findMany({
+      where: { businessId, id: { in: employeeIds }, isActive: true },
+      select: { id: true },
+    });
+    const groups = await prisma.employeeGroup.findMany({
+      where: { businessId, id: { in: groupIds }, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    const data = employees.flatMap((e) =>
+      groups.map((g) => ({ employeeId: e.id, groupId: g.id }))
+    );
+    if (data.length) {
+      await prisma.employeeGroupMember.createMany({ data, skipDuplicates: true });
+    }
+    return { assigned: data.length };
+  }
+
+  async removeFromGroups(businessId: string, employeeIds: string[], groupIds: string[]) {
+    const result = await prisma.employeeGroupMember.deleteMany({
+      where: {
+        employeeId: { in: employeeIds },
+        groupId: { in: groupIds },
+        employee: { businessId },
+      },
+    });
+    return { removed: result.count };
+  }
+
+  async moveBetweenGroups(
+    businessId: string,
+    employeeIds: string[],
+    fromGroupId: string,
+    toGroupId: string
+  ) {
+    await this.removeFromGroups(businessId, employeeIds, [fromGroupId]);
+    return this.addToGroups(businessId, employeeIds, [toGroupId]);
   }
 }
 

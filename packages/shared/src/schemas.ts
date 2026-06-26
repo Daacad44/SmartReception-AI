@@ -399,6 +399,9 @@ export const createEmployeeSchema = z.object({
   employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
   language: z.string().max(10).optional(),
   timezone: z.string().max(64).optional(),
+  tags: z.array(z.string().max(50)).optional(),
+  notes: z.string().max(2000).optional(),
+  emergencyContact: z.string().max(100).optional(),
   groupIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -408,10 +411,25 @@ export const createEmployeeGroupSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
+  department: z.string().max(100).optional(),
+  notes: z.string().max(1000).optional(),
+  ownerId: z.string().uuid().optional(),
   employeeIds: z.array(z.string().uuid()).optional(),
 });
 
 export const updateEmployeeGroupSchema = createEmployeeGroupSchema.partial();
+
+const employeeAudienceFilterSchema = z.object({
+  department: z.string().max(100).optional(),
+  branch: z.string().max(100).optional(),
+  status: z.enum(EMPLOYEE_STATUSES).optional(),
+  role: z.string().max(100).optional(),
+  roles: z.array(z.string().max(100)).optional(),
+  tags: z.array(z.string().max(50)).optional(),
+  groupIds: z.array(z.string().uuid()).optional(),
+  employeeIds: z.array(z.string().uuid()).optional(),
+  logic: z.enum(['AND', 'OR']).optional(),
+}).optional();
 
 export const createEmployeeBroadcastSchema = z.object({
   name: z.string().min(1).max(200),
@@ -420,8 +438,12 @@ export const createEmployeeBroadcastSchema = z.object({
   schedule: z.enum(EMPLOYEE_BROADCAST_SCHEDULES).default('ONE_TIME'),
   messageType: z.enum(CAMPAIGN_MESSAGE_TYPES).default('TEXT'),
   groupId: z.string().uuid().optional(),
+  groupIds: z.array(z.string().uuid()).optional(),
   department: z.string().max(100).optional(),
   branch: z.string().max(100).optional(),
+  roles: z.array(z.string().max(100)).optional(),
+  tags: z.array(z.string().max(50)).optional(),
+  audienceFilter: employeeAudienceFilterSchema,
   employeeIds: z.array(z.string().uuid()).optional(),
   sendToAll: z.boolean().optional(),
   templateId: z.string().uuid().optional(),
@@ -456,6 +478,65 @@ export const generateEmployeeMessageSchema = z.object({
 export const sendEmployeeReplySchema = z.object({
   content: z.string().min(1).max(4096),
 });
+
+export const bulkEmployeeIdsSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+export const bulkAssignGroupsSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+  groupIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+export const bulkRemoveGroupsSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+  groupIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+export const bulkUpdateEmployeeStatusSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+  status: z.enum(EMPLOYEE_STATUSES),
+});
+
+export const moveEmployeesGroupSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+  fromGroupId: z.string().uuid(),
+  toGroupId: z.string().uuid(),
+});
+
+export const mergeGroupsSchema = z.object({
+  sourceGroupId: z.string().uuid(),
+  targetGroupId: z.string().uuid(),
+});
+
+export const groupMembersSchema = z.object({
+  employeeIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+export const employeeExportSchema = z.object({
+  format: z.enum(['csv', 'xlsx', 'json']).default('csv'),
+  employeeIds: z.array(z.string().uuid()).optional(),
+  groupId: z.string().uuid().optional(),
+  department: z.string().max(100).optional(),
+  branch: z.string().max(100).optional(),
+  status: z.enum(EMPLOYEE_STATUSES).optional(),
+});
+
+export const employeeImportPasteSchema = z.object({
+  content: z.string().min(10).max(500000),
+});
+
+export const previewRecipientsSchema = createEmployeeBroadcastSchema.pick({
+  sendToAll: true,
+  groupId: true,
+  groupIds: true,
+  department: true,
+  branch: true,
+  roles: true,
+  tags: true,
+  employeeIds: true,
+  audienceFilter: true,
+}).partial();
 
 export const createJourneySchema = z.object({
   name: z.string().min(1).max(200),

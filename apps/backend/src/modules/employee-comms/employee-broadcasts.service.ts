@@ -7,50 +7,8 @@ import {
 import { enqueueEmployeeBroadcastSend, removeEmployeeBroadcastQueueJobs } from './employee-broadcast-queue.utils';
 import { assertEmployeeBroadcastAllowed } from './employee-limits.service';
 import { enqueueEmployeeBroadcastBatches } from './employee-broadcast-batch.service';
+import { resolveEmployeeRecipients, previewEmployeeRecipients } from './employee-recipient-resolver.service';
 import type { Prisma } from '@prisma/client';
-
-async function resolveEmployeeRecipients(
-  businessId: string,
-  options: {
-    sendToAll?: boolean;
-    groupId?: string | null;
-    department?: string | null;
-    branch?: string | null;
-    employeeIds?: string[];
-  }
-) {
-  const { sendToAll, groupId, department, branch, employeeIds } = options;
-
-  if (employeeIds?.length) {
-    return prisma.employee.findMany({
-      where: { businessId, isActive: true, status: 'ACTIVE', id: { in: employeeIds } },
-    });
-  }
-
-  if (sendToAll) {
-    return prisma.employee.findMany({
-      where: { businessId, isActive: true, status: 'ACTIVE' },
-    });
-  }
-
-  if (groupId) {
-    const group = await prisma.employeeGroup.findFirst({
-      where: { id: groupId, businessId },
-      include: { members: { include: { employee: true } } },
-    });
-    if (!group) throw new NotFoundError('Employee group not found');
-    return group.members.map((m) => m.employee).filter((e) => e.isActive && e.status === 'ACTIVE');
-  }
-
-  const where: Prisma.EmployeeWhereInput = {
-    businessId,
-    isActive: true,
-    status: 'ACTIVE',
-    ...(department && { department }),
-    ...(branch && { branch }),
-  };
-  return prisma.employee.findMany({ where });
-}
 
 export async function executeEmployeeBroadcastSend(
   broadcastId: string,
@@ -120,9 +78,13 @@ export class EmployeeBroadcastsService {
     const employees = await resolveEmployeeRecipients(businessId, {
       sendToAll: input.sendToAll,
       groupId: input.groupId,
+      groupIds: input.groupIds,
       department: input.department,
       branch: input.branch,
+      roles: input.roles,
+      tags: input.tags,
       employeeIds: input.employeeIds,
+      audienceFilter: input.audienceFilter,
     });
     if (!employees.length) throw new NotFoundError('No employees match the selected audience');
     await assertEmployeeBroadcastAllowed(businessId, employees.length);
@@ -145,8 +107,12 @@ export class EmployeeBroadcastsService {
         schedule: input.schedule ?? 'ONE_TIME',
         messageType: input.messageType ?? 'TEXT',
         groupId: input.groupId,
+        groupIds: input.groupIds ?? [],
         department: input.department,
         branch: input.branch,
+        roles: input.roles ?? [],
+        tags: input.tags ?? [],
+        audienceFilter: input.audienceFilter as object,
         employeeIds: input.employeeIds ?? [],
         sendToAll: input.sendToAll ?? false,
         templateId: input.templateId,
@@ -207,6 +173,20 @@ export class EmployeeBroadcastsService {
     await prisma.employeeBroadcast.update({ where: { id, businessId }, data: { status: 'CANCELLED' } });
   }
 
+  async previewRecipients(businessId: string, input: Partial<CreateEmployeeBroadcastInput>) {
+    return previewEmployeeRecipients(businessId, {
+      sendToAll: input.sendToAll,
+      groupId: input.groupId,
+      groupIds: input.groupIds,
+      department: input.department,
+      branch: input.branch,
+      roles: input.roles,
+      tags: input.tags,
+      employeeIds: input.employeeIds,
+      audienceFilter: input.audienceFilter,
+    });
+  }
+
   async analytics(businessId: string) {
     const [totals, recent] = await Promise.all([
       prisma.employeeBroadcast.aggregate({
@@ -232,8 +212,37 @@ export class EmployeeBroadcastsService {
     ]);
     const sent = totals._sum.sentCount ?? 0;
     const delivered = totals._sum.deliveredCount ?? 0;
+
+    const [employeeCount, groupCount, topGroups, topDepartments] = await Promise.all([
+      prisma.employee.count({ where: { businessId, isActive: true } }),
+      prisma.employeeGroup.count({ where: { businessId, status: 'ACTIVE' } }),
+      prisma.employeeGroupMember.groupBy({
+        by: ['groupId'],
+        where: { group: { businessId } },
+        _count: true,
+      }),
+      prisma.employee.groupBy({
+        by: ['department'],
+        where: { businessId, isActive: true, department: { not: null } },
+        _count: true,
+      }),
+    ]);
+
+    const topGroupsSorted = topGroups.sort((a, b) => b._count - a._count).slice(0, 5);
+    const topDepartmentsSorted = topDepartments
+      .sort((a, b) => b._count - a._count)
+      .slice(0, 5);
+
+    const groupNames = await prisma.employeeGroup.findMany({
+      where: { id: { in: topGroupsSorted.map((g) => g.groupId) } },
+      select: { id: true, name: true },
+    });
+    const groupNameMap = Object.fromEntries(groupNames.map((g) => [g.id, g.name]));
+
     return {
       totals: {
+        employees: employeeCount,
+        groups: groupCount,
         broadcasts: totals._count,
         sent,
         delivered,
@@ -242,6 +251,16 @@ export class EmployeeBroadcastsService {
         responses: totals._sum.responseCount ?? 0,
       },
       deliveryRate: sent > 0 ? Math.round((delivered / sent) * 100) : 0,
+      responseRate: sent > 0 ? Math.round(((totals._sum.responseCount ?? 0) / sent) * 100) : 0,
+      topGroups: topGroupsSorted.map((g) => ({
+        groupId: g.groupId,
+        name: groupNameMap[g.groupId] ?? 'Unknown',
+        members: g._count,
+      })),
+      topDepartments: topDepartmentsSorted.map((d) => ({
+        department: d.department,
+        count: d._count,
+      })),
       recentActivity: recent,
     };
   }

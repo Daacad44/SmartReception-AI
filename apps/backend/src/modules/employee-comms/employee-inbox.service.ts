@@ -5,12 +5,24 @@ import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import type { PaginationInput } from '@smartreception/shared';
 
 export class EmployeeInboxService {
-  async listConversations(businessId: string, params: PaginationInput & { archived?: boolean }) {
-    const { page, limit, search } = params;
+  async listConversations(businessId: string, params: PaginationInput & { archived?: boolean; groupId?: string }) {
+    const { page, limit, search, groupId } = params;
     const skip = (page - 1) * limit;
+
+    let employeeIds: string[] | undefined;
+    if (groupId) {
+      const members = await prisma.employeeGroupMember.findMany({
+        where: { groupId, employee: { businessId } },
+        select: { employeeId: true },
+      });
+      employeeIds = members.map((m) => m.employeeId);
+      if (!employeeIds.length) return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+    }
+
     const where = {
       businessId,
       isArchived: params.archived ?? false,
+      ...(employeeIds && { employeeId: { in: employeeIds } }),
       ...(search && {
         employee: {
           OR: [
