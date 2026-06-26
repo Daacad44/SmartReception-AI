@@ -41,10 +41,12 @@ export async function buildDynamicBusinessWelcome(
 export async function buildTenantMenuOptionReply(
   businessId: string,
   option: number
-): Promise<string | null> {
+): Promise<string> {
   const profile = await getCachedBusinessProfile(businessId);
   const service = profile.services[option - 1];
-  if (!service) return null;
+  if (!service) {
+    return `Lambarka aad dooratay ma jiro. Fadlan dooro lambar ka mid ah adeegyadeena.\n\nJawaab "menu" si aad dib ugu noqoto liiska adeegyada.`;
+  }
 
   const lines = [`${service.name}`];
   if (service.description?.trim()) {

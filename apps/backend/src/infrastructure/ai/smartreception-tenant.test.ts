@@ -13,15 +13,19 @@ test('isSmartReceptionBusiness detects platform workspace by slug', () => {
     true
   );
   assert.equal(
-    isSmartReceptionBusiness({ id: '2', slug: 'botan-dev', name: 'Botan Dev' }),
+    isSmartReceptionBusiness({ id: '2', slug: 'botan-developer', name: 'Botan Dev' }),
+    false
+  );
+  assert.equal(
+    isSmartReceptionBusiness({ id: '3', slug: 'botan-dev', name: 'SmartReception AI' }),
     false
   );
 });
 
-test('isSmartReceptionBusiness detects platform workspace by name', () => {
+test('isSmartReceptionBusiness does not match by business name alone', () => {
   assert.equal(
-    isSmartReceptionBusiness({ id: '3', slug: 'platform', name: 'SmartReception AI' }),
-    true
+    isSmartReceptionBusiness({ id: '4', slug: 'platform', name: 'SmartReception AI' }),
+    false
   );
 });
 

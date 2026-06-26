@@ -11,7 +11,7 @@ import {
   isPredominantlyEnglish,
 } from './business-language.util';
 
-const LEGACY_IDENTITY_NAMES = new Set(['botandev', 'botan dev', 'botan developer']);
+const LEGACY_IDENTITY_NAMES = new Set(['smartreception ai', 'smartreception']);
 
 function normalizeName(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? '';
