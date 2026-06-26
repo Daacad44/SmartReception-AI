@@ -36,6 +36,9 @@ router.get('/businesses/:businessId/business-profile', (req, res, next) =>
 router.patch('/businesses/:businessId/business-profile', (req, res, next) =>
   superAdminController.updateBusinessProfile(req, res, next)
 );
+router.delete('/businesses/:businessId/business-profile', (req, res, next) =>
+  superAdminController.clearBusinessProfile(req, res, next)
+);
 router.get('/businesses/:businessId/knowledge-bases', (req, res, next) =>
   superAdminController.listKnowledgeBases(req, res, next)
 );

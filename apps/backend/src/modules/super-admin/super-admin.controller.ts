@@ -243,6 +243,18 @@ export class SuperAdminController {
     }
   }
 
+  async clearBusinessProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.clearBusinessProfile(
+        routeParam(req.params.businessId),
+        req.user!.userId
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listKnowledgeBases(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await superAdminService.listKnowledgeBases(routeParam(req.params.businessId));

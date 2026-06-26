@@ -105,6 +105,17 @@ export class BusinessProfileService {
   }
 
   async deletePdf(businessId: string) {
+    const profile = await prisma.businessProfile.findUnique({ where: { businessId } });
+    if (!profile) return;
+
+    if (profile.profilePdfUrl) {
+      try {
+        await storageService.delete(profile.profilePdfUrl);
+      } catch {
+        // PDF may already be removed from storage
+      }
+    }
+
     await prisma.businessProfile.update({
       where: { businessId },
       data: {
@@ -116,6 +127,27 @@ export class BusinessProfileService {
       },
     });
     invalidateBusinessProfileCache(businessId);
+    invalidateBusinessTenantCache(businessId);
+  }
+
+  /** Delete entire Business Profile for this business only (not Knowledge Base). */
+  async clearProfile(businessId: string) {
+    const profile = await prisma.businessProfile.findUnique({ where: { businessId } });
+    if (!profile) return { deleted: false };
+
+    if (profile.profilePdfUrl) {
+      try {
+        await storageService.delete(profile.profilePdfUrl);
+      } catch {
+        // Best-effort storage cleanup
+      }
+    }
+
+    await prisma.businessProfile.delete({ where: { businessId } });
+    invalidateBusinessProfileCache(businessId);
+    invalidateBusinessTenantCache(businessId);
+
+    return { deleted: true };
   }
 }
 

@@ -35,5 +35,8 @@ router.post('/reprocess-pdf', authorize(PERMISSIONS['settings:write']), (req, re
 router.delete('/pdf', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   businessProfileController.deletePdf(req, res, next)
 );
+router.delete('/', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
+  businessProfileController.clearProfile(req, res, next)
+);
 
 export default router;

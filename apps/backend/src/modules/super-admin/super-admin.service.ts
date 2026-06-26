@@ -601,6 +601,24 @@ export class SuperAdminService {
     return profile;
   }
 
+  async clearBusinessProfile(businessId: string, adminUserId: string) {
+    const business = await prisma.business.findUnique({ where: { id: businessId } });
+    if (!business) throw new NotFoundError('Business not found');
+    const { businessProfileService } = await import('../business-profile/business-profile.service');
+    const result = await businessProfileService.clearProfile(businessId);
+    await prisma.auditLog.create({
+      data: {
+        businessId,
+        userId: adminUserId,
+        action: 'DELETE',
+        entity: 'BusinessProfile',
+        entityId: businessId,
+        newData: { cleared: true },
+      },
+    });
+    return result;
+  }
+
   async listKnowledgeBases(businessId: string) {
     const business = await prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundError('Business not found');
