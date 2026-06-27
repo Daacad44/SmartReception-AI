@@ -33,7 +33,7 @@ import { useConversationRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
-import { cn, getInitials, formatRelativeTime } from '@/lib/utils';
+import { cn, getInitials, formatRelativeTime, formatMessagePreview } from '@/lib/utils';
 import { isNetworkOrTimeoutError } from '@/lib/api';
 import type { Message } from '@/lib/entities';
 
@@ -324,7 +324,9 @@ export function ConversationsPage() {
                           )}
                         </div>
                       )}
-                      {msg.content && <p className="text-sm">{msg.content}</p>}
+                      {msg.content && (
+                        <p className="whitespace-pre-wrap break-words text-sm">{msg.content}</p>
+                      )}
                       <div className="mt-1 flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -535,7 +537,9 @@ function ConversationItem({
             {formatRelativeTime(conversation.lastMessageAt)}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{conversation.lastMessage}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground break-words">
+          {formatMessagePreview(conversation.lastMessage)}
+        </p>
         <div className="mt-1 flex items-center gap-1">
           {conversation.unreadCount > 0 && (
             <Badge className="bg-accent text-white text-[10px] h-4 min-w-4 px-1">

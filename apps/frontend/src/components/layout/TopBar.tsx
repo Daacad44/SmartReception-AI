@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings, Moon, Sun, Menu } from 'lucide-react';
+import { Search, Bell, ChevronDown, Building2, LogOut, User, Settings, Moon, Sun, Menu, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -32,9 +32,11 @@ const QUICK_LINKS = [
 
 interface TopBarProps {
   onMenuClick?: () => void;
+  sidebarCollapsed?: boolean;
+  onSidebarToggle?: () => void;
 }
 
-export function TopBar({ onMenuClick }: TopBarProps) {
+export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBarProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { businesses, currentBusiness, switchBusiness } = useBusiness();
@@ -88,6 +90,18 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
+        </Button>
+      )}
+
+      {onSidebarToggle && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden shrink-0 md:flex"
+          onClick={onSidebarToggle}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <PanelLeft className="h-5 w-5" />
         </Button>
       )}
 

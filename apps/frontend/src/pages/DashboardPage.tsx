@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useDashboardBundle, useConversations, useWhatsAppStatus, isInitialLoading } from '@/hooks/useApi';
-import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativeTime } from '@/lib/utils';
+import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativeTime, formatMessagePreview } from '@/lib/utils';
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuerySection } from '@/components/QuerySection';
@@ -436,7 +436,9 @@ export function DashboardPage() {
                         {conv.status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
+                    <p className="line-clamp-2 text-sm text-muted-foreground break-words">
+                      {formatMessagePreview(conv.lastMessage)}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{formatRelativeTime(conv.lastMessageAt)}</p>
