@@ -89,6 +89,8 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables ?? [],
+        whatsappTemplateName: input.whatsappTemplateName,
+        whatsappTemplateLanguage: input.whatsappTemplateLanguage,
         isSystem: false,
       },
     });
@@ -112,6 +114,8 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables,
+        whatsappTemplateName: input.whatsappTemplateName,
+        whatsappTemplateLanguage: input.whatsappTemplateLanguage,
       },
     });
 

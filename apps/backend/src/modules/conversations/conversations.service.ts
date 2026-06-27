@@ -2,16 +2,19 @@ import { conversationsRepository } from './conversations.repository';
 import { NotFoundError, ValidationError, WhatsAppDeliveryError } from '../../core/errors';
 import { PaginationInput, SendMessageInput } from '@smartreception/shared';
 import { prisma } from '../../infrastructure/database/prisma';
+import type { Prisma } from '@prisma/client';
 import { sendConversationMessage } from '../whatsapp/whatsapp-outbound.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { phoneDigits } from '../../core/utils/customer-phone';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
-import { logger } from '../../core/logger';
+import { messageTemplatesService } from '../message-templates/message-templates.service';
 import {
   formatSessionExpiryMessage,
   getWhatsAppSessionWindow,
 } from '../whatsapp/whatsapp-session.service';
+import { resolveConversationTemplateSend } from '../whatsapp/conversation-template.service';
+import { logger } from '../../core/logger';
 
 export class ConversationsService {
   async list(
@@ -53,7 +56,8 @@ export class ConversationsService {
       businessId,
       conversationId,
       userId,
-      contentLength: input.content.length,
+      contentLength: input.content?.length ?? 0,
+      templateId: input.templateId,
     });
 
     const conversation = await conversationsRepository.findConversationWithWhatsApp(
@@ -100,7 +104,37 @@ export class ConversationsService {
     }
 
     const sessionWindow = await getWhatsAppSessionWindow(conversationId, conversation.customerId);
-    if (!sessionWindow.isOpen) {
+
+    let outboundContent = input.content?.trim() ?? '';
+    let outboundType = input.type ?? 'TEXT';
+    let templateMeta:
+      | {
+          templateId: string;
+          templateName: string;
+          templateNameMeta?: string;
+          templateLanguage?: string;
+          templateComponents?: unknown[];
+        }
+      | undefined;
+
+    if (input.templateId) {
+      const resolved = await resolveConversationTemplateSend({
+        businessId,
+        conversationId,
+        customerId: conversation.customerId,
+        templateId: input.templateId,
+        whatsappAccountId: whatsappAccount.id,
+      });
+      outboundContent = resolved.content;
+      outboundType = resolved.messageType;
+      templateMeta = {
+        templateId: resolved.templateId,
+        templateName: resolved.templateName,
+        templateNameMeta: resolved.templateNameMeta,
+        templateLanguage: resolved.templateLanguage,
+        templateComponents: resolved.templateComponents,
+      };
+    } else if (!sessionWindow.isOpen) {
       const sessionMessage = formatSessionExpiryMessage(sessionWindow);
       logger.warn('[Outbound] Blocked agent send — WhatsApp session closed', {
         conversationId,
@@ -111,15 +145,20 @@ export class ConversationsService {
       throw new ValidationError(sessionMessage);
     }
 
+    if (!outboundContent) {
+      throw new ValidationError('Message content is required');
+    }
+
     const message = await conversationsRepository.createMessage({
       conversationId,
       direction: 'OUTBOUND',
-      content: input.content,
-      type: input.type,
+      content: outboundContent,
+      type: outboundType,
       mediaUrl: input.mediaUrl,
       sentByUserId: userId,
       isAiGenerated: false,
       status: 'PENDING',
+      metadata: templateMeta ? ({ template: templateMeta } as Prisma.InputJsonValue) : undefined,
     });
 
     logger.info('[Outbound] Message persisted as PENDING', {
@@ -135,11 +174,14 @@ export class ConversationsService {
       messageId: message.id,
       phoneNumber: recipientPhone,
       phoneNumberId: whatsappAccount.phoneNumberId,
-      content: input.content,
-      type: input.type,
+      content: outboundContent,
+      type: outboundType,
       mediaUrl: input.mediaUrl,
       mediaFilename: input.mediaFilename,
       accessToken,
+      templateName: templateMeta?.templateNameMeta,
+      templateLanguage: templateMeta?.templateLanguage,
+      templateComponents: templateMeta?.templateComponents,
     });
 
     if (!delivered.success) {
@@ -227,6 +269,10 @@ export class ConversationsService {
     }
 
     return conversationsRepository.handoffToHuman(businessId, conversationId, userId);
+  }
+
+  async listTemplates(businessId: string) {
+    return messageTemplatesService.list(businessId);
   }
 
   async sendTypingIndicator(businessId: string, conversationId: string) {

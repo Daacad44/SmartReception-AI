@@ -6,14 +6,23 @@ export function useSendMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ conversationId, content }: { conversationId: string; content: string }) => {
-      const response = await api.post(`/conversations/${conversationId}/messages`, { content });
+    mutationFn: async ({
+      conversationId,
+      content,
+      templateId,
+    }: {
+      conversationId: string;
+      content?: string;
+      templateId?: string;
+    }) => {
+      const payload = templateId ? { templateId } : { content: content! };
+      const response = await api.post(`/conversations/${conversationId}/messages`, payload);
       return extractData(response);
     },
-    onSuccess: (_data, { conversationId }) => {
+    onSuccess: (_data, { conversationId, templateId }) => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success('Message sent to WhatsApp');
+      toast.success(templateId ? 'Template sent to WhatsApp' : 'Message sent to WhatsApp');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -380,6 +389,30 @@ export function useTestWhatsAppConnection() {
       toast.success(
         `Connection OK${data?.verifiedName ? `: ${data.verifiedName}` : ''}`
       );
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useUpdateWhatsAppAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      accountId,
+      data,
+    }: {
+      accountId: string;
+      data: { reengagementTemplateName?: string | null; reengagementTemplateLanguage?: string | null };
+    }) => {
+      const response = await api.patch(`/whatsapp/accounts/${accountId}`, data);
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      toast.success('WhatsApp template settings saved');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

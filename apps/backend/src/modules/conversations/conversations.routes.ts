@@ -14,6 +14,9 @@ router.get('/', authorize(PERMISSIONS['conversations:read']), (req, res, next) =
 router.get('/summary', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.summary(req, res, next)
 );
+router.get('/templates', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.listTemplates(req, res, next)
+);
 router.get('/:id/messages', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.getMessages(req, res, next)
 );

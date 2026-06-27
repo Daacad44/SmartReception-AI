@@ -22,6 +22,9 @@ export interface SendConversationMessageParams {
   mediaUrl?: string;
   mediaFilename?: string;
   accessToken?: string;
+  templateName?: string;
+  templateLanguage?: string;
+  templateComponents?: unknown[];
 }
 
 export interface SendConversationMessageResult {
@@ -43,6 +46,9 @@ export async function sendConversationMessage(
     mediaUrl,
     mediaFilename,
     accessToken,
+    templateName,
+    templateLanguage,
+    templateComponents,
   } = params;
 
   const recipient = phoneDigits(phoneNumber);
@@ -66,6 +72,9 @@ export async function sendConversationMessage(
     content,
     mediaUrl,
     mediaFilename,
+    templateName,
+    templateLanguage,
+    templateComponents,
   });
 
   if (sendResult.success && sendResult.whatsappMsgId) {

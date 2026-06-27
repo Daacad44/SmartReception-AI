@@ -998,6 +998,8 @@ model MessageTemplate {
   category    String?
   isSystem    Boolean      @default(false)
   variables   String[]     @default([])
+  whatsappTemplateName     String?
+  whatsappTemplateLanguage String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -1169,6 +1171,8 @@ model WhatsAppAccount {
   lastGraphApiResponse Json?
   lastGraphApiError    Json?
   lastOutgoingAt       DateTime?
+  reengagementTemplateName     String?
+  reengagementTemplateLanguage String?  @default("en")
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

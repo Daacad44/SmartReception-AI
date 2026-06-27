@@ -411,6 +411,27 @@ export function useConversationSummary() {
   });
 }
 
+export function useConversationTemplates() {
+  return useAuthQuery<
+    Array<{
+      id: string;
+      name: string;
+      content: string;
+      type: string;
+      isSystem: boolean;
+    }>
+  >({
+    queryKey: ['conversation-templates'],
+    queryFn: async () => {
+      const response = await api.get('/conversations/templates', {
+        timeout: CONVERSATIONS_TIMEOUT,
+      });
+      return extractData(response);
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useMessages(conversationId: string | null) {
   return useAuthQuery<{ messages: Message[]; whatsappSession: WhatsAppSession | null }>({
     queryKey: ['messages', conversationId],
@@ -769,6 +790,8 @@ export function useWhatsAppAccounts() {
           webhookStatus?: string | null;
           lastSyncAt?: string | null;
           isActive: boolean;
+          reengagementTemplateName?: string | null;
+          reengagementTemplateLanguage?: string | null;
         }>
       >(response);
     },

@@ -1,5 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { PaginationInput } from '@smartreception/shared';
 
 export class ConversationsRepository {
@@ -112,6 +112,7 @@ export class ConversationsRepository {
     isAiGenerated?: boolean;
     whatsappMsgId?: string;
     status?: string;
+    metadata?: Prisma.InputJsonValue;
   }) {
     return prisma.$transaction(async (tx) => {
       const message = await tx.message.create({
@@ -125,6 +126,7 @@ export class ConversationsRepository {
           isAiGenerated: data.isAiGenerated ?? false,
           whatsappMsgId: data.whatsappMsgId,
           status: (data.status as 'PENDING') || 'PENDING',
+          metadata: data.metadata,
         },
       });
 
