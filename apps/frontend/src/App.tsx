@@ -73,6 +73,13 @@ const CampaignsPage = lazyWithRetry(() =>
 const EmployeeCommunicationPage = lazyWithRetry(() =>
   import('@/pages/EmployeeCommunicationPage').then((m) => ({ default: m.EmployeeCommunicationPage }))
 );
+const SubscriptionManagementPage = lazyWithRetry(() =>
+  import('@/pages/SubscriptionManagementPage').then((m) => ({ default: m.SubscriptionManagementPage }))
+);
+const SubscriptionExpiredPage = lazyWithRetry(() =>
+  import('@/pages/SubscriptionExpiredPage').then((m) => ({ default: m.SubscriptionExpiredPage }))
+);
+import { SubscriptionGate } from '@/components/SubscriptionGate';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,6 +154,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/subscription-expired"
+                  element={
+                    <ProtectedRoute>
+                      <SubscriptionExpiredPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/forgot-password"
                   element={
                     <PublicRoute>
@@ -164,11 +179,13 @@ export default function App() {
                 />
                 <Route
                   element={
-                    <OnboardingGate>
-                      <ProtectedRoute>
-                        <DashboardLayout />
-                      </ProtectedRoute>
-                    </OnboardingGate>
+                    <SubscriptionGate>
+                      <OnboardingGate>
+                        <ProtectedRoute>
+                          <DashboardLayout />
+                        </ProtectedRoute>
+                      </OnboardingGate>
+                    </SubscriptionGate>
                   }
                 >
                   <Route
@@ -304,6 +321,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <UserManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/subscriptions"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <SubscriptionManagementPage />
                       </PermissionRoute>
                     }
                   />

@@ -23,6 +23,10 @@ export const QUEUE_NAMES = {
   CAMPAIGN_JOURNEY: 'campaign-journey',
   EMPLOYEE_BROADCAST: 'employee-broadcast',
   EMPLOYEE_BROADCAST_BATCH: 'employee-broadcast-batch',
+  SUBSCRIPTION_EXPIRATION: 'subscription-expiration',
+  SUBSCRIPTION_REMINDER: 'subscription-reminder',
+  SUBSCRIPTION_LOCK: 'subscription-lock',
+  SUBSCRIPTION_NOTIFICATION: 'subscription-notification',
 } as const;
 
 let whatsappQueue: Queue | null = null;
@@ -170,6 +174,10 @@ export interface EmployeeBroadcastBatchJobData {
   businessId: string;
   recipientIds: string[];
   runVersion: number;
+}
+
+export interface SubscriptionScanJobData {
+  type: 'expiration' | 'reminders';
 }
 
 export function createWorker<T>(
