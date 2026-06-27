@@ -126,3 +126,43 @@ Every agent send logs:
 - No access tokens in API responses
 - Graph API errors returned to agent (for debugging) without token leakage
 - Business ownership enforced via `requireBusiness` + conversation `businessId` scope
+
+---
+
+## Per-Number Delivery Failures (Meta Error 131047)
+
+**Symptom:** Some phone numbers receive agent replies; others show "Delivery failed" even though the platform previously showed success.
+
+**Root cause:** WhatsApp Cloud API **24-hour customer care session window**. Free-form text messages are only allowed within 24 hours of the customer's last inbound message. Outside that window, Meta returns error **131047** (re-engagement message required).
+
+### Evidence (production)
+
+| Number | Last customer inbound | Agent send | Result |
+|--------|----------------------|------------|--------|
+| `+252687716299` | Within 24h (active chat) | Agent "Asc" | Delivered (blue checks) |
+| `+252612599355` | 2026-06-23 (4+ days ago) | Agent "Asc" 2026-06-27 | Failed — Meta `131047` |
+
+Meta may return HTTP 200 with a `wamid` initially, then asynchronously update status to `FAILED` via webhook. This is why the UI could briefly show success before the failure appeared.
+
+### Fix (session window enforcement)
+
+| File | Change |
+|------|--------|
+| `whatsapp-session.service.ts` | 24h window check; Meta error parsing (`131047`, `131026`) |
+| `conversations.service.ts` | Block agent sends when session closed; expose `whatsappSession` on messages API |
+| `ConversationsPage.tsx` | Session-expired banner; disable composer; show Meta error details |
+
+Session detection uses the **latest inbound message across all conversations for the same customer**, which handles duplicate customer records with different phone formats (e.g. `612599355` vs `252612599355`).
+
+### What agents should do
+
+1. **Within 24h of customer message:** Free-form replies work normally.
+2. **After 24h:** Customer must send a new WhatsApp message first, **or** use an approved **template message** (Campaigns).
+3. **Duplicate conversations:** If a customer messages but the wrong thread shows as expired, merge duplicate customer records or reply in the active thread.
+
+### Meta error codes
+
+| Code | Meaning |
+|------|---------|
+| `131047` | Re-engagement message — 24h session expired |
+| `131026` | Message undeliverable — user may have blocked or opted out |

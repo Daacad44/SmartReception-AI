@@ -8,6 +8,10 @@ import { whatsappRepository } from '../whatsapp/whatsapp.repository';
 import { phoneDigits } from '../../core/utils/customer-phone';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 import { logger } from '../../core/logger';
+import {
+  formatSessionExpiryMessage,
+  getWhatsAppSessionWindow,
+} from '../whatsapp/whatsapp-session.service';
 
 export class ConversationsService {
   async list(
@@ -35,7 +39,8 @@ export class ConversationsService {
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
-    return conversation;
+    const whatsappSession = await getWhatsAppSessionWindow(id, conversation.customerId);
+    return { ...conversation, whatsappSession };
   }
 
   async sendMessage(
@@ -92,6 +97,18 @@ export class ConversationsService {
       phoneDigits(conversation.customer.phone);
     if (!recipientPhone || recipientPhone.length < 8) {
       throw new ValidationError('Customer phone number is invalid for WhatsApp delivery');
+    }
+
+    const sessionWindow = await getWhatsAppSessionWindow(conversationId, conversation.customerId);
+    if (!sessionWindow.isOpen) {
+      const sessionMessage = formatSessionExpiryMessage(sessionWindow);
+      logger.warn('[Outbound] Blocked agent send — WhatsApp session closed', {
+        conversationId,
+        customerId: conversation.customerId,
+        lastInboundAt: sessionWindow.lastInboundAt,
+        expiresAt: sessionWindow.expiresAt,
+      });
+      throw new ValidationError(sessionMessage);
     }
 
     const message = await conversationsRepository.createMessage({
@@ -169,11 +186,20 @@ export class ConversationsService {
   }
 
   async getMessages(businessId: string, conversationId: string) {
-    const messages = await conversationsRepository.findMessages(businessId, conversationId);
-    if (!messages) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, businessId },
+      select: { id: true, customerId: true },
+    });
+    if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
-    return messages;
+
+    const [messages, whatsappSession] = await Promise.all([
+      conversationsRepository.findMessages(businessId, conversationId),
+      getWhatsAppSessionWindow(conversationId, conversation.customerId),
+    ]);
+
+    return { messages: messages ?? [], whatsappSession };
   }
 
   async markAsRead(businessId: string, conversationId: string) {

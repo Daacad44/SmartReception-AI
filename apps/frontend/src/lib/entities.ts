@@ -51,6 +51,15 @@ export interface Message {
   senderName: string;
   timestamp: string;
   status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  deliveryError?: string;
+}
+
+export interface WhatsAppSession {
+  isOpen: boolean;
+  lastInboundAt: string | null;
+  expiresAt: string | null;
+  remainingMs: number;
+  remainingHours: number;
 }
 
 export interface Customer {

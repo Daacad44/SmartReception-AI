@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from '@/lib/supabase-config';
 import type {
   Conversation,
   Message,
+  WhatsAppSession,
   Customer,
   Appointment,
   KnowledgeDocument,
@@ -55,6 +56,36 @@ function mapMessageStatus(status: string | null | undefined): Message['status'] 
     return normalized as Message['status'];
   }
   return 'sent';
+}
+
+const WHATSAPP_SESSION_ERROR_CODES = new Set([131047, 131026]);
+
+function parseDeliveryError(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const meta = metadata as Record<string, unknown>;
+
+  const graphError = meta.graphApiError as { code?: number | string; message?: string } | undefined;
+  if (graphError?.code && WHATSAPP_SESSION_ERROR_CODES.has(Number(graphError.code))) {
+    return graphError.message ?? 'WhatsApp session expired (24-hour window)';
+  }
+
+  const deliveryErrors = meta.deliveryErrors as
+    | Array<{ code?: number; message?: string; error_data?: { details?: string } }>
+    | undefined;
+  const first = deliveryErrors?.[0];
+  if (first?.code && WHATSAPP_SESSION_ERROR_CODES.has(first.code)) {
+    return (
+      first.error_data?.details ??
+      first.message ??
+      'WhatsApp session expired (24-hour window)'
+    );
+  }
+
+  if (graphError?.message) return graphError.message;
+  if (first?.error_data?.details) return first.error_data.details;
+  if (first?.message) return first.message;
+
+  return undefined;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,6 +139,7 @@ export function transformMessage(raw: any, conversationId: string): Message {
     senderName,
     timestamp: raw.createdAt,
     status: mapMessageStatus(raw.status),
+    deliveryError: parseDeliveryError(raw.metadata),
   };
 }
 
@@ -380,15 +412,28 @@ export function useConversationSummary() {
 }
 
 export function useMessages(conversationId: string | null) {
-  return useAuthQuery<Message[]>({
+  return useAuthQuery<{ messages: Message[]; whatsappSession: WhatsAppSession | null }>({
     queryKey: ['messages', conversationId],
     queryFn: async () => {
       const response = await api.get(`/conversations/${conversationId}/messages`, {
         timeout: CONVERSATIONS_TIMEOUT,
       });
-      const data = extractData<unknown[]>(response);
-      const messages = Array.isArray(data) ? data : [];
-      return messages.map((m) => transformMessage(m, conversationId!));
+      const data = extractData<{ messages?: unknown[]; whatsappSession?: WhatsAppSession } | unknown[]>(
+        response
+      );
+
+      if (Array.isArray(data)) {
+        return {
+          messages: data.map((m) => transformMessage(m, conversationId!)),
+          whatsappSession: null,
+        };
+      }
+
+      const messages = Array.isArray(data.messages) ? data.messages : [];
+      return {
+        messages: messages.map((m) => transformMessage(m, conversationId!)),
+        whatsappSession: data.whatsappSession ?? null,
+      };
     },
     enabled: !!conversationId,
     staleTime: 2_000,

@@ -12,6 +12,7 @@ import {
   Calendar,
   ArrowLeft,
   Info,
+  AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -81,7 +82,10 @@ export function ConversationsPage() {
     status: statusFilter,
     search: debouncedSearch || undefined,
   });
-  const { data: messages, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
+  const { data: messagesData, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
+  const messages = messagesData?.messages;
+  const whatsappSession = messagesData?.whatsappSession;
+  const sessionClosed = whatsappSession != null && !whatsappSession.isOpen;
   const sendMessage = useSendMessage();
   const takeover = useTakeoverConversation();
   const transferToAi = useTransferToAi();
@@ -340,7 +344,8 @@ export function ConversationsPage() {
                       )}
                       {msg.status === 'failed' && (
                         <p className="mt-1 text-[10px] font-medium text-destructive">
-                          Delivery failed — customer did not receive this message
+                          {msg.deliveryError ??
+                            'Delivery failed — customer did not receive this message'}
                         </p>
                       )}
                       <div className="mt-1 flex items-center justify-end gap-1">
@@ -376,12 +381,30 @@ export function ConversationsPage() {
             </ScrollArea>
 
             <div className="border-t bg-card p-3">
+              {sessionClosed && (
+                <div className="mb-3 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">24-hour WhatsApp session expired</p>
+                    <p className="mt-0.5 text-warning/90">
+                      {whatsappSession?.lastInboundAt
+                        ? 'The customer must send a new WhatsApp message before you can reply with free-form text. You can also use an approved template message from Campaigns.'
+                        : 'This customer has not sent a WhatsApp message yet. They must message you first.'}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-end gap-2">
                 <Textarea
-                  placeholder="Type a message..."
+                  placeholder={
+                    sessionClosed
+                      ? 'Session expired — wait for customer to message or use a template'
+                      : 'Type a message...'
+                  }
                   className="min-h-[40px] max-h-24 resize-none"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  disabled={sessionClosed}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -392,7 +415,7 @@ export function ConversationsPage() {
                 <Button
                   size="icon"
                   className="shrink-0 bg-accent hover:bg-accent/90"
-                  disabled={sendMessage.isPending || !message.trim()}
+                  disabled={sendMessage.isPending || !message.trim() || sessionClosed}
                   onClick={handleSend}
                 >
                   <Send className="h-4 w-4" />
