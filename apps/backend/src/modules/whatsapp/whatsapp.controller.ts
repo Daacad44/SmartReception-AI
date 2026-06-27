@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { whatsappModuleService } from './whatsapp.service';
 import { logger } from '../../core/logger';
-import { connectWhatsAppSchema } from '@smartreception/shared';
+import { connectWhatsAppSchema, updateWhatsAppAccountSchema } from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
 import { config } from '../../config';
 import { NotFoundError } from '../../core/errors';
@@ -194,6 +194,20 @@ export class WhatsAppController {
       const accountId = req.body?.accountId as string | undefined;
       const result = await whatsappModuleService.testConnection(req.user!.businessId!, accountId);
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateAccount(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = updateWhatsAppAccountSchema.parse(req.body);
+      const account = await whatsappModuleService.updateAccount(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        input
+      );
+      res.json({ success: true, data: account });
     } catch (error) {
       next(error);
     }

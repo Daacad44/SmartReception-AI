@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import api, { extractData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
   useConnectWhatsAppFromEnv,
   useDisconnectWhatsApp,
   useTestWhatsAppConnection,
+  useUpdateWhatsAppAccount,
 } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
 import { Copy, Trash2, Plug, Wifi, RefreshCw } from 'lucide-react';
@@ -59,6 +60,12 @@ export function WhatsAppSettings() {
   const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
   const testConnection = useTestWhatsAppConnection();
+  const updateWhatsAppAccount = useUpdateWhatsAppAccount();
+
+  const [reengagementForm, setReengagementForm] = useState({
+    reengagementTemplateName: '',
+    reengagementTemplateLanguage: 'en',
+  });
 
   const [form, setForm] = useState({
     phoneNumberId: '',
@@ -103,11 +110,32 @@ export function WhatsAppSettings() {
     webhookHealth?.status === 'verified';
   const webhookDisplayStatus = webhookIsVerified ? 'verified' : webhookHealth?.status ?? 'not_configured';
 
+  const activeAccount = accounts?.find((a) => a.isActive);
+
+  useEffect(() => {
+    if (activeAccount) {
+      setReengagementForm({
+        reengagementTemplateName: activeAccount.reengagementTemplateName ?? '',
+        reengagementTemplateLanguage: activeAccount.reengagementTemplateLanguage ?? 'en',
+      });
+    }
+  }, [activeAccount?.id, activeAccount?.reengagementTemplateName, activeAccount?.reengagementTemplateLanguage]);
+
   if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
   }
 
-  const activeAccount = accounts?.find((a) => a.isActive);
+  const handleSaveReengagementTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeAccount) return;
+    await updateWhatsAppAccount.mutateAsync({
+      accountId: activeAccount.id,
+      data: {
+        reengagementTemplateName: reengagementForm.reengagementTemplateName.trim() || null,
+        reengagementTemplateLanguage: reengagementForm.reengagementTemplateLanguage.trim() || 'en',
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -333,6 +361,48 @@ export function WhatsAppSettings() {
           )}
         </CardContent>
       </Card>
+
+      {activeAccount && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Re-engagement Template</CardTitle>
+            <CardDescription>
+              Meta-approved template name for sending prepared messages outside the 24-hour session.
+              Create a template in Meta Business Manager with one body variable (e.g. &quot;Message: {'{{1}}'}&quot;).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveReengagementTemplate} className="grid max-w-lg gap-4">
+              <div className="space-y-2">
+                <Label>Template Name (Meta)</Label>
+                <Input
+                  value={reengagementForm.reengagementTemplateName}
+                  onChange={(e) =>
+                    setReengagementForm({ ...reengagementForm, reengagementTemplateName: e.target.value })
+                  }
+                  placeholder="e.g. customer_follow_up"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Template Language</Label>
+                <Input
+                  value={reengagementForm.reengagementTemplateLanguage}
+                  onChange={(e) =>
+                    setReengagementForm({
+                      ...reengagementForm,
+                      reengagementTemplateLanguage: e.target.value,
+                    })
+                  }
+                  placeholder="en"
+                />
+              </div>
+              <Button type="submit" disabled={updateWhatsAppAccount.isPending}>
+                Save Template Settings
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

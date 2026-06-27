@@ -9,7 +9,7 @@ import { getAiQueue, getWhatsappQueue } from '../../infrastructure/queue/queues'
 import { config } from '../../config';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
-import { ConnectWhatsAppInput } from '@smartreception/shared';
+import { ConnectWhatsAppInput, UpdateWhatsAppAccountInput } from '@smartreception/shared';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState } from './whatsapp-pipeline-state';
@@ -619,6 +619,8 @@ export class WhatsAppModuleService {
         webhookStatus: true,
         lastSyncAt: true,
         isActive: true,
+        reengagementTemplateName: true,
+        reengagementTemplateLanguage: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -785,6 +787,32 @@ export class WhatsAppModuleService {
       qualityRating: info.qualityRating,
       testedAt: new Date().toISOString(),
     };
+  }
+
+  async updateAccount(businessId: string, accountId: string, input: UpdateWhatsAppAccountInput) {
+    const account = await prisma.whatsAppAccount.findFirst({
+      where: { id: accountId, businessId },
+    });
+    if (!account) {
+      throw new NotFoundError('WhatsApp account not found');
+    }
+
+    return prisma.whatsAppAccount.update({
+      where: { id: accountId },
+      data: {
+        reengagementTemplateName: input.reengagementTemplateName,
+        reengagementTemplateLanguage: input.reengagementTemplateLanguage,
+      },
+      select: {
+        id: true,
+        phoneNumberId: true,
+        phoneNumber: true,
+        displayName: true,
+        reengagementTemplateName: true,
+        reengagementTemplateLanguage: true,
+        isActive: true,
+      },
+    });
   }
 
   async disconnectAccount(businessId: string, accountId: string) {

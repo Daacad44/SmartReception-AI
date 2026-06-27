@@ -42,6 +42,9 @@ router.post('/connect-env', authorize(PERMISSIONS['settings:write']), (req, res,
 router.post('/test', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   whatsappController.testConnection(req, res, next)
 );
+router.patch('/accounts/:id', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
+  whatsappController.updateAccount(req, res, next)
+);
 router.delete('/accounts/:id', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   whatsappController.disconnectAccount(req, res, next)
 );

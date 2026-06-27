@@ -246,17 +246,27 @@ export const connectWhatsAppSchema = z.object({
   accessToken: z.string().min(1).max(500),
 });
 
+export const updateWhatsAppAccountSchema = z.object({
+  reengagementTemplateName: z.string().max(200).optional().nullable(),
+  reengagementTemplateLanguage: z.string().max(20).optional().nullable(),
+});
+
 export const knowledgeSearchSchema = z.object({
   q: z.string().min(1).max(500),
   limit: z.coerce.number().int().min(1).max(20).default(10),
 });
 
-export const sendMessageSchema = z.object({
-  content: z.string().min(1).max(4096),
-  type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO', 'TEMPLATE', 'INTERACTIVE']).default('TEXT'),
-  mediaUrl: z.string().url().optional(),
-  mediaFilename: z.string().max(255).optional(),
-});
+export const sendMessageSchema = z
+  .object({
+    content: z.string().max(4096).optional(),
+    templateId: z.string().uuid().optional(),
+    type: z.enum(['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO', 'TEMPLATE', 'INTERACTIVE']).default('TEXT'),
+    mediaUrl: z.string().url().optional(),
+    mediaFilename: z.string().max(255).optional(),
+  })
+  .refine((data) => Boolean(data.templateId) || Boolean(data.content?.trim()), {
+    message: 'Message content or templateId is required',
+  });
 
 export const inviteTeamMemberSchema = z.object({
   email: z.string().email(),
@@ -562,6 +572,8 @@ export const createMessageTemplateSchema = z.object({
     .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
     .default('MARKETING'),
   variables: z.array(z.string().max(50)).optional(),
+  whatsappTemplateName: z.string().max(200).optional().nullable(),
+  whatsappTemplateLanguage: z.string().max(20).optional().nullable(),
 });
 
 export const updateMessageTemplateSchema = createMessageTemplateSchema.partial();
@@ -670,6 +682,7 @@ export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;
+export type UpdateWhatsAppAccountInput = z.infer<typeof updateWhatsAppAccountSchema>;
 export type TwoFactorVerifyInput = z.infer<typeof twoFactorVerifySchema>;
 export type TwoFactorSetupVerifyInput = z.infer<typeof twoFactorSetupVerifySchema>;
 export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;

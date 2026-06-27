@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   Info,
   AlertTriangle,
+  LayoutTemplate,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,9 +27,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useConversations, useMessages } from '@/hooks/useApi';
+import { useConversations, useMessages, useConversationTemplates } from '@/hooks/useApi';
 import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
 import { useConversationRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
@@ -83,6 +86,7 @@ export function ConversationsPage() {
     search: debouncedSearch || undefined,
   });
   const { data: messagesData, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
+  const { data: templates, isLoading: templatesLoading } = useConversationTemplates();
   const messages = messagesData?.messages;
   const whatsappSession = messagesData?.whatsappSession;
   const sessionClosed = whatsappSession != null && !whatsappSession.isOpen;
@@ -115,6 +119,11 @@ export function ConversationsPage() {
       { conversationId: selectedId, content: message.trim() },
       { onSuccess: () => setMessage('') }
     );
+  };
+
+  const handleSendTemplate = (templateId: string) => {
+    if (!selectedId) return;
+    sendMessage.mutate({ conversationId: selectedId, templateId });
   };
 
   const filtered = conversations;
@@ -388,13 +397,49 @@ export function ConversationsPage() {
                     <p className="font-medium">24-hour WhatsApp session expired</p>
                     <p className="mt-0.5 text-warning/90">
                       {whatsappSession?.lastInboundAt
-                        ? 'The customer must send a new WhatsApp message before you can reply with free-form text. You can also use an approved template message from Campaigns.'
-                        : 'This customer has not sent a WhatsApp message yet. They must message you first.'}
+                        ? 'Free-form replies are blocked. Use Templates below to send a prepared message anytime (requires Meta-approved template in Settings).'
+                        : 'This customer has not sent a WhatsApp message yet. Use Templates to send an approved opening message.'}
                     </p>
                   </div>
                 </div>
               )}
               <div className="flex items-end gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      disabled={sendMessage.isPending || templatesLoading || !selectedId}
+                      title="Send template"
+                    >
+                      <LayoutTemplate className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-80">
+                    <DropdownMenuLabel>Send template</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {templatesLoading && (
+                      <DropdownMenuItem disabled>Loading templates…</DropdownMenuItem>
+                    )}
+                    {!templatesLoading && !templates?.length && (
+                      <DropdownMenuItem disabled>No templates available</DropdownMenuItem>
+                    )}
+                    {templates?.map((tpl) => (
+                      <DropdownMenuItem
+                        key={tpl.id}
+                        className="flex flex-col items-start gap-1 py-2"
+                        onClick={() => handleSendTemplate(tpl.id)}
+                      >
+                        <span className="font-medium">{tpl.name}</span>
+                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                          {formatMessagePreview(tpl.content)}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Textarea
                   placeholder={
                     sessionClosed

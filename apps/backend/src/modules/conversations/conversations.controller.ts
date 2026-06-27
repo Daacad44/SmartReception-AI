@@ -69,6 +69,15 @@ export class ConversationsController {
     }
   }
 
+  async listTemplates(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await conversationsService.listTemplates(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getMessages(req: Request, res: Response, next: NextFunction) {
     try {
       const messages = await conversationsService.getMessages(
