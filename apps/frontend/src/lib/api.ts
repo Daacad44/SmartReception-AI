@@ -130,6 +130,14 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status !== 401 || originalRequest._retry) {
+      const code = getErrorCode(error);
+      if (
+        error.response?.status === 403 &&
+        code === 'SUBSCRIPTION_EXPIRED' &&
+        !window.location.pathname.startsWith('/subscription-expired')
+      ) {
+        window.location.assign('/subscription-expired');
+      }
       return Promise.reject(error);
     }
 

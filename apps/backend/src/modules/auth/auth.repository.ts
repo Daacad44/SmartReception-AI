@@ -74,6 +74,23 @@ export class AuthRepository {
         },
       });
 
+      const freePlan = await tx.subscriptionPlanCatalog.findUnique({ where: { code: 'FREE' } });
+      if (freePlan) {
+        await tx.businessSubscription.create({
+          data: {
+            businessId: business.id,
+            planId: freePlan.id,
+            status: 'PENDING',
+            paymentStatus: 'NOT_APPLICABLE',
+          },
+        });
+      }
+
+      await tx.business.update({
+        where: { id: business.id },
+        data: { licenseStatus: 'PENDING', isLicenseLocked: true },
+      });
+
       await tx.aIConfiguration.create({
         data: { businessId: business.id },
       });

@@ -332,14 +332,8 @@ export class BillingService {
   }
 
   async assertActiveSubscription(businessId: string) {
-    const subscription = await billingRepository.getSubscription(businessId);
-    const status = subscription?.status ?? 'TRIALING';
-
-    if (status === 'PAST_DUE' || status === 'CANCELLED' || status === 'EXPIRED') {
-      throw new ForbiddenError(
-        `Subscription is ${status.toLowerCase().replace('_', ' ')}. Please update billing to continue.`
-      );
-    }
+    const { assertValidLicense } = await import('../subscription/subscription-license.service');
+    await assertValidLicense(businessId);
   }
 }
 

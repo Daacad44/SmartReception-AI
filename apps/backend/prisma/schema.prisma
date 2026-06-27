@@ -58,6 +58,76 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum BusinessLicenseStatus {
+  PENDING
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionDurationPreset {
+  DAYS_30
+  DAYS_90
+  DAYS_180
+  DAYS_365
+  CUSTOM
+}
+
+enum SubscriptionActivityAction {
+  ASSIGNED
+  EXTENDED
+  SHORTENED
+  PAUSED
+  RESUMED
+  SUSPENDED
+  REACTIVATED
+  EXPIRED
+  UNLOCKED
+  RENEWED
+  CANCELLED
+  UPGRADED
+  DOWNGRADED
+  NOTE_ADDED
+}
+
+enum SubscriptionNotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+  PUSH
+}
+
+enum SubscriptionNotificationType {
+  REMINDER_7D
+  REMINDER_3D
+  REMINDER_2D
+  REMINDER_1D
+  REMINDER_12H
+  REMINDER_6H
+  REMINDER_1H
+  EXPIRED
+  ACTIVATED
+  SUSPENDED
+  RENEWED
+}
+
+enum SubscriptionNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum SubscriptionPaymentStatus {
+  NOT_APPLICABLE
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
 enum ConversationStatus {
   OPEN
   PENDING
@@ -335,6 +405,8 @@ model Business {
   businessType String?
   businessCategory String?
   whatsappStatus WhatsAppStatus @default(NOT_CONNECTED)
+  licenseStatus  BusinessLicenseStatus @default(PENDING)
+  isLicenseLocked Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -351,6 +423,10 @@ model Business {
   notifications     Notification[]
   auditLogs         AuditLog[]
   subscription      Subscription?
+  businessSubscription BusinessSubscription?
+  subscriptionHistory SubscriptionHistory[]
+  subscriptionNotifications SubscriptionNotification[]
+  subscriptionActivityLogs SubscriptionActivityLog[]
   invoices          Invoice[]
   aiConfiguration   AIConfiguration?
   teamInvitations   TeamInvitation[]
@@ -420,6 +496,9 @@ model User {
   ownedEmployeeGroups EmployeeGroup[]         @relation("EmployeeGroupOwner")
   auditLogs           AuditLog[]
   notifications       Notification[]
+  assignedSubscriptions BusinessSubscription[] @relation("SubscriptionAssignedBy")
+  subscriptionHistoryEntries SubscriptionHistory[] @relation("SubscriptionHistoryPerformedBy")
+  subscriptionActivityEntries SubscriptionActivityLog[] @relation("SubscriptionActivityPerformedBy")
 
   @@index([email])
   @@index([isActive])
@@ -1553,4 +1632,128 @@ model Invoice {
   @@index([status])
   @@index([createdAt])
   @@map("invoices")
+}
+
+// ─── ENTERPRISE SUBSCRIPTION & LICENSE ───────────────────────────────────────
+
+model SubscriptionPlanCatalog {
+  id            String           @id @default(uuid())
+  code          SubscriptionPlan @unique
+  name          String
+  description   String?
+  features      Json?
+  monthlyPrice  Decimal          @default(0) @db.Decimal(10, 2)
+  yearlyPrice   Decimal          @default(0) @db.Decimal(10, 2)
+  sortOrder     Int              @default(0)
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  businessSubscriptions BusinessSubscription[]
+  history               SubscriptionHistory[]
+
+  @@map("subscription_plans")
+}
+
+model BusinessSubscription {
+  id              String                    @id @default(uuid())
+  businessId      String                    @unique
+  planId          String
+  status          BusinessLicenseStatus     @default(PENDING)
+  durationPreset  SubscriptionDurationPreset?
+  durationDays    Int?
+  activatedAt     DateTime?
+  expiresAt       DateTime?
+  pausedAt        DateTime?
+  cancelledAt     DateTime?
+  isPaused        Boolean                   @default(false)
+  internalNotes   String?
+  paymentStatus   SubscriptionPaymentStatus @default(NOT_APPLICABLE)
+  assignedById    String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  business    Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan        SubscriptionPlanCatalog @relation(fields: [planId], references: [id])
+  assignedBy  User?                 @relation("SubscriptionAssignedBy", fields: [assignedById], references: [id])
+  history     SubscriptionHistory[]
+  notifications SubscriptionNotification[]
+  activityLogs SubscriptionActivityLog[]
+
+  @@index([status])
+  @@index([expiresAt])
+  @@index([planId])
+  @@map("business_subscriptions")
+}
+
+model SubscriptionHistory {
+  id                     String                @id @default(uuid())
+  businessSubscriptionId String
+  businessId             String
+  planId                 String?
+  status                 BusinessLicenseStatus
+  activatedAt            DateTime?
+  expiresAt              DateTime?
+  action                 SubscriptionActivityAction
+  reason                 String?
+  metadata               Json?
+  performedById          String?
+  createdAt              DateTime              @default(now())
+
+  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan                 SubscriptionPlanCatalog? @relation(fields: [planId], references: [id])
+  performedBy          User?                @relation("SubscriptionHistoryPerformedBy", fields: [performedById], references: [id])
+
+  @@index([businessId])
+  @@index([businessSubscriptionId])
+  @@index([createdAt])
+  @@map("subscription_history")
+}
+
+model SubscriptionNotification {
+  id                     String                       @id @default(uuid())
+  businessId             String
+  businessSubscriptionId String
+  channel                SubscriptionNotificationChannel
+  type                   SubscriptionNotificationType
+  status                 SubscriptionNotificationStatus @default(PENDING)
+  scheduledFor           DateTime
+  sentAt                 DateTime?
+  message                String?
+  error                  String?
+  metadata               Json?
+  createdAt              DateTime                     @default(now())
+
+  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessSubscriptionId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("subscription_notifications")
+}
+
+model SubscriptionActivityLog {
+  id                     String                   @id @default(uuid())
+  businessId             String
+  businessSubscriptionId String?
+  action                 SubscriptionActivityAction
+  performedById          String?
+  performedByEmail       String?
+  ipAddress              String?
+  oldValue               Json?
+  newValue               Json?
+  notes                  String?
+  createdAt              DateTime                 @default(now())
+
+  business             Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription? @relation(fields: [businessSubscriptionId], references: [id], onDelete: SetNull)
+  performedBy          User?                 @relation("SubscriptionActivityPerformedBy", fields: [performedById], references: [id])
+
+  @@index([businessId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("subscription_activity_logs")
 }

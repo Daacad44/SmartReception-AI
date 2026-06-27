@@ -51,3 +51,9 @@ export class EmailNotVerifiedError extends AppError {
     super(403, message, 'EMAIL_NOT_VERIFIED');
   }
 }
+
+export class SubscriptionExpiredError extends AppError {
+  constructor(message = 'Subscription expired') {
+    super(403, message, 'SUBSCRIPTION_EXPIRED');
+  }
+}

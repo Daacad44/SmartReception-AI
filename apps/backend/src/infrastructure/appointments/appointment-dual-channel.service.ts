@@ -99,6 +99,17 @@ export async function dispatchDualChannelNotification(params: {
   scheduledAt?: Date;
 }): Promise<{ emailSent: boolean; whatsappSent: boolean }> {
   const { appointment, notificationType } = params;
+
+  const { isWhatsAppAutomationAllowed } = await import(
+    '../../modules/subscription/subscription-license.service'
+  );
+  if (!(await isWhatsAppAutomationAllowed(appointment.businessId))) {
+    logger.info('Appointment notifications blocked — invalid subscription', {
+      businessId: appointment.businessId,
+    });
+    return { emailSent: false, whatsappSent: false };
+  }
+
   const base = {
     appointmentId: appointment.id,
     businessId: appointment.businessId,

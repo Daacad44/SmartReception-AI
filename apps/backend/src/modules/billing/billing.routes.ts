@@ -2,13 +2,18 @@ import { Router } from 'express';
 import { billingController } from './billing.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { requireValidLicense } from '../../core/middleware/subscription.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
 
 router.post('/webhook', (req, res, next) => billingController.webhook(req, res, next));
 
-router.use(authenticate, requireBusiness);
+router.get('/license', authenticate, requireBusiness, (req, res, next) =>
+  billingController.getLicenseStatus(req, res, next)
+);
+
+router.use(authenticate, requireBusiness, requireValidLicense());
 
 router.get('/', authorize(PERMISSIONS['billing:read']), (req, res, next) =>
   billingController.getOverview(req, res, next)

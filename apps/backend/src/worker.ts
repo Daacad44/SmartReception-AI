@@ -31,6 +31,12 @@ import { logger } from './core/logger';
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
   const { businessId, conversationId, messageId, customerMessage } = job.data;
 
+  const { isWhatsAppAutomationAllowed } = await import('./modules/subscription/subscription-license.service');
+  if (!(await isWhatsAppAutomationAllowed(businessId))) {
+    logger.debug(`Skipping AI job — subscription invalid for business ${businessId}`);
+    return;
+  }
+
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId, businessId },
     include: { customer: true, whatsappAccount: true },
@@ -184,6 +190,23 @@ async function startWorkers(): Promise<void> {
     });
   }, MISSED_SCAN_MS);
   void processMissedAppointments().catch(() => undefined);
+
+  const {
+    processDueReminders,
+    processExpiredSubscriptions,
+  } = await import('./modules/subscription/subscription-scheduler.service');
+
+  const SUBSCRIPTION_SCAN_MS = 60 * 1000;
+  setInterval(() => {
+    void processExpiredSubscriptions().catch((error) => {
+      logger.warn('Subscription expiration scan failed', { error });
+    });
+    void processDueReminders().catch((error) => {
+      logger.warn('Subscription reminder scan failed', { error });
+    });
+  }, SUBSCRIPTION_SCAN_MS);
+  void processExpiredSubscriptions().catch(() => undefined);
+  void processDueReminders().catch(() => undefined);
 }
 
 const shutdown = async (signal: string) => {

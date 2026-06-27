@@ -66,6 +66,13 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     extracted,
   } = params;
 
+  const { isWhatsAppAutomationAllowed } = await import('../subscription/subscription-license.service');
+  if (!(await isWhatsAppAutomationAllowed(businessId))) {
+    logger.info('WhatsApp automation blocked — invalid subscription license', { businessId });
+    logPipelineStep(pipelineKey, 'deferred_tasks_done');
+    return;
+  }
+
   const { tryHandleEmployeeInbound } = await import('../employee-comms/employee-inbound.service');
   const handledAsEmployee = await tryHandleEmployeeInbound({
     businessId,

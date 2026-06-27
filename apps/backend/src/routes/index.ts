@@ -24,33 +24,48 @@ import messageTemplatesRoutes from '../modules/message-templates/message-templat
 import employeeCommsRoutes from '../modules/employee-comms/employee-comms.routes';
 import businessProfileRoutes from '../modules/business-profile/business-profile.routes';
 import onboardingRoutes from '../modules/onboarding/onboarding.routes';
+import {
+  subscriptionAdminRoutes,
+  subscriptionRoutes,
+} from '../modules/subscription/subscription.routes';
+import { requireValidLicense } from '../core/middleware/subscription.middleware';
+import { authenticate } from '../core/middleware/auth.middleware';
+import { requireBusiness } from '../core/middleware/authorize.middleware';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
-router.use('/business', businessRoutes);
-router.use('/customers', customersRoutes);
-router.use('/conversations', conversationsRoutes);
-router.use('/appointments', appointmentsRoutes);
-router.use('/knowledge', knowledgeRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/dashboard', dashboardRoutes);
-router.use('/notifications', notificationsRoutes);
-router.use('/billing', billingRoutes);
-router.use('/team', teamRoutes);
-router.use('/whatsapp', whatsappRoutes);
-router.use('/ai', aiRoutes);
-router.use('/services', servicesRoutes);
-router.use('/audit', auditRoutes);
 router.use('/webhooks', webhooksRoutes);
-router.use('/2fa', twoFactorRoutes);
 router.use('/super-admin', superAdminRoutes);
-router.use('/segments', segmentsRoutes);
-router.use('/campaigns', campaignsRoutes);
-router.use('/customer-import', customerImportRoutes);
-router.use('/message-templates', messageTemplatesRoutes);
-router.use('/employee-comms', employeeCommsRoutes);
-router.use('/business-profile', businessProfileRoutes);
-router.use('/onboarding', onboardingRoutes);
+router.use('/super-admin/subscriptions', subscriptionAdminRoutes);
+router.use('/subscription', subscriptionRoutes);
+
+const licensed = Router();
+licensed.use(authenticate, requireBusiness, requireValidLicense());
+
+licensed.use('/business', businessRoutes);
+licensed.use('/customers', customersRoutes);
+licensed.use('/conversations', conversationsRoutes);
+licensed.use('/appointments', appointmentsRoutes);
+licensed.use('/knowledge', knowledgeRoutes);
+licensed.use('/analytics', analyticsRoutes);
+licensed.use('/dashboard', dashboardRoutes);
+licensed.use('/notifications', notificationsRoutes);
+licensed.use('/team', teamRoutes);
+licensed.use('/whatsapp', whatsappRoutes);
+licensed.use('/ai', aiRoutes);
+licensed.use('/services', servicesRoutes);
+licensed.use('/audit', auditRoutes);
+licensed.use('/2fa', twoFactorRoutes);
+licensed.use('/segments', segmentsRoutes);
+licensed.use('/campaigns', campaignsRoutes);
+licensed.use('/customer-import', customerImportRoutes);
+licensed.use('/message-templates', messageTemplatesRoutes);
+licensed.use('/employee-comms', employeeCommsRoutes);
+licensed.use('/business-profile', businessProfileRoutes);
+licensed.use('/onboarding', onboardingRoutes);
+
+router.use('/billing', billingRoutes);
+router.use(licensed);
 
 export default router;
