@@ -53,3 +53,15 @@ export function formatRelativeTime(date: string | Date): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   return then.toLocaleDateString();
 }
+
+/** Normalize message text for single-line inbox previews (keeps list items readable). */
+export function formatMessagePreview(content: string | null | undefined, maxLength = 120): string {
+  if (!content?.trim()) return '';
+  const normalized = content
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  const singleLine = normalized.replace(/\n+/g, ' · ');
+  if (singleLine.length <= maxLength) return singleLine;
+  return `${singleLine.slice(0, maxLength).trimEnd()}…`;
+}
