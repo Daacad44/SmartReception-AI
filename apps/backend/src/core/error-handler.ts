@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { AppError } from './errors';
+import { AppError, WhatsAppDeliveryError } from './errors';
 import { logger } from './logger';
 
 export function errorHandler(
@@ -26,6 +26,7 @@ export function errorHandler(
       success: false,
       error: err.message,
       code: err.code,
+      ...(err instanceof WhatsAppDeliveryError && err.details ? { details: err.details } : {}),
     });
     return;
   }

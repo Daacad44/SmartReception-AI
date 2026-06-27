@@ -13,6 +13,7 @@ export function useSendMessage() {
     onSuccess: (_data, { conversationId }) => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('Message sent to WhatsApp');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

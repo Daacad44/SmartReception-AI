@@ -50,7 +50,7 @@ export interface Message {
   sender: 'customer' | 'agent' | 'ai';
   senderName: string;
   timestamp: string;
-  status: 'sent' | 'delivered' | 'read';
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface Customer {
