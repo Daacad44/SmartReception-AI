@@ -49,7 +49,8 @@ function mapConversationStatus(
 function mapMessageStatus(status: string | null | undefined): Message['status'] {
   if (!status) return 'sent';
   const normalized = status.toLowerCase();
-  if (normalized === 'failed' || normalized === 'pending') return 'sent';
+  if (normalized === 'failed') return 'failed';
+  if (normalized === 'pending') return 'pending';
   if (normalized === 'delivered' || normalized === 'read' || normalized === 'sent') {
     return normalized as Message['status'];
   }

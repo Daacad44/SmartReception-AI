@@ -75,7 +75,7 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     return;
   }
 
-  await sendConversationMessage({
+  const result = await sendConversationMessage({
     businessId,
     conversationId,
     messageId,
@@ -87,6 +87,14 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>): Promise<void> {
     mediaFilename,
     accessToken: resolveStoredToken(conversation.whatsappAccount.accessToken),
   });
+
+  if (!result.success) {
+    logger.error('[Outbound] Queue worker failed to deliver message', {
+      messageId,
+      conversationId,
+      error: result.error,
+    });
+  }
 }
 
 async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {

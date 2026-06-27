@@ -39,6 +39,10 @@ import type { Message } from '@/lib/entities';
 
 function messageStatusLabel(status: Message['status']): string {
   switch (status) {
+    case 'failed':
+      return 'Failed to send';
+    case 'pending':
+      return 'Sending…';
     case 'read':
       return 'Message read';
     case 'delivered':
@@ -325,13 +329,25 @@ export function ConversationsPage() {
                         </div>
                       )}
                       {msg.content && (
-                        <p className="whitespace-pre-wrap break-words text-sm">{msg.content}</p>
+                        <p
+                          className={cn(
+                            'whitespace-pre-wrap break-words text-sm',
+                            msg.status === 'failed' && 'text-destructive'
+                          )}
+                        >
+                          {msg.content}
+                        </p>
+                      )}
+                      {msg.status === 'failed' && (
+                        <p className="mt-1 text-[10px] font-medium text-destructive">
+                          Delivery failed — customer did not receive this message
+                        </p>
                       )}
                       <div className="mt-1 flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        {msg.sender !== 'customer' && (
+                        {msg.sender !== 'customer' && msg.status !== 'failed' && msg.status !== 'pending' && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="inline-flex">

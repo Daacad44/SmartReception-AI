@@ -57,3 +57,12 @@ export class SubscriptionExpiredError extends AppError {
     super(403, message, 'SUBSCRIPTION_EXPIRED');
   }
 }
+
+export class WhatsAppDeliveryError extends AppError {
+  constructor(
+    message: string,
+    public details?: Record<string, unknown>
+  ) {
+    super(502, message, 'WHATSAPP_DELIVERY_FAILED');
+  }
+}

@@ -9,6 +9,7 @@ import {
   recordGraphApiError,
 } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
+import { phoneDigits } from '../../core/utils/customer-phone';
 
 export interface SendConversationMessageParams {
   businessId: string;
@@ -23,9 +24,15 @@ export interface SendConversationMessageParams {
   accessToken?: string;
 }
 
+export interface SendConversationMessageResult {
+  success: boolean;
+  whatsappMsgId: string | null;
+  error?: Record<string, unknown>;
+}
+
 export async function sendConversationMessage(
   params: SendConversationMessageParams
-): Promise<boolean> {
+): Promise<SendConversationMessageResult> {
   const {
     businessId,
     messageId,
@@ -38,13 +45,22 @@ export async function sendConversationMessage(
     accessToken,
   } = params;
 
+  const recipient = phoneDigits(phoneNumber);
   recordOutboundAttempt(businessId, content);
-  console.log('[WhatsApp] Sending reply');
+
+  logger.info('[Outbound] WhatsApp Graph API request starting', {
+    businessId,
+    messageId,
+    phoneNumberId,
+    recipient,
+    type: type ?? 'TEXT',
+    hasToken: Boolean(accessToken?.trim()),
+  });
 
   const msgType = (type ?? 'TEXT') as OutboundMessageType;
   const sendResult = await whatsappService.sendOutbound({
     phoneNumberId,
-    to: phoneNumber,
+    to: recipient,
     accessToken,
     type: msgType,
     content,
@@ -55,15 +71,28 @@ export async function sendConversationMessage(
   if (sendResult.success && sendResult.whatsappMsgId) {
     recordOutboundSuccess(businessId, content);
     recordGraphApiResponse(businessId, sendResult.response);
-    console.log('[WhatsApp] Reply sent successfully');
+    logger.info('[Outbound] WhatsApp Graph API success', {
+      businessId,
+      messageId,
+      whatsappMsgId: sendResult.whatsappMsgId,
+      recipient,
+    });
   } else {
     recordGraphApiError(businessId, sendResult.error);
+    logger.error('[Outbound] WhatsApp Graph API failure', {
+      businessId,
+      messageId,
+      recipient,
+      error: sendResult.error,
+    });
   }
 
-  await whatsappRepository.recordGraphApiResult(phoneNumberId, {
-    response: sendResult.response,
-    error: sendResult.error,
-  }).catch((error) => logger.warn('Failed to record Graph API result', { error }));
+  await whatsappRepository
+    .recordGraphApiResult(phoneNumberId, {
+      response: sendResult.response,
+      error: sendResult.error,
+    })
+    .catch((error) => logger.warn('Failed to record Graph API result', { error }));
 
   await prisma.message.update({
     where: { id: messageId },
@@ -78,5 +107,9 @@ export async function sendConversationMessage(
     },
   });
 
-  return sendResult.success;
+  return {
+    success: sendResult.success,
+    whatsappMsgId: sendResult.whatsappMsgId,
+    error: sendResult.error as Record<string, unknown> | undefined,
+  };
 }
