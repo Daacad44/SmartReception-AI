@@ -30,7 +30,7 @@ export function useSubscriptionLicense() {
   });
 }
 
-const BLOCKED_STATUSES = new Set(['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING']);
+const BLOCKED_STATUSES = new Set(['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING', 'LOCKED']);
 
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();

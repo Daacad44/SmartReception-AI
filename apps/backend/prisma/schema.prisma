@@ -48,6 +48,7 @@ enum SubscriptionPlan {
   BUSINESS
   PROFESSIONAL
   ENTERPRISE
+  CUSTOM
 }
 
 enum SubscriptionStatus {
@@ -65,10 +66,14 @@ enum BusinessLicenseStatus {
   SUSPENDED
   EXPIRED
   CANCELLED
+  LOCKED
 }
 
 enum SubscriptionDurationPreset {
+  DAYS_7
+  DAYS_14
   DAYS_30
+  DAYS_60
   DAYS_90
   DAYS_180
   DAYS_365
@@ -85,22 +90,18 @@ enum SubscriptionActivityAction {
   REACTIVATED
   EXPIRED
   UNLOCKED
+  LOCKED
   RENEWED
   CANCELLED
   UPGRADED
   DOWNGRADED
   NOTE_ADDED
-}
-
-enum SubscriptionNotificationChannel {
-  EMAIL
-  WHATSAPP
-  SMS
-  PUSH
+  EDITED
 }
 
 enum SubscriptionNotificationType {
   REMINDER_7D
+  REMINDER_5D
   REMINDER_3D
   REMINDER_2D
   REMINDER_1D
@@ -113,19 +114,60 @@ enum SubscriptionNotificationType {
   RENEWED
 }
 
-enum SubscriptionNotificationStatus {
-  PENDING
-  SENT
-  FAILED
-  SKIPPED
-}
-
 enum SubscriptionPaymentStatus {
   NOT_APPLICABLE
   PENDING
   PAID
   FAILED
   REFUNDED
+  MANUAL
+  COMPLIMENTARY
+  LOCAL_PAYMENT_PENDING
+}
+
+enum SubscriptionPaymentMethod {
+  CASH
+  EVC_PLUS
+  ZAAD
+  EDAHAB
+  PREMIER_WALLET
+  BANK
+  MANUAL
+  STRIPE
+}
+
+enum SubscriptionTransactionType {
+  PAYMENT
+  REFUND
+  ADJUSTMENT
+  RENEWAL
+}
+
+enum SubscriptionTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SubscriptionDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum SubscriptionNotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum SubscriptionNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum ConversationStatus {
@@ -427,6 +469,8 @@ model Business {
   subscriptionHistory SubscriptionHistory[]
   subscriptionNotifications SubscriptionNotification[]
   subscriptionActivityLogs SubscriptionActivityLog[]
+  subscriptionPayments SubscriptionPayment[]
+  subscriptionTransactions SubscriptionTransaction[]
   invoices          Invoice[]
   aiConfiguration   AIConfiguration?
   teamInvitations   TeamInvitation[]
@@ -499,6 +543,9 @@ model User {
   assignedSubscriptions BusinessSubscription[] @relation("SubscriptionAssignedBy")
   subscriptionHistoryEntries SubscriptionHistory[] @relation("SubscriptionHistoryPerformedBy")
   subscriptionActivityEntries SubscriptionActivityLog[] @relation("SubscriptionActivityPerformedBy")
+  recordedSubscriptionPayments SubscriptionPayment[] @relation("SubscriptionPaymentRecordedBy")
+  subscriptionRenewals SubscriptionRenewal[] @relation("SubscriptionRenewalBy")
+  appliedSubscriptionDiscounts SubscriptionDiscount[] @relation("SubscriptionDiscountAppliedBy")
 
   @@index([email])
   @@index([isActive])
@@ -1637,17 +1684,27 @@ model Invoice {
 // ─── ENTERPRISE SUBSCRIPTION & LICENSE ───────────────────────────────────────
 
 model SubscriptionPlanCatalog {
-  id            String           @id @default(uuid())
-  code          SubscriptionPlan @unique
-  name          String
-  description   String?
-  features      Json?
-  monthlyPrice  Decimal          @default(0) @db.Decimal(10, 2)
-  yearlyPrice   Decimal          @default(0) @db.Decimal(10, 2)
-  sortOrder     Int              @default(0)
-  isActive      Boolean          @default(true)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id                   String           @id @default(uuid())
+  code                 SubscriptionPlan @unique
+  name                 String
+  description          String?
+  features             Json?
+  featureFlags         Json?
+  monthlyPrice         Decimal          @default(0) @db.Decimal(10, 2)
+  yearlyPrice          Decimal          @default(0) @db.Decimal(10, 2)
+  maxUsers             Int              @default(1)
+  maxConversations     Int              @default(100)
+  maxWhatsappNumbers   Int              @default(1)
+  maxAiAgents          Int              @default(1)
+  storageLimitMb       Int              @default(512)
+  knowledgeBaseLimit   Int              @default(1)
+  teamLimit            Int              @default(1)
+  campaignLimit        Int              @default(0)
+  appointmentLimit     Int              @default(50)
+  sortOrder            Int              @default(0)
+  isActive             Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   businessSubscriptions BusinessSubscription[]
   history               SubscriptionHistory[]
@@ -1656,29 +1713,40 @@ model SubscriptionPlanCatalog {
 }
 
 model BusinessSubscription {
-  id              String                    @id @default(uuid())
-  businessId      String                    @unique
-  planId          String
-  status          BusinessLicenseStatus     @default(PENDING)
-  durationPreset  SubscriptionDurationPreset?
-  durationDays    Int?
-  activatedAt     DateTime?
-  expiresAt       DateTime?
-  pausedAt        DateTime?
-  cancelledAt     DateTime?
-  isPaused        Boolean                   @default(false)
-  internalNotes   String?
-  paymentStatus   SubscriptionPaymentStatus @default(NOT_APPLICABLE)
-  assignedById    String?
-  createdAt       DateTime                  @default(now())
-  updatedAt       DateTime                  @updatedAt
+  id                String                     @id @default(uuid())
+  businessId        String                     @unique
+  planId            String
+  previousPlanId    String?
+  status            BusinessLicenseStatus      @default(PENDING)
+  durationPreset    SubscriptionDurationPreset?
+  durationDays      Int?
+  activatedAt       DateTime?
+  expiresAt         DateTime?
+  pausedAt          DateTime?
+  cancelledAt       DateTime?
+  lockedAt          DateTime?
+  isPaused          Boolean                    @default(false)
+  isTrial           Boolean                    @default(false)
+  internalNotes     String?
+  paymentStatus     SubscriptionPaymentStatus  @default(NOT_APPLICABLE)
+  paymentMethod     SubscriptionPaymentMethod?
+  referenceNumber   String?
+  invoiceNumber     String?
+  lastPaymentAt     DateTime?
+  nextRenewalAt     DateTime?
+  assignedById      String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 
-  business    Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  plan        SubscriptionPlanCatalog @relation(fields: [planId], references: [id])
-  assignedBy  User?                 @relation("SubscriptionAssignedBy", fields: [assignedById], references: [id])
-  history     SubscriptionHistory[]
-  notifications SubscriptionNotification[]
-  activityLogs SubscriptionActivityLog[]
+  business       Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan           SubscriptionPlanCatalog @relation(fields: [planId], references: [id])
+  assignedBy     User?                 @relation("SubscriptionAssignedBy", fields: [assignedById], references: [id])
+  history        SubscriptionHistory[]
+  notifications  SubscriptionNotification[]
+  activityLogs   SubscriptionActivityLog[]
+  payments       SubscriptionPayment[]
+  renewals       SubscriptionRenewal[]
+  discounts      SubscriptionDiscount[]
 
   @@index([status])
   @@index([expiresAt])
@@ -1756,4 +1824,112 @@ model SubscriptionActivityLog {
   @@index([action])
   @@index([createdAt])
   @@map("subscription_activity_logs")
+}
+
+model SubscriptionPayment {
+  id                     String                    @id @default(uuid())
+  businessId             String
+  businessSubscriptionId String
+  amount                 Decimal                   @db.Decimal(10, 2)
+  currency               String                    @default("USD")
+  status                 SubscriptionPaymentStatus @default(PENDING)
+  paymentMethod          SubscriptionPaymentMethod?
+  referenceNumber        String?
+  invoiceNumber          String?
+  provider               String?
+  providerRef            String?
+  paidAt                 DateTime?
+  notes                  String?
+  metadata               Json?
+  recordedById           String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  recordedBy           User?                @relation("SubscriptionPaymentRecordedBy", fields: [recordedById], references: [id])
+  transactions         SubscriptionTransaction[]
+  renewals             SubscriptionRenewal[]
+
+  @@index([businessId])
+  @@index([businessSubscriptionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("subscription_payments")
+}
+
+model SubscriptionTransaction {
+  id          String                      @id @default(uuid())
+  businessId  String
+  paymentId   String?
+  type        SubscriptionTransactionType
+  amount      Decimal                     @db.Decimal(10, 2)
+  currency    String                      @default("USD")
+  provider    String?
+  providerRef String?
+  status      SubscriptionTransactionStatus @default(PENDING)
+  metadata    Json?
+  createdAt   DateTime                    @default(now())
+
+  business Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  payment  SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([paymentId])
+  @@index([status])
+  @@map("subscription_transactions")
+}
+
+model SubscriptionRenewal {
+  id                     String   @id @default(uuid())
+  businessSubscriptionId String
+  paymentId              String?
+  previousExpiresAt      DateTime?
+  newExpiresAt           DateTime
+  renewedById            String?
+  reason                 String?
+  createdAt              DateTime @default(now())
+
+  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  payment              SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  renewedBy            User?                @relation("SubscriptionRenewalBy", fields: [renewedById], references: [id])
+
+  @@index([businessSubscriptionId])
+  @@index([createdAt])
+  @@map("subscription_renewals")
+}
+
+model SubscriptionCoupon {
+  id            String                   @id @default(uuid())
+  code          String                   @unique
+  name          String?
+  discountType  SubscriptionDiscountType
+  discountValue Decimal                  @db.Decimal(10, 2)
+  maxUses       Int?
+  usedCount     Int                      @default(0)
+  expiresAt     DateTime?
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  discounts SubscriptionDiscount[]
+
+  @@map("subscription_coupons")
+}
+
+model SubscriptionDiscount {
+  id                     String                   @id @default(uuid())
+  businessSubscriptionId String
+  couponId               String?
+  discountType           SubscriptionDiscountType
+  discountValue          Decimal                  @db.Decimal(10, 2)
+  appliedAt              DateTime                 @default(now())
+  appliedById            String?
+
+  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  coupon               SubscriptionCoupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  appliedBy            User?                  @relation("SubscriptionDiscountAppliedBy", fields: [appliedById], references: [id])
+
+  @@index([businessSubscriptionId])
+  @@map("subscription_discounts")
 }

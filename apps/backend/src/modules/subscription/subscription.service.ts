@@ -4,10 +4,12 @@ import { ValidationError, NotFoundError } from '../../core/errors';
 import { subscriptionRepository } from './subscription.repository';
 import {
   DURATION_PRESET_DAYS,
+  calculateSubscriptionDates,
   type AssignSubscriptionInput,
   type SubscriptionActorContext,
 } from './subscription.types';
 import { scheduleSubscriptionReminders } from './subscription-scheduler.service';
+import { getBusinessUsageSnapshot } from './subscription-usage.service';
 
 function resolveDurationDays(
   preset: AssignSubscriptionInput['durationPreset'],
@@ -63,42 +65,134 @@ export class SubscriptionService {
     const plan = await subscriptionRepository.getPlanByCode(input.planCode);
     if (!plan) throw new ValidationError('Invalid subscription plan');
 
-    const durationDays = resolveDurationDays(input.durationPreset, input.customDurationDays);
-    const activatedAt = input.activationDate ?? new Date();
-    const expiresAt = addDays(activatedAt, durationDays);
-    const status: BusinessLicenseStatus = input.planCode === 'FREE' ? 'TRIAL' : 'ACTIVE';
+    const calc = calculateSubscriptionDates({
+      startDate: input.activationDate ?? new Date(),
+      durationPreset: input.durationPreset,
+      customDurationDays: input.customDurationDays,
+      endDate: input.endDate,
+      isTrial: input.isTrial,
+    });
+
+    const status = calc.status;
     const old = business.businessSubscription;
 
-    const subscription = await subscriptionRepository.upsertBusinessSubscription(input.businessId, {
-      businessId: input.businessId,
-      planId: plan.id,
-      status,
-      durationPreset: input.durationPreset,
-      durationDays,
-      activatedAt,
-      expiresAt,
-      isPaused: false,
-      pausedAt: null,
-      cancelledAt: null,
-      internalNotes: input.internalNotes,
-      paymentStatus: input.paymentStatus ?? 'NOT_APPLICABLE',
-      assignedById: actor.userId,
+    const subscription = await prisma.$transaction(async (tx) => {
+      const existing = await tx.businessSubscription.findUnique({
+        where: { businessId: input.businessId },
+      });
+
+      const sub = await tx.businessSubscription.upsert({
+        where: { businessId: input.businessId },
+        create: {
+          businessId: input.businessId,
+          planId: plan.id,
+          previousPlanId: existing?.planId ?? null,
+          status,
+          durationPreset: input.durationPreset,
+          durationDays: calc.durationDays,
+          activatedAt: calc.startDate,
+          expiresAt: calc.endDate,
+          isPaused: false,
+          isTrial: input.isTrial ?? false,
+          pausedAt: null,
+          cancelledAt: null,
+          lockedAt: null,
+          internalNotes: input.internalNotes,
+          paymentStatus: input.paymentStatus ?? 'NOT_APPLICABLE',
+          paymentMethod: input.paymentMethod ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          invoiceNumber: input.invoiceNumber ?? null,
+          lastPaymentAt: input.paymentStatus === 'PAID' ? new Date() : null,
+          nextRenewalAt: calc.endDate,
+          assignedById: actor.userId,
+        },
+        update: {
+          planId: plan.id,
+          previousPlanId: existing?.planId ?? null,
+          status,
+          durationPreset: input.durationPreset,
+          durationDays: calc.durationDays,
+          activatedAt: calc.startDate,
+          expiresAt: calc.endDate,
+          isPaused: false,
+          isTrial: input.isTrial ?? false,
+          pausedAt: null,
+          cancelledAt: null,
+          lockedAt: null,
+          internalNotes: input.internalNotes,
+          paymentStatus: input.paymentStatus ?? 'NOT_APPLICABLE',
+          paymentMethod: input.paymentMethod ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          invoiceNumber: input.invoiceNumber ?? null,
+          lastPaymentAt: input.paymentStatus === 'PAID' ? new Date() : null,
+          nextRenewalAt: calc.endDate,
+          assignedById: actor.userId,
+        },
+        include: { plan: true },
+      });
+
+      await tx.business.update({
+        where: { id: input.businessId },
+        data: { licenseStatus: status, isLicenseLocked: false },
+      });
+
+      await tx.subscriptionHistory.create({
+        data: {
+          businessSubscriptionId: sub.id,
+          businessId: input.businessId,
+          planId: plan.id,
+          status,
+          activatedAt: calc.startDate,
+          expiresAt: calc.endDate,
+          action: 'ASSIGNED',
+          performedById: actor.userId,
+          reason: input.reason,
+          metadata: {
+            durationDays: calc.durationDays,
+            durationPreset: input.durationPreset,
+            paymentStatus: input.paymentStatus,
+            paymentMethod: input.paymentMethod,
+          },
+        },
+      });
+
+      if (input.amount && input.amount > 0) {
+        const payment = await tx.subscriptionPayment.create({
+          data: {
+            businessId: input.businessId,
+            businessSubscriptionId: sub.id,
+            amount: input.amount,
+            status: input.paymentStatus ?? 'PENDING',
+            paymentMethod: input.paymentMethod ?? null,
+            referenceNumber: input.referenceNumber ?? null,
+            invoiceNumber: input.invoiceNumber ?? null,
+            paidAt: input.paymentStatus === 'PAID' ? new Date() : null,
+            recordedById: actor.userId,
+            notes: input.reason,
+          },
+        });
+
+        await tx.subscriptionTransaction.create({
+          data: {
+            businessId: input.businessId,
+            paymentId: payment.id,
+            type: 'PAYMENT',
+            amount: input.amount,
+            status: input.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING',
+            provider: input.paymentMethod ?? 'MANUAL',
+            providerRef: input.referenceNumber ?? undefined,
+          },
+        });
+      }
+
+      return sub;
     });
 
-    await subscriptionRepository.updateBusinessLicense(input.businessId, status, false);
-    await subscriptionRepository.syncLegacySubscription(input.businessId, plan.code, expiresAt);
-
-    await subscriptionRepository.createHistory({
-      businessSubscription: { connect: { id: subscription.id } },
-      business: { connect: { id: input.businessId } },
-      plan: { connect: { id: plan.id } },
-      status,
-      activatedAt,
-      expiresAt,
-      action: 'ASSIGNED',
-      performedBy: { connect: { id: actor.userId } },
-      metadata: { durationDays, durationPreset: input.durationPreset },
-    });
+    await subscriptionRepository.syncLegacySubscription(
+      input.businessId,
+      plan.code,
+      subscription.expiresAt!
+    );
 
     await subscriptionRepository.logAction({
       businessId: input.businessId,
@@ -108,9 +202,20 @@ export class SubscriptionService {
       performedByEmail: actor.email,
       ipAddress: actor.ipAddress,
       oldValue: old
-        ? { status: old.status, expiresAt: old.expiresAt, planCode: old.plan?.code }
+        ? {
+            status: old.status,
+            expiresAt: old.expiresAt,
+            planCode: old.plan?.code,
+          }
         : undefined,
-      newValue: { status, expiresAt, planCode: plan.code, durationDays },
+      newValue: {
+        status,
+        expiresAt: calc.endDate,
+        planCode: plan.code,
+        durationDays: calc.durationDays,
+        remainingDays: calc.remainingDays,
+      },
+      notes: input.reason,
     });
 
     await scheduleSubscriptionReminders(subscription.id);
@@ -150,6 +255,15 @@ export class SubscriptionService {
 
     await subscriptionRepository.updateBusinessLicense(businessId, status, false);
     await subscriptionRepository.syncLegacySubscription(businessId, updated.plan.code, expiresAt);
+
+    await subscriptionRepository.createRenewal({
+      businessSubscriptionId: updated.id,
+      previousExpiresAt: oldExpires,
+      newExpiresAt: expiresAt,
+      renewedById: actor.userId,
+      reason,
+    });
+
     await subscriptionRepository.logAction({
       businessId,
       businessSubscriptionId: updated.id,
@@ -215,13 +329,13 @@ export class SubscriptionService {
     businessId: string,
     status: BusinessLicenseStatus,
     actor: SubscriptionActorContext,
-    action: 'SUSPENDED' | 'REACTIVATED' | 'CANCELLED' | 'EXPIRED' | 'UNLOCKED',
+    action: 'SUSPENDED' | 'REACTIVATED' | 'CANCELLED' | 'EXPIRED' | 'UNLOCKED' | 'LOCKED',
     notes?: string
   ) {
     const sub = await subscriptionRepository.getBusinessSubscription(businessId);
     if (!sub) throw new NotFoundError('Subscription not found');
 
-    const isLocked = ['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING'].includes(status);
+    const isLocked = ['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING', 'LOCKED'].includes(status);
     const updated = await subscriptionRepository.upsertBusinessSubscription(businessId, {
       businessId,
       planId: sub.planId,
@@ -231,10 +345,17 @@ export class SubscriptionService {
       activatedAt: sub.activatedAt,
       expiresAt: sub.expiresAt,
       isPaused: status === 'SUSPENDED',
+      isTrial: sub.isTrial,
       pausedAt: status === 'SUSPENDED' ? new Date() : null,
       cancelledAt: status === 'CANCELLED' ? new Date() : sub.cancelledAt,
+      lockedAt: status === 'LOCKED' ? new Date() : status === 'ACTIVE' || status === 'TRIAL' ? null : sub.lockedAt,
       internalNotes: sub.internalNotes,
       paymentStatus: sub.paymentStatus,
+      paymentMethod: sub.paymentMethod,
+      referenceNumber: sub.referenceNumber,
+      invoiceNumber: sub.invoiceNumber,
+      lastPaymentAt: sub.lastPaymentAt,
+      nextRenewalAt: sub.nextRenewalAt,
       assignedById: sub.assignedById,
     });
 
@@ -435,39 +556,106 @@ export class SubscriptionService {
     const business = await subscriptionRepository.getBusinessLicense(businessId);
     if (!business) throw new NotFoundError('Business not found');
 
-    const [history, activity, notifications] = await Promise.all([
+    const [history, activity, notifications, payments, usage] = await Promise.all([
       subscriptionRepository.listHistory(businessId),
       subscriptionRepository.listActivityLogs(businessId),
       subscriptionRepository.listNotifications(businessId),
+      subscriptionRepository.listPayments(businessId),
+      getBusinessUsageSnapshot(businessId),
     ]);
 
     const sub = business.businessSubscription;
+    const owner = business.members[0]?.user ?? null;
+    const now = Date.now();
+    const remainingDays = sub?.expiresAt
+      ? Math.max(0, Math.ceil((sub.expiresAt.getTime() - now) / (1000 * 60 * 60 * 24)))
+      : 0;
+
     return {
       business: {
         id: business.id,
         name: business.name,
         email: business.email,
+        phone: business.phone,
         licenseStatus: business.licenseStatus,
         isLicenseLocked: business.isLicenseLocked,
         isActive: business.isActive,
-        memberCount: 0,
-        customerCount: 0,
+        owner: owner
+          ? {
+              id: owner.id,
+              name: `${owner.firstName} ${owner.lastName}`.trim(),
+              email: owner.email,
+            }
+          : null,
         subscription: sub
           ? {
               id: sub.id,
               status: sub.status,
-              plan: { code: sub.plan.code, name: sub.plan.name },
+              plan: {
+                code: sub.plan.code,
+                name: sub.plan.name,
+                monthlyPrice: Number(sub.plan.monthlyPrice),
+                yearlyPrice: Number(sub.plan.yearlyPrice),
+                limits: {
+                  maxUsers: sub.plan.maxUsers,
+                  maxConversations: sub.plan.maxConversations,
+                  maxWhatsappNumbers: sub.plan.maxWhatsappNumbers,
+                  maxAiAgents: sub.plan.maxAiAgents,
+                  storageLimitMb: sub.plan.storageLimitMb,
+                  knowledgeBaseLimit: sub.plan.knowledgeBaseLimit,
+                  teamLimit: sub.plan.teamLimit,
+                  campaignLimit: sub.plan.campaignLimit,
+                  appointmentLimit: sub.plan.appointmentLimit,
+                },
+                featureFlags: sub.plan.featureFlags,
+              },
               activatedAt: sub.activatedAt?.toISOString() ?? null,
               expiresAt: sub.expiresAt?.toISOString() ?? null,
+              remainingDays,
               isPaused: sub.isPaused,
+              isTrial: sub.isTrial,
               paymentStatus: sub.paymentStatus,
+              paymentMethod: sub.paymentMethod,
+              referenceNumber: sub.referenceNumber,
+              invoiceNumber: sub.invoiceNumber,
+              lastPaymentAt: sub.lastPaymentAt?.toISOString() ?? null,
+              nextRenewalAt: sub.nextRenewalAt?.toISOString() ?? null,
               internalNotes: sub.internalNotes,
             }
           : null,
       },
+      usage,
+      payments,
       history,
       activity,
       notifications,
+    };
+  }
+
+  async lockSubscription(businessId: string, actor: SubscriptionActorContext, reason?: string) {
+    return this.setStatus(businessId, 'LOCKED', actor, 'LOCKED', reason ?? 'Locked by super admin');
+  }
+
+  async calculatePreview(input: {
+    activationDate?: string;
+    durationPreset: AssignSubscriptionInput['durationPreset'];
+    customDurationDays?: number;
+    endDate?: string;
+    isTrial?: boolean;
+  }) {
+    const calc = calculateSubscriptionDates({
+      startDate: input.activationDate ? new Date(input.activationDate) : new Date(),
+      durationPreset: input.durationPreset,
+      customDurationDays: input.customDurationDays,
+      endDate: input.endDate ? new Date(input.endDate) : undefined,
+      isTrial: input.isTrial,
+    });
+    return {
+      startDate: calc.startDate.toISOString(),
+      endDate: calc.endDate.toISOString(),
+      durationDays: calc.durationDays,
+      remainingDays: calc.remainingDays,
+      status: calc.status,
     };
   }
 

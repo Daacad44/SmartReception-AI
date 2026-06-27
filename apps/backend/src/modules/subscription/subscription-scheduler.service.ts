@@ -28,7 +28,7 @@ export async function scheduleSubscriptionReminders(businessSubscriptionId: stri
     const scheduledFor = new Date(expiresAt - offset);
     if (scheduledFor.getTime() <= now) continue;
 
-    for (const channel of ['EMAIL', 'WHATSAPP'] as const) {
+    for (const channel of ['EMAIL', 'WHATSAPP', 'IN_APP'] as const) {
       await subscriptionRepository.createNotification({
         business: { connect: { id: sub.businessId } },
         businessSubscription: { connect: { id: sub.id } },

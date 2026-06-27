@@ -76,6 +76,9 @@ const EmployeeCommunicationPage = lazyWithRetry(() =>
 const SubscriptionManagementPage = lazyWithRetry(() =>
   import('@/pages/SubscriptionManagementPage').then((m) => ({ default: m.SubscriptionManagementPage }))
 );
+const SubscriptionDetailsPage = lazyWithRetry(() =>
+  import('@/pages/SubscriptionDetailsPage').then((m) => ({ default: m.SubscriptionDetailsPage }))
+);
 const SubscriptionExpiredPage = lazyWithRetry(() =>
   import('@/pages/SubscriptionExpiredPage').then((m) => ({ default: m.SubscriptionExpiredPage }))
 );
@@ -329,6 +332,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <SubscriptionManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/subscriptions/:businessId"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <SubscriptionDetailsPage />
                       </PermissionRoute>
                     }
                   />

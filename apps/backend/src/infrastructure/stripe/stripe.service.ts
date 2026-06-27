@@ -3,7 +3,7 @@ import { SubscriptionPlan } from '@prisma/client';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 
-const PLAN_PRICE_ENV: Record<Exclude<SubscriptionPlan, 'FREE'>, string> = {
+const PLAN_PRICE_ENV: Record<Exclude<SubscriptionPlan, 'FREE' | 'CUSTOM'>, string> = {
   STARTER: 'STRIPE_PRICE_STARTER',
   BUSINESS: 'STRIPE_PRICE_BUSINESS',
   PROFESSIONAL: 'STRIPE_PRICE_PROFESSIONAL',
@@ -25,13 +25,15 @@ export function isStripeConfigured(): boolean {
 }
 
 export function getStripePriceId(plan: SubscriptionPlan): string | null {
-  if (plan === 'FREE') return null;
+  if (plan === 'FREE' || plan === 'CUSTOM') return null;
   const envKey = PLAN_PRICE_ENV[plan];
   return process.env[envKey] || null;
 }
 
 export function planFromPriceId(priceId: string): SubscriptionPlan | null {
-  for (const plan of Object.keys(PLAN_PRICE_ENV) as Array<Exclude<SubscriptionPlan, 'FREE'>>) {
+  for (const plan of Object.keys(PLAN_PRICE_ENV) as Array<
+    Exclude<SubscriptionPlan, 'FREE' | 'CUSTOM'>
+  >) {
     const envKey = PLAN_PRICE_ENV[plan];
     if (process.env[envKey] === priceId) return plan;
   }

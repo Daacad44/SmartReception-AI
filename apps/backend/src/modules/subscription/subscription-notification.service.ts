@@ -6,6 +6,7 @@ import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { logger } from '../../core/logger';
 import { formatRemainingTime } from './subscription-license.service';
 import { subscriptionRepository } from './subscription.repository';
+import { notifyBilling } from '../../infrastructure/notifications/notification-helper';
 
 function buildReminderMessage(businessName: string, expiresAt: Date | null): string {
   const remaining = formatRemainingTime(expiresAt);
@@ -63,6 +64,12 @@ export async function sendSubscriptionReminder(
         type: 'TEXT',
         content: message,
       });
+    } else if (notification.channel === 'IN_APP') {
+      await notifyBilling(
+        notification.businessId,
+        'Subscription Reminder',
+        `Your subscription expires in ${formatRemainingTime(notification.businessSubscription.expiresAt)}.`
+      );
     } else {
       await subscriptionRepository.markNotificationFailed(
         notification.id,
