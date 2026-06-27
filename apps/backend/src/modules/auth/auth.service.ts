@@ -77,6 +77,19 @@ export class AuthService {
     const memberships = await authRepository.getUserBusinesses(user.id);
     const primaryMembership = memberships[0];
 
+    if (primaryMembership && !user.isSuperAdmin) {
+      const { validateBusinessLicense } = await import(
+        '../subscription/subscription-license.service'
+      );
+      const license = await validateBusinessLicense(primaryMembership.businessId);
+      if (!license.valid) {
+        const { ForbiddenError } = await import('../../core/errors');
+        throw new ForbiddenError(
+          license.reason ?? 'Subscription expired. Please contact SmartReception support.'
+        );
+      }
+    }
+
     const mustVerify2fa = twoFactorService.requiresTwoFactor(
       primaryMembership?.role,
       user.totpEnabled,

@@ -39,9 +39,37 @@ export class SubscriptionRepository {
         licenseStatus: true,
         isLicenseLocked: true,
         isActive: true,
+        members: {
+          where: { role: 'OWNER', isActive: true },
+          take: 1,
+          include: {
+            user: { select: { id: true, email: true, firstName: true, lastName: true } },
+          },
+        },
         businessSubscription: { include: { plan: true } },
       },
     });
+  }
+
+  async listPayments(businessId: string, limit = 25) {
+    return prisma.subscriptionPayment.findMany({
+      where: { businessId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { recordedBy: { select: { email: true, firstName: true, lastName: true } } },
+    });
+  }
+
+  async createPayment(data: Prisma.SubscriptionPaymentUncheckedCreateInput) {
+    return prisma.subscriptionPayment.create({ data });
+  }
+
+  async createRenewal(data: Prisma.SubscriptionRenewalUncheckedCreateInput) {
+    return prisma.subscriptionRenewal.create({ data });
+  }
+
+  async createTransaction(data: Prisma.SubscriptionTransactionUncheckedCreateInput) {
+    return prisma.subscriptionTransaction.create({ data });
   }
 
   async listBusinessSubscriptions(params: {

@@ -12,6 +12,9 @@ adminRouter.use(authenticate, requireSuperAdmin);
 
 adminRouter.get('/plans', (req, res, next) => subscriptionAdminController.listPlans(req, res, next));
 adminRouter.get('/', (req, res, next) => subscriptionAdminController.list(req, res, next));
+adminRouter.post('/calculate-preview', (req, res, next) =>
+  subscriptionAdminController.calculatePreview(req, res, next)
+);
 adminRouter.get('/:businessId', (req, res, next) => subscriptionAdminController.get(req, res, next));
 adminRouter.post('/:businessId/assign', (req, res, next) =>
   subscriptionAdminController.assign(req, res, next)
@@ -45,6 +48,9 @@ adminRouter.post('/:businessId/upgrade', (req, res, next) =>
 );
 adminRouter.post('/:businessId/downgrade', (req, res, next) =>
   subscriptionAdminController.downgrade(req, res, next)
+);
+adminRouter.post('/:businessId/lock', (req, res, next) =>
+  subscriptionAdminController.lock(req, res, next)
 );
 adminRouter.post('/:businessId/notes', (req, res, next) =>
   subscriptionAdminController.addNote(req, res, next)

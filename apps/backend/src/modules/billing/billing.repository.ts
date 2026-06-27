@@ -10,6 +10,7 @@ const PLAN_LIMITS: Record<
   BUSINESS: { conversations: 3000, customers: 1500, teamMembers: 5 },
   PROFESSIONAL: { conversations: 5000, customers: 2000, teamMembers: 10 },
   ENTERPRISE: { conversations: 50000, customers: 20000, teamMembers: 100 },
+  CUSTOM: { conversations: 999999, customers: 999999, teamMembers: 999 },
 };
 
 const PLAN_PRICES: Record<SubscriptionPlan, number> = {
@@ -18,6 +19,7 @@ const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   BUSINESS: 79,
   PROFESSIONAL: 99,
   ENTERPRISE: 299,
+  CUSTOM: 0,
 };
 
 export class BillingRepository {

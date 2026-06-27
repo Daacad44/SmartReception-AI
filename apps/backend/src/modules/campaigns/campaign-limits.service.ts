@@ -17,6 +17,7 @@ const PLAN_LIMITS: Record<SubscriptionPlan, CampaignPlanLimits> = {
   BUSINESS: { maxActiveCampaigns: 20, maxScheduledMessagesPerMonth: 5000, segmentation: true, aiGenerator: false, journeys: true, priorityQueue: false },
   PROFESSIONAL: { maxActiveCampaigns: 9999, maxScheduledMessagesPerMonth: 10000, segmentation: true, aiGenerator: true, journeys: true, priorityQueue: false },
   ENTERPRISE: { maxActiveCampaigns: 9999, maxScheduledMessagesPerMonth: 999999, segmentation: true, aiGenerator: true, journeys: true, priorityQueue: true },
+  CUSTOM: { maxActiveCampaigns: 9999, maxScheduledMessagesPerMonth: 999999, segmentation: true, aiGenerator: true, journeys: true, priorityQueue: true },
 };
 
 export async function getCampaignPlanLimits(businessId: string): Promise<CampaignPlanLimits> {

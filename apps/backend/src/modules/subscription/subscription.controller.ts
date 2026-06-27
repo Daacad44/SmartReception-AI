@@ -62,11 +62,20 @@ export class SubscriptionAdminController {
           planCode: req.body.planCode,
           durationPreset: req.body.durationPreset as SubscriptionDurationPreset,
           customDurationDays: req.body.customDurationDays,
-          activationDate: req.body.activationDate
-            ? new Date(req.body.activationDate)
-            : undefined,
+          activationDate: req.body.startDate
+            ? new Date(req.body.startDate)
+            : req.body.activationDate
+              ? new Date(req.body.activationDate)
+              : undefined,
+          endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+          isTrial: req.body.isTrial === true,
           internalNotes: req.body.internalNotes,
           paymentStatus: req.body.paymentStatus,
+          paymentMethod: req.body.paymentMethod,
+          referenceNumber: req.body.referenceNumber,
+          invoiceNumber: req.body.invoiceNumber,
+          amount: req.body.amount ? Number(req.body.amount) : undefined,
+          reason: req.body.reason,
         },
         actorFromReq(req)
       );
@@ -207,6 +216,28 @@ export class SubscriptionAdminController {
         'DOWNGRADED',
         req.body.reason
       );
+      res.json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async lock(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await subscriptionService.lockSubscription(
+        businessIdFromReq(req),
+        actorFromReq(req),
+        req.body.reason
+      );
+      res.json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async calculatePreview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await subscriptionService.calculatePreview(req.body);
       res.json({ data: result });
     } catch (error) {
       next(error);

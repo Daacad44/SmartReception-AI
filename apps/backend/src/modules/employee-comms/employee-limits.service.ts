@@ -16,6 +16,7 @@ const PLAN_LIMITS: Record<SubscriptionPlan, EmployeeCommPlanLimits> = {
   BUSINESS: { maxEmployees: 2000, maxMessagesPerMonth: 50000, aiGenerator: true, priorityQueue: false, unlimitedScheduling: true },
   PROFESSIONAL: { maxEmployees: 500, maxMessagesPerMonth: 10000, aiGenerator: true, priorityQueue: false, unlimitedScheduling: true },
   ENTERPRISE: { maxEmployees: 999999, maxMessagesPerMonth: 9999999, aiGenerator: true, priorityQueue: true, unlimitedScheduling: true },
+  CUSTOM: { maxEmployees: 999999, maxMessagesPerMonth: 9999999, aiGenerator: true, priorityQueue: true, unlimitedScheduling: true },
 };
 
 export async function getEmployeeCommLimits(businessId: string): Promise<EmployeeCommPlanLimits> {
