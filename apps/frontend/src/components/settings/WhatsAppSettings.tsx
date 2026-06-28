@@ -406,7 +406,7 @@ export function WhatsAppSettings() {
                   placeholder="en"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Must match Meta exactly (e.g. <code>en</code> or <code>en_US</code> for hello_world).
+                  Use Meta language code only: <code>en</code> or <code>en_US</code> — not &quot;English&quot;.
                 </p>
               </div>
               <label className="flex cursor-pointer items-start gap-2">

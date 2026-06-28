@@ -4,6 +4,7 @@ import { prisma } from '../database/prisma';
 import type { SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 import type { WhatsAppWebhookMessage } from './whatsapp.types';
 import { parseWebhookBody } from './whatsapp-webhook.parser';
+import { normalizeWhatsAppTemplateLanguage } from './whatsapp-template-language.util';
 
 export type { WhatsAppWebhookMessage, SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 export { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
@@ -114,7 +115,7 @@ export class WhatsAppService {
           type: 'template',
           template: {
             name: params.templateName,
-            language: { code: params.templateLanguage ?? 'en' },
+            language: { code: normalizeWhatsAppTemplateLanguage(params.templateLanguage) },
             ...(params.templateComponents?.length
               ? { components: params.templateComponents }
               : {}),

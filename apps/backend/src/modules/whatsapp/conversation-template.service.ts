@@ -7,6 +7,10 @@ import {
 } from '../campaigns/campaign-personalization.service';
 import { getWhatsAppSessionWindow } from './whatsapp-session.service';
 import type { OutboundMessageType } from '../../infrastructure/whatsapp/whatsapp.types';
+import {
+  isMetaTemplateSlug,
+  normalizeWhatsAppTemplateLanguage,
+} from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
 export type ResolvedConversationTemplate = {
   content: string;
@@ -90,11 +94,15 @@ export async function resolveConversationTemplateSend(params: {
 
   if (!sessionWindow.isOpen) {
     const metaTemplateName =
-      template.whatsappTemplateName ?? whatsappAccount?.reengagementTemplateName ?? null;
-    const metaTemplateLanguage =
+      template.whatsappTemplateName ??
+      (isMetaTemplateSlug(template.name) ? template.name.trim() : null) ??
+      whatsappAccount?.reengagementTemplateName ??
+      null;
+    const metaTemplateLanguage = normalizeWhatsAppTemplateLanguage(
       template.whatsappTemplateLanguage ??
-      whatsappAccount?.reengagementTemplateLanguage ??
-      'en';
+        whatsappAccount?.reengagementTemplateLanguage ??
+        'en'
+    );
 
     if (!metaTemplateName) {
       throw new ValidationError(

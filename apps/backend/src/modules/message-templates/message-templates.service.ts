@@ -1,6 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { CreateMessageTemplateInput, UpdateMessageTemplateInput } from '@smartreception/shared';
+import { isMetaTemplateSlug } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
 export class MessageTemplatesService {
   /** Remove legacy auto-seeded templates — inbox shows user-created templates only. */
@@ -45,7 +46,9 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables ?? [],
-        whatsappTemplateName: input.whatsappTemplateName,
+        whatsappTemplateName:
+          input.whatsappTemplateName ??
+          (isMetaTemplateSlug(input.name) ? input.name.trim() : null),
         whatsappTemplateLanguage: input.whatsappTemplateLanguage,
         isSystem: false,
       },

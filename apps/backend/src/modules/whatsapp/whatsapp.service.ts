@@ -10,6 +10,7 @@ import { config } from '../../config';
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
 import { ConnectWhatsAppInput, UpdateWhatsAppAccountInput } from '@smartreception/shared';
+import { normalizeWhatsAppTemplateLanguage } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState } from './whatsapp-pipeline-state';
@@ -801,7 +802,9 @@ export class WhatsAppModuleService {
       where: { id: accountId },
       data: {
         reengagementTemplateName: input.reengagementTemplateName,
-        reengagementTemplateLanguage: input.reengagementTemplateLanguage,
+        reengagementTemplateLanguage: input.reengagementTemplateLanguage
+          ? normalizeWhatsAppTemplateLanguage(input.reengagementTemplateLanguage)
+          : input.reengagementTemplateLanguage,
         reengagementTemplateHasBodyVariable: input.reengagementTemplateHasBodyVariable,
       },
       select: {
