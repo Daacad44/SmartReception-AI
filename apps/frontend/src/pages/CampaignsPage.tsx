@@ -418,7 +418,10 @@ export function CampaignsPage() {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => api.post('/message-templates', payload),
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const response = await api.post('/message-templates', payload);
+      return extractData(response);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
@@ -432,8 +435,10 @@ export function CampaignsPage() {
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: Record<string, unknown>) =>
-      api.patch(`/message-templates/${id}`, payload),
+    mutationFn: async ({ id, ...payload }: Record<string, unknown>) => {
+      const response = await api.patch(`/message-templates/${id}`, payload);
+      return extractData(response);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
@@ -446,11 +451,42 @@ export function CampaignsPage() {
     },
   });
 
+  const handleSaveTemplate = () => {
+    const payload = {
+      name: templateForm.name.trim(),
+      content: templateForm.content.trim(),
+      type: templateForm.type,
+      whatsappTemplateName: templateForm.whatsappTemplateName.trim() || null,
+      whatsappTemplateLanguage: templateForm.whatsappTemplateLanguage.trim() || null,
+    };
+
+    if (!payload.name || !payload.content) {
+      toast.error('Name and content are required');
+      return;
+    }
+
+    if (editingTemplate?.isSystem) {
+      toast.error('System templates cannot be edited. Click New Template to create your own.');
+      return;
+    }
+
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, ...payload });
+      return;
+    }
+
+    createTemplateMutation.mutate(payload);
+  };
+
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => api.delete(`/message-templates/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
       toast.success('Template deleted');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -1305,21 +1341,9 @@ export function CampaignsPage() {
           </DialogBody>
           <DialogFooter>
             <Button
+              type="button"
               className="bg-accent hover:bg-accent/90"
-              onClick={() => {
-                const payload = {
-                  name: templateForm.name.trim(),
-                  content: templateForm.content.trim(),
-                  type: templateForm.type,
-                  whatsappTemplateName: templateForm.whatsappTemplateName.trim() || null,
-                  whatsappTemplateLanguage: templateForm.whatsappTemplateLanguage.trim() || null,
-                };
-                if (editingTemplate && !editingTemplate.isSystem) {
-                  updateTemplateMutation.mutate({ id: editingTemplate.id, ...payload });
-                } else if (!editingTemplate) {
-                  createTemplateMutation.mutate(payload);
-                }
-              }}
+              onClick={handleSaveTemplate}
               disabled={
                 !templateForm.name.trim() ||
                 !templateForm.content.trim() ||

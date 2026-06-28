@@ -1,7 +1,10 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { CreateMessageTemplateInput, UpdateMessageTemplateInput } from '@smartreception/shared';
-import { isMetaTemplateSlug } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
+import {
+  normalizeWhatsAppTemplateLanguage,
+  isMetaTemplateSlug,
+} from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
 export class MessageTemplatesService {
   /** Remove legacy auto-seeded templates — inbox shows user-created templates only. */
@@ -37,7 +40,14 @@ export class MessageTemplatesService {
     const existing = await prisma.messageTemplate.findFirst({
       where: { businessId, name: input.name },
     });
-    if (existing) throw new ConflictError('Template with this name already exists');
+    if (existing) {
+      if (existing.isSystem) {
+        throw new ConflictError(
+          'This name is reserved by a system template. Choose a different name or wait for the next platform update.'
+        );
+      }
+      return this.update(businessId, existing.id, input, userId);
+    }
 
     const template = await prisma.messageTemplate.create({
       data: {
@@ -49,7 +59,9 @@ export class MessageTemplatesService {
         whatsappTemplateName:
           input.whatsappTemplateName ??
           (isMetaTemplateSlug(input.name) ? input.name.trim() : null),
-        whatsappTemplateLanguage: input.whatsappTemplateLanguage,
+        whatsappTemplateLanguage: input.whatsappTemplateLanguage
+          ? normalizeWhatsAppTemplateLanguage(input.whatsappTemplateLanguage)
+          : null,
         isSystem: false,
       },
     });
@@ -74,8 +86,12 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables,
-        whatsappTemplateName: input.whatsappTemplateName,
-        whatsappTemplateLanguage: input.whatsappTemplateLanguage,
+        whatsappTemplateName:
+          input.whatsappTemplateName ??
+          (input.name && isMetaTemplateSlug(input.name) ? input.name.trim() : undefined),
+        whatsappTemplateLanguage: input.whatsappTemplateLanguage
+          ? normalizeWhatsAppTemplateLanguage(input.whatsappTemplateLanguage)
+          : input.whatsappTemplateLanguage,
       },
     });
 
