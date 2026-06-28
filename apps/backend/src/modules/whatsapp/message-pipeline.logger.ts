@@ -15,6 +15,7 @@ export type PipelineStep =
   | 'ai_finished'
   | 'reply_sent'
   | 'reply_failed'
+  | 'human_handoff_initiated'
   | 'deferred_tasks_done';
 
 interface PipelineContext {

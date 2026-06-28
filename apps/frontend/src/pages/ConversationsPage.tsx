@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversations, useMessages, useConversationTemplates } from '@/hooks/useApi';
-import { useSendMessage, useTakeoverConversation, useMarkConversationRead } from '@/hooks/useMutations';
+import { useSendMessage, useTakeoverConversation, useTransferToAi, useMarkConversationRead } from '@/hooks/useMutations';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useConversationRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -46,6 +47,7 @@ import {
   getStatusLabel,
 } from '@/lib/conversation-status';
 import { ConversationHandoffPanel } from '@/components/conversations/ConversationHandoffPanel';
+import { ConversationModeToggle } from '@/components/conversations/ConversationModeToggle';
 
 function messageStatusLabel(status: Message['status']): string {
   switch (status) {
@@ -89,7 +91,10 @@ export function ConversationsPage() {
   const sessionClosed = whatsappSession != null && !whatsappSession.isOpen;
   const sendMessage = useSendMessage();
   const takeover = useTakeoverConversation();
+  const returnToAi = useTransferToAi();
   const markRead = useMarkConversationRead();
+  const { hasPermission } = usePermissions();
+  const canManageHandoff = hasPermission('conversations:write');
 
   useConversationRealtime(selectedId);
 
@@ -230,6 +235,16 @@ export function ConversationsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {canManageHandoff && (
+                  <ConversationModeToggle
+                    conversation={selected}
+                    conversationId={selected.id}
+                    onTakeover={() => takeover.mutate(selected.id)}
+                    onReturnToAi={() => returnToAi.mutate(selected.id)}
+                    takeoverPending={takeover.isPending}
+                    returnPending={returnToAi.isPending}
+                  />
+                )}
                 <Badge className={CONVERSATION_STATUS_COLORS[selected.status] ?? ''}>
                   {getStatusLabel(selected.status)}
                 </Badge>
