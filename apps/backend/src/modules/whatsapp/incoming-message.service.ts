@@ -183,7 +183,17 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       conversationId: conversation.id,
       reason: extracted.content?.trim() ?? 'Customer requested human support',
     });
-    logPipelineStep(pipelineKey, 'deferred_tasks_done');
+    await sendAutomatedReply({
+      businessId,
+      conversationId: conversation.id,
+      phoneNumberId,
+      customerPhone: msg.from,
+      accessToken,
+      content:
+        'Waan fahmay. Waxaan kuu wareejinayaa wakiil bani-aadam ah oo ku caawin kara. Fadlan sug inta aan kuu xirayo.',
+      metadata: { type: 'human_handoff_acknowledgment', language: 'so' },
+    });
+    logPipelineStep(pipelineKey, 'human_handoff_initiated');
     persistPipelineTiming(message.id, { ...timings, totalMs: Date.now() - startedAt });
     void runDeferredInboundTasks({
       businessId,

@@ -19,6 +19,10 @@ const SOMALI_HUMAN_PATTERNS: RegExp[] = [
   /\bfadlan\s+iigu\s+wareeji\s+shaqaale\b/i,
   /\bii\s+wareeji\s+(shaqaale|qof|taageero)\b/i,
   /\btaageero\s+shaqaale\b/i,
+  /\b(bani|bini)\s*aadam\s+ayaan\s+rab(aa|o)\b/i,
+  /\b(bani|bini)\s*aadam\s+rab(aa|o)\b/i,
+  /\b(bani|bini)\s*aadam\b/i,
+  /\bwaxaan\s+rab(aa|o)\s+(bani|bini)\s*aadam\b/i,
 ];
 
 export function detectHumanHandoffRequest(message: string): boolean {

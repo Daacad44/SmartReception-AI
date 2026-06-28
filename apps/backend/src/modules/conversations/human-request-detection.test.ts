@@ -16,6 +16,8 @@ describe('detectHumanHandoffRequest', () => {
     assert.equal(detectHumanHandoffRequest('Waxaan rabaa qof'), true);
     assert.equal(detectHumanHandoffRequest('Shaqaale ayaan rabaa'), true);
     assert.equal(detectHumanHandoffRequest('Ma doonayo AI'), true);
+    assert.equal(detectHumanHandoffRequest('bani adam rabaa'), true);
+    assert.equal(detectHumanHandoffRequest('Waxaan rabaa bini aadam'), true);
   });
 
   it('ignores normal messages', () => {
