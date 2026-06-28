@@ -15,6 +15,8 @@ export class AuthRepository {
     passwordHash: string;
     firstName: string;
     lastName: string;
+    phone?: string;
+    pendingBusinessName?: string;
     emailOtpHash?: string;
     emailOtpExpires?: Date;
     emailOtpAttempts?: number;
@@ -80,7 +82,7 @@ export class AuthRepository {
           data: {
             businessId: business.id,
             planId: freePlan.id,
-            status: 'PENDING',
+            status: 'ACTIVE',
             paymentStatus: 'NOT_APPLICABLE',
           },
         });
@@ -88,11 +90,11 @@ export class AuthRepository {
 
       await tx.business.update({
         where: { id: business.id },
-        data: { licenseStatus: 'PENDING', isLicenseLocked: true },
+        data: { licenseStatus: 'TRIAL', isLicenseLocked: false },
       });
 
       await tx.aIConfiguration.create({
-        data: { businessId: business.id },
+        data: { businessId: business.id, languages: ['so', 'en'] },
       });
 
       await tx.knowledgeBase.create({
@@ -100,6 +102,10 @@ export class AuthRepository {
           businessId: business.id,
           name: 'Default Knowledge Base',
         },
+      });
+
+      await tx.aiTrainingWorkspace.create({
+        data: { businessId: business.id },
       });
 
       return { business, membership };

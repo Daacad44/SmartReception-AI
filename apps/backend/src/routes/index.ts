@@ -47,6 +47,9 @@ router.use('/super-admin/ai-training', aiTrainingAdminRoutes);
 router.use('/super-admin/subscriptions', subscriptionAdminRoutes);
 router.use('/subscription', subscriptionRoutes);
 
+// Onboarding: auth only — users may not have businessId yet (pre- and mid-onboarding)
+router.use('/onboarding', authenticate, onboardingRoutes);
+
 const licensed = Router();
 licensed.use(authenticate, requireBusiness, requireValidLicense());
 
@@ -70,7 +73,6 @@ licensed.use('/customer-import', customerImportRoutes);
 licensed.use('/message-templates', messageTemplatesRoutes);
 licensed.use('/employee-comms', employeeCommsRoutes);
 licensed.use('/business-profile', businessProfileRoutes);
-licensed.use('/onboarding', onboardingRoutes);
 licensed.use('/governance', governanceRoutes);
 licensed.use('/ai-training', aiTrainingRoutes);
 licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);

@@ -61,7 +61,7 @@ export async function authenticate(
     const { bearer, cookie } = extractTokens(req);
     const decoded = resolveDecodedToken(bearer, cookie);
 
-    const [membership, user] = await Promise.all([
+    const [membership, user, primaryMembership] = await Promise.all([
       decoded.businessId
         ? prisma.businessMember.findUnique({
             where: {
@@ -76,16 +76,25 @@ export async function authenticate(
         where: { id: decoded.userId },
         select: { isSuperAdmin: true },
       }),
+      !decoded.businessId
+        ? prisma.businessMember.findFirst({
+            where: { userId: decoded.userId, isActive: true },
+            orderBy: { joinedAt: 'asc' },
+          })
+        : Promise.resolve(null),
     ]);
 
-    if (decoded.businessId && membership && !membership.isActive && !decoded.impersonating) {
+    const resolvedMembership = membership ?? primaryMembership;
+    const resolvedBusinessId = decoded.businessId ?? primaryMembership?.businessId;
+
+    if (resolvedBusinessId && resolvedMembership && !resolvedMembership.isActive && !decoded.impersonating) {
       throw new UnauthorizedError('Your account has been deactivated for this business');
     }
 
     const role =
       decoded.impersonating && user?.isSuperAdmin
         ? decoded.role || 'OWNER'
-        : membership?.role || 'VIEWER';
+        : resolvedMembership?.role || 'VIEWER';
     let permissions = [...(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [])];
 
     if (user?.isSuperAdmin) {
@@ -94,7 +103,8 @@ export async function authenticate(
 
     req.user = {
       ...decoded,
-      role: decoded.impersonating ? decoded.role : membership?.role,
+      businessId: resolvedBusinessId,
+      role: decoded.impersonating ? decoded.role : resolvedMembership?.role,
       permissions,
       isSuperAdmin: user?.isSuperAdmin,
     };

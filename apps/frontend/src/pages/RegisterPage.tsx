@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Bot, Mail, Lock, User, ArrowRight, Check, X } from 'lucide-react';
+import { Bot, Mail, Lock, User, ArrowRight, Check, X, Building2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,28 +13,30 @@ import api, { extractData } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const passwordChecks = [
-  { id: 'length', label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
-  { id: 'upper', label: 'One uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
-  { id: 'lower', label: 'One lowercase letter', test: (p: string) => /[a-z]/.test(p) },
-  { id: 'number', label: 'One number', test: (p: string) => /[0-9]/.test(p) },
-  { id: 'special', label: 'One special character', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { id: 'length', label: 'Ugu yaraan 8 xaraf', test: (p: string) => p.length >= 8 },
+  { id: 'upper', label: 'Hal xaraf weyn', test: (p: string) => /[A-Z]/.test(p) },
+  { id: 'lower', label: 'Hal xaraf yar', test: (p: string) => /[a-z]/.test(p) },
+  { id: 'number', label: 'Hal lambar', test: (p: string) => /[0-9]/.test(p) },
+  { id: 'special', label: 'Hal calaamad gaar ah', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ] as const;
 
 const registerSchema = z
   .object({
-    fullName: z.string().min(2, 'Full name is required'),
-    email: z.string().email('Please enter a valid business email'),
+    businessName: z.string().min(2, 'Magaca ganacsiga waa waajib'),
+    fullName: z.string().min(2, 'Magaca mulkiilaha waa waajib'),
+    phone: z.string().min(6, 'Telefoon sax ah geli'),
+    email: z.string().email('Email sax ah geli'),
     password: z
       .string()
-      .min(8)
-      .regex(/[A-Z]/, 'Include uppercase')
-      .regex(/[a-z]/, 'Include lowercase')
-      .regex(/[0-9]/, 'Include number')
-      .regex(/[^A-Za-z0-9]/, 'Include special character'),
+      .min(8, 'Password waa inuu ka koobnaadaa ugu yaraan 8 xaraf')
+      .regex(/[A-Z]/, 'Ku dar xaraf weyn')
+      .regex(/[a-z]/, 'Ku dar xaraf yar')
+      .regex(/[0-9]/, 'Ku dar lambar')
+      .regex(/[^A-Za-z0-9]/, 'Ku dar calaamad gaar ah'),
     confirmPassword: z.string().min(8),
   })
   .refine((d) => d.password === d.confirmPassword, {
-    message: 'Passwords do not match',
+    message: 'Password-yadu isma laha',
     path: ['confirmPassword'],
   });
 
@@ -83,6 +85,8 @@ export function RegisterPage() {
     registerUser({
       firstName,
       lastName,
+      businessName: data.businessName,
+      phone: data.phone,
       email: data.email,
       password: data.password,
       confirmPassword: data.confirmPassword,
@@ -100,37 +104,55 @@ export function RegisterPage() {
         </div>
         <div>
           <h2 className="mb-4 text-4xl font-bold leading-tight">
-            Professional WhatsApp<br />automation for your business
+            Isdiiwaangeli<br />ganacsigaaga
           </h2>
           <p className="text-lg text-white/70">
-            Join businesses using AI receptionists, campaign automation, and CRM — all in one platform.
+            Abuur AI Receptionist, WhatsApp automation, iyo CRM — dhammaan hal madal.
           </p>
         </div>
-        <p className="text-sm text-white/40">© 2025 SmartReception AI. All rights reserved.</p>
+        <p className="text-sm text-white/40">© 2025 SmartReception AI</p>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-6 md:p-8">
         <Card className="w-full max-w-md border-0 shadow-xl">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Create your account</CardTitle>
-            <CardDescription>Start your SmartReception AI journey</CardDescription>
+            <CardTitle className="text-2xl">Abuur Akoon</CardTitle>
+            <CardDescription>Bilow safarkaaga SmartReception AI</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label>Full Name</Label>
+                <Label>Magaca Ganacsiga *</Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pl-9" placeholder="Tusaale: SmartReception AI" {...register('businessName')} />
+                </div>
+                {errors.businessName && <p className="text-xs text-destructive">{errors.businessName.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Magaca Mulkiilaha *</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="pl-9" placeholder="John Smith" {...register('fullName')} />
+                  <Input className="pl-9" placeholder="Magacaaga oo buuxa" {...register('fullName')} />
                 </div>
                 {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label>Business Email</Label>
+                <Label>Telefoon *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pl-9" placeholder="+252..." {...register('phone')} />
+                </div>
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Email *</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="email" className="pl-9 pr-9" placeholder="you@company.com" {...register('email')} />
+                  <Input type="email" className="pl-9 pr-9" placeholder="email@ganacsiga.com" {...register('email')} />
                   {emailStatus === 'available' && (
                     <Check className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-success" />
                   )}
@@ -140,12 +162,12 @@ export function RegisterPage() {
                 </div>
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                 {emailStatus === 'taken' && (
-                  <p className="text-xs text-destructive">This email is already registered</p>
+                  <p className="text-xs text-destructive">Email-kan hore ayaa loo diiwaangeliyay</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label>Password</Label>
+                <Label>Password *</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input type="password" className="pl-9" {...register('password')} />
@@ -170,7 +192,7 @@ export function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Confirm Password</Label>
+                <Label>Xaqiiji Password *</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input type="password" className="pl-9" {...register('confirmPassword')} />
@@ -185,13 +207,13 @@ export function RegisterPage() {
                 className="w-full bg-accent hover:bg-accent/90"
                 disabled={isRegistering || emailStatus === 'taken'}
               >
-                {isRegistering ? 'Creating account...' : 'Create account'}
+                {isRegistering ? 'Fadlan sug...' : 'Abuur Akoon'}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-accent hover:underline">Sign in</Link>
+              Hore ma u lahayd akoon?{' '}
+              <Link to="/login" className="font-medium text-accent hover:underline">Gal</Link>
             </p>
           </CardContent>
         </Card>

@@ -88,6 +88,8 @@ export interface RegisterData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
+  businessName: string;
+  phone: string;
 }
 
 export interface UserProfile {

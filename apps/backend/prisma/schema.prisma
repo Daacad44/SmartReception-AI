@@ -605,6 +605,7 @@ model User {
   totpEnabled       Boolean   @default(false)
   totpBackupCodes   String?
   welcomeSeenAt     DateTime?
+  pendingBusinessName String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

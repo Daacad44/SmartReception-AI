@@ -2,11 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import { onboardingService } from './onboarding.service';
 import {
   onboardingBusinessInfoSchema,
-  onboardingProfileSchema,
-  onboardingDiscoverySchema,
-  onboardingPlanSchema,
+  onboardingDescriptionSchema,
+  onboardingServicesSchema,
+  onboardingWorkingHoursSchema,
+  onboardingLanguagesSchema,
   onboardingWhatsAppSchema,
 } from '@smartreception/shared';
+import { authRepository } from '../auth/auth.repository';
+
+async function resolveBusinessId(req: Request): Promise<string | null> {
+  if (req.user?.businessId) return req.user.businessId;
+  const memberships = await authRepository.getUserBusinesses(req.user!.userId);
+  return memberships[0]?.businessId ?? null;
+}
 
 export class OnboardingController {
   async businessTypes(_req: Request, res: Response, next: NextFunction) {
@@ -27,6 +35,15 @@ export class OnboardingController {
     }
   }
 
+  async welcome(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await onboardingService.advanceWelcome(req.user!.userId);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async businessInfo(req: Request, res: Response, next: NextFunction) {
     try {
       const input = onboardingBusinessInfoSchema.parse(req.body);
@@ -37,45 +54,60 @@ export class OnboardingController {
     }
   }
 
-  async profile(req: Request, res: Response, next: NextFunction) {
+  async description(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = onboardingProfileSchema.parse(req.body);
-      const businessId = req.user!.businessId;
+      const input = onboardingDescriptionSchema.parse(req.body);
+      const businessId = await resolveBusinessId(req);
       if (!businessId) {
-        res.status(400).json({ success: false, error: 'Business context required' });
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
         return;
       }
-      const data = await onboardingService.saveProfile(req.user!.userId, businessId, input);
+      const data = await onboardingService.saveDescription(req.user!.userId, businessId, input);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
   }
 
-  async discovery(req: Request, res: Response, next: NextFunction) {
+  async services(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = onboardingDiscoverySchema.parse(req.body);
-      const businessId = req.user!.businessId;
+      const input = onboardingServicesSchema.parse(req.body);
+      const businessId = await resolveBusinessId(req);
       if (!businessId) {
-        res.status(400).json({ success: false, error: 'Business context required' });
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
         return;
       }
-      const data = await onboardingService.saveDiscovery(req.user!.userId, businessId, input);
+      const data = await onboardingService.saveServices(req.user!.userId, businessId, input);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
   }
 
-  async plan(req: Request, res: Response, next: NextFunction) {
+  async workingHours(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = onboardingPlanSchema.parse(req.body);
-      const businessId = req.user!.businessId;
+      const input = onboardingWorkingHoursSchema.parse(req.body);
+      const businessId = await resolveBusinessId(req);
       if (!businessId) {
-        res.status(400).json({ success: false, error: 'Business context required' });
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
         return;
       }
-      const data = await onboardingService.savePlan(req.user!.userId, businessId, input);
+      const data = await onboardingService.saveWorkingHours(req.user!.userId, businessId, input);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async languages(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = onboardingLanguagesSchema.parse(req.body);
+      const businessId = await resolveBusinessId(req);
+      if (!businessId) {
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
+        return;
+      }
+      const data = await onboardingService.saveLanguages(req.user!.userId, businessId, input);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -85,9 +117,9 @@ export class OnboardingController {
   async whatsapp(req: Request, res: Response, next: NextFunction) {
     try {
       const input = onboardingWhatsAppSchema.parse(req.body);
-      const businessId = req.user!.businessId;
+      const businessId = await resolveBusinessId(req);
       if (!businessId) {
-        res.status(400).json({ success: false, error: 'Business context required' });
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
         return;
       }
       const data = await onboardingService.connectWhatsApp(req.user!.userId, businessId, input);
@@ -99,9 +131,9 @@ export class OnboardingController {
 
   async complete(req: Request, res: Response, next: NextFunction) {
     try {
-      const businessId = req.user!.businessId;
+      const businessId = await resolveBusinessId(req);
       if (!businessId) {
-        res.status(400).json({ success: false, error: 'Business context required' });
+        res.status(400).json({ success: false, error: 'Ganacsi lama helin' });
         return;
       }
       const data = await onboardingService.complete(req.user!.userId, businessId);

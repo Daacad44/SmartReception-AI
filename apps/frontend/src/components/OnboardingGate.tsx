@@ -33,8 +33,9 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
 
   if (isLoading || (isFetching && !status)) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
         <LoadingState rows={3} />
+        <p className="text-sm text-muted-foreground">Fadlan sug...</p>
       </div>
     );
   }
@@ -43,11 +44,13 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <ErrorState
+          title="Wax yar ayaa khaldamay"
           message={
             isNetworkOrTimeoutError(error)
-              ? 'Connection lost. Could not verify your workspace status.'
-              : 'Unable to load onboarding status.'
+              ? 'Xiriirka server-ka ayaa cilad galay. Fadlan mar kale isku day.'
+              : 'Fadlan mar kale isku day.'
           }
+          retryLabel="Mar kale isku day"
           onRetry={() => refetch()}
         />
       </div>
@@ -84,8 +87,9 @@ export function OnboardingOnlyRoute({ children }: { children: React.ReactNode })
 
   if (isLoading || (isFetching && !status)) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
         <LoadingState rows={3} />
+        <p className="text-sm text-muted-foreground">Fadlan sug...</p>
       </div>
     );
   }
@@ -94,11 +98,13 @@ export function OnboardingOnlyRoute({ children }: { children: React.ReactNode })
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <ErrorState
+          title="Wax yar ayaa khaldamay"
           message={
             isNetworkOrTimeoutError(error)
-              ? 'Connection lost. Retrying workspace status...'
-              : 'Unable to load onboarding status.'
+              ? 'Xiriirka server-ka ayaa cilad galay. Fadlan mar kale isku day.'
+              : 'Fadlan mar kale isku day.'
           }
+          retryLabel="Mar kale isku day"
           onRetry={() => refetch()}
         />
       </div>

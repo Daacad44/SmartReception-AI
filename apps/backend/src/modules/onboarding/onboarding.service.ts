@@ -1,23 +1,32 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { authRepository } from '../auth/auth.repository';
 import { whatsappModuleService } from '../whatsapp/whatsapp.service';
-import { tokenService } from '../../infrastructure/auth/token.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../core/errors';
 import type {
   OnboardingBusinessInfoInput,
-  OnboardingProfileInput,
-  OnboardingDiscoveryInput,
-  OnboardingPlanInput,
+  OnboardingDescriptionInput,
+  OnboardingServicesInput,
+  OnboardingWorkingHoursInput,
+  OnboardingLanguagesInput,
   OnboardingWhatsAppInput,
 } from '@smartreception/shared';
-import type { Industry, SubscriptionPlan, WhatsAppStatus } from '@prisma/client';
+import type { WhatsAppStatus } from '@prisma/client';
 import { businessTypesService } from './business-types.service';
+
+const TOTAL_STEPS = 8;
 
 function slugify(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+}
+
+function parseOnboardingData(data: unknown): Record<string, unknown> {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return {};
 }
 
 export class OnboardingService {
@@ -30,35 +39,54 @@ export class OnboardingService {
     const membership = memberships[0];
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { welcomeSeenAt: true, isSuperAdmin: true },
+      select: { welcomeSeenAt: true, isSuperAdmin: true, pendingBusinessName: true, phone: true },
     });
 
     if (!membership) {
+      if (user?.pendingBusinessName) {
+        await this.ensureBusinessForUser(userId);
+        const refreshed = await authRepository.getUserBusinesses(userId);
+        if (refreshed[0]) {
+          return this.buildStatus(refreshed[0], user);
+        }
+      }
       return {
         completed: false,
         currentStep: 0,
-        totalSteps: 5,
+        totalSteps: TOTAL_STEPS,
         hasBusiness: false,
         welcomeSeen: Boolean(user?.welcomeSeenAt),
         business: null,
         whatsappConnected: false,
         whatsappStatus: 'NOT_CONNECTED' as WhatsAppStatus,
+        onboardingData: {},
       };
     }
 
     const business = membership.business;
+    return this.buildStatus(membership, user);
+  }
+
+  private async buildStatus(
+    membership: Awaited<ReturnType<typeof authRepository.getUserBusinesses>>[number],
+    user: { welcomeSeenAt: Date | null } | null
+  ) {
+    const business = membership.business;
     const completed = Boolean(business.onboardingCompletedAt);
+    const profile = await prisma.businessProfile.findUnique({
+      where: { businessId: business.id },
+    });
+    const onboardingData = parseOnboardingData(business.onboardingData);
     const whatsappAccount = await prisma.whatsAppAccount.findFirst({
       where: { businessId: business.id, isActive: true },
     });
     const whatsappStatus: WhatsAppStatus =
-      business.whatsappStatus ??
-      (whatsappAccount ? 'CONNECTED' : 'NOT_CONNECTED');
+      business.whatsappStatus ?? (whatsappAccount ? 'CONNECTED' : 'NOT_CONNECTED');
 
     return {
       completed,
-      currentStep: completed ? 5 : Math.max(business.onboardingStep, 1),
-      totalSteps: 5,
+      currentStep: completed ? TOTAL_STEPS : Math.min(business.onboardingStep, TOTAL_STEPS - 1),
+      totalSteps: TOTAL_STEPS,
       hasBusiness: true,
       welcomeSeen: Boolean(user?.welcomeSeenAt),
       business: {
@@ -73,123 +101,193 @@ export class OnboardingService {
         city: business.city,
         address: business.address,
         website: business.website,
-        employeeRange: business.employeeRange,
-        customerVolume: business.customerVolume,
-        mainGoal: business.mainGoal,
         plan: business.subscription?.plan ?? 'FREE',
-        onboardingData: business.onboardingData,
         whatsappStatus,
+      },
+      onboardingData: {
+        ...onboardingData,
+        description: profile?.businessDescription ?? onboardingData.description,
+        services: (onboardingData.services as string[] | undefined) ?? [],
+        workingHours: profile?.workingHours
+          ? (() => {
+              try {
+                return JSON.parse(profile.workingHours!) as Record<string, unknown>;
+              } catch {
+                return onboardingData.workingHours;
+              }
+            })()
+          : onboardingData.workingHours,
+        languages: onboardingData.languages,
       },
       whatsappConnected: whatsappStatus === 'CONNECTED',
       whatsappStatus,
     };
   }
 
-  async saveBusinessInfo(userId: string, input: OnboardingBusinessInfoInput) {
-    const memberships = await authRepository.getUserBusinesses(userId);
+  private async ensureBusinessForUser(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.pendingBusinessName) return;
 
-    if (memberships.length > 0) {
-      const business = await prisma.business.update({
-        where: { id: memberships[0].businessId },
-        data: {
-          name: input.name,
-          industry: input.industry as Industry,
-          businessType: input.businessType,
-          businessCategory: input.businessCategory,
-          phone: input.phone,
-          whatsappNumber: input.whatsappNumber,
-          country: input.country,
-          city: input.city,
-          address: input.address,
-          website: input.website || null,
-          onboardingStep: Math.max(memberships[0].business.onboardingStep, 1),
-        },
-        include: { subscription: true },
-      });
-      return { business, tokens: null };
-    }
-
-    let slug = slugify(input.name);
+    let slug = slugify(user.pendingBusinessName);
     const existingSlug = await prisma.business.findUnique({ where: { slug } });
     if (existingSlug) slug = `${slug}-${Date.now()}`;
 
-    const { business } = await authRepository.createBusinessWithOwner(userId, {
-      name: input.name,
+    await authRepository.createBusinessWithOwner(userId, {
+      name: user.pendingBusinessName,
       slug,
-      industry: input.industry,
-      phone: input.phone,
-      onboardingStep: 1,
+      phone: user.phone ?? undefined,
+      onboardingStep: 0,
     });
+    await prisma.user.update({ where: { id: userId }, data: { pendingBusinessName: null } });
+  }
 
+  private async getOwnerBusiness(userId: string) {
+    const memberships = await authRepository.getUserBusinesses(userId);
+    if (!memberships[0]) {
+      await this.ensureBusinessForUser(userId);
+      const retry = await authRepository.getUserBusinesses(userId);
+      if (!retry[0]) throw new NotFoundError('Business not found');
+      return retry[0];
+    }
+    return memberships[0];
+  }
+
+  async advanceWelcome(userId: string) {
+    const membership = await this.getOwnerBusiness(userId);
     await prisma.business.update({
-      where: { id: business.id },
+      where: { id: membership.businessId },
+      data: { onboardingStep: Math.max(membership.business.onboardingStep, 1) },
+    });
+    return { step: 1 };
+  }
+
+  async saveBusinessInfo(userId: string, input: OnboardingBusinessInfoInput) {
+    const membership = await this.getOwnerBusiness(userId);
+    const business = await prisma.business.update({
+      where: { id: membership.businessId },
       data: {
+        name: input.name,
+        industry: (input.industry as never) || membership.business.industry || 'OTHER',
         businessType: input.businessType,
         businessCategory: input.businessCategory,
-        whatsappNumber: input.whatsappNumber,
+        phone: input.phone,
+        whatsappNumber: input.whatsappNumber || input.phone,
         country: input.country,
         city: input.city,
         address: input.address,
         website: input.website || null,
+        onboardingStep: Math.max(membership.business.onboardingStep, 2),
+      },
+      include: { subscription: true },
+    });
+
+    await prisma.businessProfile.upsert({
+      where: { businessId: business.id },
+      create: {
+        businessId: business.id,
+        businessName: input.name,
+        phone: input.phone,
+        website: input.website || null,
+        address: input.address,
+        city: input.city,
+        country: input.country,
+      },
+      update: {
+        businessName: input.name,
+        phone: input.phone,
+        website: input.website || null,
+        address: input.address,
+        city: input.city,
+        country: input.country,
       },
     });
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundError('User not found');
-
-    const tokens = await tokenService.createTokenPair(userId, user.email, business.id, 'OWNER');
-
-    return { business, tokens };
+    return { business, tokens: null };
   }
 
-  async saveProfile(userId: string, businessId: string, input: OnboardingProfileInput) {
+  async saveDescription(userId: string, businessId: string, input: OnboardingDescriptionInput) {
     await this.assertOwner(userId, businessId);
-    return prisma.business.update({
-      where: { id: businessId },
-      data: {
-        employeeRange: input.employeeRange,
-        customerVolume: input.customerVolume,
-        mainGoal: input.mainGoal,
-        onboardingStep: 2,
-      },
+    const existing = parseOnboardingData(
+      (await prisma.business.findUnique({ where: { id: businessId } }))?.onboardingData
+    );
+
+    await prisma.businessProfile.upsert({
+      where: { businessId },
+      create: { businessId, businessName: '', businessDescription: input.description },
+      update: { businessDescription: input.description },
     });
-  }
 
-  async saveDiscovery(userId: string, businessId: string, input: OnboardingDiscoveryInput) {
-    await this.assertOwner(userId, businessId);
     return prisma.business.update({
       where: { id: businessId },
       data: {
         onboardingStep: 3,
-        onboardingData: {
-          referralSource: input.referralSource,
-          problemToSolve: input.problemToSolve,
-          biggestChallenge: input.biggestChallenge,
-        },
+        onboardingData: { ...existing, description: input.description },
       },
     });
   }
 
-  async savePlan(userId: string, businessId: string, input: OnboardingPlanInput) {
+  async saveServices(userId: string, businessId: string, input: OnboardingServicesInput) {
     await this.assertOwner(userId, businessId);
-    const plan = input.plan as SubscriptionPlan;
-    const status = plan === 'FREE' ? 'TRIALING' : 'ACTIVE';
+    const existing = parseOnboardingData(
+      (await prisma.business.findUnique({ where: { id: businessId } }))?.onboardingData
+    );
+    const servicesText = input.services.join('\n');
 
-    await prisma.subscription.upsert({
+    await prisma.businessProfile.upsert({
       where: { businessId },
-      create: {
-        businessId,
-        plan,
-        status,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-      },
-      update: { plan, status },
+      create: { businessId, businessName: '', companyOverview: servicesText },
+      update: { companyOverview: servicesText },
     });
 
     return prisma.business.update({
       where: { id: businessId },
-      data: { onboardingStep: 4 },
+      data: {
+        onboardingStep: 4,
+        onboardingData: { ...existing, services: input.services },
+      },
+    });
+  }
+
+  async saveWorkingHours(userId: string, businessId: string, input: OnboardingWorkingHoursInput) {
+    await this.assertOwner(userId, businessId);
+    const existing = parseOnboardingData(
+      (await prisma.business.findUnique({ where: { id: businessId } }))?.onboardingData
+    );
+    const hoursText = JSON.stringify(input.workingHours, null, 2);
+
+    await prisma.businessProfile.upsert({
+      where: { businessId },
+      create: { businessId, businessName: '', workingHours: hoursText },
+      update: { workingHours: hoursText },
+    });
+
+    return prisma.business.update({
+      where: { id: businessId },
+      data: {
+        onboardingStep: 5,
+        onboardingData: { ...existing, workingHours: input.workingHours },
+      },
+    });
+  }
+
+  async saveLanguages(userId: string, businessId: string, input: OnboardingLanguagesInput) {
+    await this.assertOwner(userId, businessId);
+    const existing = parseOnboardingData(
+      (await prisma.business.findUnique({ where: { id: businessId } }))?.onboardingData
+    );
+
+    await prisma.aIConfiguration.upsert({
+      where: { businessId },
+      create: { businessId, languages: input.languages },
+      update: { languages: input.languages },
+    });
+
+    return prisma.business.update({
+      where: { id: businessId },
+      data: {
+        onboardingStep: 6,
+        onboardingData: { ...existing, languages: input.languages },
+      },
     });
   }
 
@@ -217,15 +315,12 @@ export class OnboardingService {
     }
 
     const business = await prisma.business.findUnique({ where: { id: businessId } });
-    const existingData =
-      business?.onboardingData && typeof business.onboardingData === 'object'
-        ? (business.onboardingData as Record<string, unknown>)
-        : {};
+    const existingData = parseOnboardingData(business?.onboardingData);
 
     return prisma.business.update({
       where: { id: businessId },
       data: {
-        onboardingStep: 5,
+        onboardingStep: 7,
         whatsappStatus,
         onboardingData: {
           ...existingData,
@@ -240,15 +335,17 @@ export class OnboardingService {
     await this.assertOwner(userId, businessId);
     const business = await prisma.business.findFirst({ where: { id: businessId } });
     if (!business) throw new NotFoundError('Business not found');
-    if (business.onboardingStep < 4) {
-      throw new ValidationError('Please complete all onboarding steps first');
+    if (business.onboardingStep < 6) {
+      throw new ValidationError('Fadlan dhammaystir dhammaan tallaabooyinka onboarding-ka');
     }
 
     return prisma.business.update({
       where: { id: businessId },
       data: {
         onboardingCompletedAt: new Date(),
-        onboardingStep: 5,
+        onboardingStep: TOTAL_STEPS,
+        licenseStatus: 'TRIAL',
+        isLicenseLocked: false,
       },
     });
   }
