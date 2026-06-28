@@ -17,6 +17,7 @@ import { getPipelineState } from './whatsapp-pipeline-state';
 import { handleIncomingMessage } from './incoming-message.service';
 import { ensureAiConfiguration } from '../ai/ai-config.service';
 import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
+import { fetchMetaMessageTemplates } from '../../infrastructure/whatsapp/whatsapp-meta-templates.service';
 import { startPipelineTrace } from './message-pipeline.logger';
 import { whatsappTenantResolver } from './whatsapp-tenant-resolver.service';
 
@@ -750,6 +751,44 @@ export class WhatsAppModuleService {
       wabaId: wabaId || undefined,
       accessToken,
     });
+  }
+
+  async listMetaTemplates(businessId: string, accountId?: string) {
+    const account = accountId
+      ? await prisma.whatsAppAccount.findFirst({ where: { id: accountId, businessId } })
+      : await whatsappRepository.findAccountByBusiness(businessId);
+
+    if (!account) {
+      throw new NotFoundError('No active WhatsApp account found');
+    }
+
+    const token = this.getAccountToken(account.accessToken);
+    if (!token) {
+      throw new ValidationError('WhatsApp access token is not configured');
+    }
+
+    const wabaId = account.wabaId?.trim();
+    if (!wabaId) {
+      throw new ValidationError(
+        'WABA ID is missing on this WhatsApp account. Add it in Settings so SmartReception can list Meta templates.'
+      );
+    }
+
+    const templates = await fetchMetaMessageTemplates(wabaId, token);
+    const approved = templates.filter((template) => template.status === 'APPROVED');
+
+    return {
+      wabaId,
+      phoneNumberId: account.phoneNumberId,
+      templates: approved.map((template) => ({
+        name: template.name,
+        language: template.language,
+        status: template.status,
+        category: template.category ?? null,
+      })),
+      totalApproved: approved.length,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   async testConnection(businessId: string, accountId?: string) {

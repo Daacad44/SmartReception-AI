@@ -894,6 +894,31 @@ export function useWhatsAppWebhookInfo() {
   });
 }
 
+export function useWhatsAppMetaTemplates(accountId?: string) {
+  return useAuthQuery({
+    queryKey: ['whatsapp-meta-templates', accountId],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/meta-templates', {
+        params: accountId ? { accountId } : undefined,
+      });
+      return extractData<{
+        wabaId: string;
+        phoneNumberId: string;
+        totalApproved: number;
+        fetchedAt: string;
+        templates: Array<{
+          name: string;
+          language: string;
+          status: string;
+          category: string | null;
+        }>;
+      }>(response);
+    },
+    enabled: Boolean(accountId),
+    refetchInterval: false,
+  });
+}
+
 export function useKnowledgeSearch(query: string) {
   return useAuthQuery({
     queryKey: ['knowledge-search', query],
