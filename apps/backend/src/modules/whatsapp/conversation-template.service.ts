@@ -7,6 +7,10 @@ import {
 } from '../campaigns/campaign-personalization.service';
 import { getWhatsAppSessionWindow } from './whatsapp-session.service';
 import type { OutboundMessageType } from '../../infrastructure/whatsapp/whatsapp.types';
+import {
+  isMetaTemplateSlug,
+  normalizeWhatsAppTemplateLanguage,
+} from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
 export type ResolvedConversationTemplate = {
   content: string;
@@ -20,7 +24,14 @@ export type ResolvedConversationTemplate = {
 
 function buildMetaBodyParameters(
   template: { content: string; variables: string[] },
-  customer: { name: string; phone: string; email: string | null; companyName: string | null; city: string | null; country: string | null },
+  customer: {
+    name: string;
+    phone: string;
+    email: string | null;
+    companyName: string | null;
+    city: string | null;
+    country: string | null;
+  },
   businessName: string
 ): Array<{ type: 'text'; text: string }> {
   const variableKeys =
@@ -36,6 +47,14 @@ function buildMetaBodyParameters(
     const text = personalized.startsWith('{{') ? '' : personalized;
     return { type: 'text' as const, text: text.slice(0, 1024) };
   });
+}
+
+function templateUsesBodyVariables(template: {
+  variables: string[];
+  content: string;
+}): boolean {
+  if (template.variables.length > 0) return true;
+  return extractTemplateVariables(template.content).length > 0;
 }
 
 export async function resolveConversationTemplateSend(params: {
@@ -61,6 +80,7 @@ export async function resolveConversationTemplateSend(params: {
       select: {
         reengagementTemplateName: true,
         reengagementTemplateLanguage: true,
+        reengagementTemplateHasBodyVariable: true,
       },
     }),
   ]);
@@ -74,31 +94,34 @@ export async function resolveConversationTemplateSend(params: {
 
   if (!sessionWindow.isOpen) {
     const metaTemplateName =
-      template.whatsappTemplateName ?? whatsappAccount?.reengagementTemplateName ?? null;
-    const metaTemplateLanguage =
+      template.whatsappTemplateName ??
+      (isMetaTemplateSlug(template.name) ? template.name.trim() : null) ??
+      whatsappAccount?.reengagementTemplateName ??
+      null;
+    const metaTemplateLanguage = normalizeWhatsAppTemplateLanguage(
       template.whatsappTemplateLanguage ??
-      whatsappAccount?.reengagementTemplateLanguage ??
-      'en';
+        whatsappAccount?.reengagementTemplateLanguage ??
+        'en'
+    );
 
     if (!metaTemplateName) {
       throw new ValidationError(
-        'Configure a WhatsApp re-engagement template in Settings → WhatsApp. Meta-approved templates can be sent anytime, even after the 24-hour session expires.'
+        'Link this template to a Meta template name, or configure Settings → WhatsApp → Re-engagement Template.'
       );
     }
 
-    const templateComponents = template.whatsappTemplateName
+    const useBodyVariable = template.whatsappTemplateName
+      ? templateUsesBodyVariables(template)
+      : (whatsappAccount?.reengagementTemplateHasBodyVariable ?? false);
+
+    const templateComponents = useBodyVariable
       ? [
           {
             type: 'body',
             parameters: buildMetaBodyParameters(template, customer, businessName),
           },
         ]
-      : [
-          {
-            type: 'body',
-            parameters: [{ type: 'text', text: content.slice(0, 1024) }],
-          },
-        ];
+      : undefined;
 
     return {
       content,

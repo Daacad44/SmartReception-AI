@@ -27,7 +27,12 @@ export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
 
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as ApiResponse | undefined;
+    const data = error.response?.data as ApiResponse & {
+      details?: Array<{ field?: string; message?: string }>;
+    };
+    if (data?.details?.length) {
+      return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
+    }
     return data?.error || data?.message || error.message;
   }
   if (error instanceof Error) {

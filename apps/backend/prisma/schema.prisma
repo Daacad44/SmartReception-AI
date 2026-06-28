@@ -1173,6 +1173,7 @@ model WhatsAppAccount {
   lastOutgoingAt       DateTime?
   reengagementTemplateName     String?
   reengagementTemplateLanguage String?  @default("en")
+  reengagementTemplateHasBodyVariable Boolean @default(false)
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

@@ -95,7 +95,7 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
   );
   timings.customerMs = Date.now() - startedAt;
 
-  const { conversation, isNew } = await whatsappRepository.findOrCreateConversation(
+  const { conversation } = await whatsappRepository.findOrCreateConversation(
     businessId,
     customer.id,
     whatsappAccountId
@@ -144,7 +144,6 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       accessToken,
       preferEnglish: requestsEnglish(aiText),
       pipelineKey,
-      isNewConversation: isNew,
     });
     timings.replyMs = Date.now() - replyStartedAt;
     logPipelineStep(pipelineKey, 'reply_sent', { timings });
@@ -275,7 +274,6 @@ interface SomaliSalesAgentParams {
   accessToken?: string;
   preferEnglish?: boolean;
   pipelineKey: string;
-  isNewConversation?: boolean;
 }
 
 async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void> {
@@ -374,18 +372,29 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     return;
   }
 
-  // First contact: introduce company from Business Profile + services menu.
-  if (params.isNewConversation && !isPlatformBusiness) {
-    console.log('[AI] New conversation — tenant welcome menu', { businessId: params.businessId });
-    await sendTenantWelcomeMenu(base);
-    logPipelineStep(params.pipelineKey, 'new_conversation_profile_welcome');
-    return;
-  }
-
   const inboundCount = await prisma.message.count({
     where: { conversationId: params.conversationId, direction: 'INBOUND' },
   });
   const isFirstCustomerMessage = inboundCount <= 1;
+
+  // First inbound in this conversation: always send welcome + services menu
+  // (platform → SmartReception 9-service menu; tenant → Business Profile menu).
+  if (isFirstCustomerMessage) {
+    console.log('[AI] First customer message — sending welcome menu', {
+      businessId: params.businessId,
+      isPlatformBusiness,
+    });
+    if (isPlatformBusiness) {
+      await sendServiceMenu(base);
+    } else {
+      await sendTenantWelcomeMenu(base);
+    }
+    logPipelineStep(
+      params.pipelineKey,
+      isPlatformBusiness ? 'new_conversation_welcome' : 'new_conversation_profile_welcome'
+    );
+    return;
+  }
 
   console.log('[AI] Free-form — routed AI reply', { businessId: params.businessId, isFirstCustomerMessage });
   logPipelineStep(params.pipelineKey, 'ai_started');

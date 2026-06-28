@@ -5,7 +5,7 @@ import {
   Users, Check, ChevronRight, ChevronLeft, Truck, Clock, XCircle, Loader2,
   Sparkles, Pause, Play, Copy, Archive, Route,
 } from 'lucide-react';
-import api, { extractData } from '@/lib/api';
+import api, { extractData, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -59,6 +59,8 @@ interface Template {
   content: string;
   type: string;
   isSystem: boolean;
+  whatsappTemplateName?: string | null;
+  whatsappTemplateLanguage?: string | null;
 }
 
 interface Campaign {
@@ -258,7 +260,13 @@ export function CampaignsPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
-  const [templateForm, setTemplateForm] = useState({ name: '', content: '', type: 'MARKETING' });
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    content: '',
+    type: 'MARKETING',
+    whatsappTemplateName: '',
+    whatsappTemplateLanguage: 'en',
+  });
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiVersions, setAiVersions] = useState<AiVersion[]>([]);
   const [journeyOpen, setJourneyOpen] = useState(false);
@@ -410,31 +418,75 @@ export function CampaignsPage() {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => api.post('/message-templates', payload),
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const response = await api.post('/message-templates', payload);
+      return extractData(response);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
       setTemplateOpen(false);
       setEditingTemplate(null);
       toast.success('Template saved');
     },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: Record<string, unknown>) =>
-      api.patch(`/message-templates/${id}`, payload),
+    mutationFn: async ({ id, ...payload }: Record<string, unknown>) => {
+      const response = await api.patch(`/message-templates/${id}`, payload);
+      return extractData(response);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
       setTemplateOpen(false);
       setEditingTemplate(null);
       toast.success('Template updated');
     },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
+
+  const handleSaveTemplate = () => {
+    const payload = {
+      name: templateForm.name.trim(),
+      content: templateForm.content.trim(),
+      type: templateForm.type,
+      whatsappTemplateName: templateForm.whatsappTemplateName.trim() || null,
+      whatsappTemplateLanguage: templateForm.whatsappTemplateLanguage.trim() || null,
+    };
+
+    if (!payload.name || !payload.content) {
+      toast.error('Name and content are required');
+      return;
+    }
+
+    if (editingTemplate?.isSystem) {
+      toast.error('System templates cannot be edited. Click New Template to create your own.');
+      return;
+    }
+
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, ...payload });
+      return;
+    }
+
+    createTemplateMutation.mutate(payload);
+  };
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => api.delete(`/message-templates/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['message-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-templates'] });
       toast.success('Template deleted');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -777,7 +829,13 @@ export function CampaignsPage() {
               variant="outline"
               onClick={() => {
                 setEditingTemplate(null);
-                setTemplateForm({ name: '', content: '', type: 'MARKETING' });
+                setTemplateForm({
+                  name: '',
+                  content: '',
+                  type: 'MARKETING',
+                  whatsappTemplateName: '',
+                  whatsappTemplateLanguage: 'en',
+                });
                 setTemplateOpen(true);
               }}
             >
@@ -798,7 +856,13 @@ export function CampaignsPage() {
                       <>
                         <Button size="sm" variant="ghost" onClick={() => {
                           setEditingTemplate(t);
-                          setTemplateForm({ name: t.name, content: t.content, type: t.type });
+                          setTemplateForm({
+                            name: t.name,
+                            content: t.content,
+                            type: t.type,
+                            whatsappTemplateName: t.whatsappTemplateName ?? '',
+                            whatsappTemplateLanguage: t.whatsappTemplateLanguage ?? 'en',
+                          });
                           setTemplateOpen(true);
                         }}>
                           <Pencil className="h-3 w-3" />
@@ -1251,20 +1315,45 @@ export function CampaignsPage() {
                 placeholder="Use {{name}} for customer name..."
               />
             </div>
+            <div className="space-y-2">
+              <Label>Meta WhatsApp Template Name (optional)</Label>
+              <Input
+                value={templateForm.whatsappTemplateName}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, whatsappTemplateName: e.target.value })
+                }
+                placeholder="smartreception_welcome"
+              />
+              <p className="text-xs text-muted-foreground">
+                Exact name from Meta Business Manager — used when sending outside the 24-hour session.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Meta Template Language (optional)</Label>
+              <Input
+                value={templateForm.whatsappTemplateLanguage}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, whatsappTemplateLanguage: e.target.value })
+                }
+                placeholder="en"
+              />
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button
+              type="button"
               className="bg-accent hover:bg-accent/90"
-              onClick={() => {
-                if (editingTemplate && !editingTemplate.isSystem) {
-                  updateTemplateMutation.mutate({ id: editingTemplate.id, ...templateForm });
-                } else if (!editingTemplate) {
-                  createTemplateMutation.mutate(templateForm);
-                }
-              }}
-              disabled={!templateForm.name || !templateForm.content}
+              onClick={handleSaveTemplate}
+              disabled={
+                !templateForm.name.trim() ||
+                !templateForm.content.trim() ||
+                createTemplateMutation.isPending ||
+                updateTemplateMutation.isPending
+              }
             >
-              Save Template
+              {createTemplateMutation.isPending || updateTemplateMutation.isPending
+                ? 'Saving…'
+                : 'Save Template'}
             </Button>
           </DialogFooter>
         </DialogContent>
