@@ -16,6 +16,7 @@ const TYPE_MAP: Record<NotificationType, 'info' | 'success' | 'warning' | 'error
   APPOINTMENT_CANCELLED: 'warning',
   CAMPAIGN_DELIVERED: 'success',
   CAMPAIGN_FAILED: 'error',
+  GOVERNANCE_APPROVAL: 'warning',
 };
 
 function mapNotification(notification: {

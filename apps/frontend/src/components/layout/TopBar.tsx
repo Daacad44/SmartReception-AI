@@ -27,7 +27,7 @@ const QUICK_LINKS = [
   { label: 'Customers', path: '/customers' },
   { label: 'Appointments', path: '/appointments' },
   { label: 'Campaign Center', path: '/campaigns' },
-  { label: 'Knowledge Base', path: '/knowledge' },
+  { label: 'Knowledge Base', path: '/ai-training' },
 ];
 
 interface TopBarProps {

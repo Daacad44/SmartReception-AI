@@ -359,3 +359,77 @@ export function appointmentMissedFollowUpEmail(data: {
     }),
   };
 }
+
+interface GovernanceApprovalRequestEmailData {
+  firstName: string;
+  businessName: string;
+  requesterName: string;
+  actionLabel: string;
+  reviewUrl: string;
+}
+
+export function governanceApprovalRequestEmail(
+  data: GovernanceApprovalRequestEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Administrator approval required</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.firstName}, an Enterprise customer submitted a sensitive action that requires your approval.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Business:</strong> ${data.businessName}<br />
+        <strong>Requested by:</strong> ${data.requesterName}<br />
+        <strong>Action:</strong> ${data.actionLabel}
+      </td></tr>
+    </table>
+    ${renderButton(data.reviewUrl, 'Review Request')}
+  `;
+
+  return {
+    subject: `[Action Required] ${data.businessName} — ${data.actionLabel}`,
+    html: renderEmailLayout({
+      preheader: `${data.requesterName} requested ${data.actionLabel}`,
+      title: 'Governance approval',
+      body,
+    }),
+  };
+}
+
+interface GovernanceActivationCodeEmailData {
+  firstName: string;
+  businessName: string;
+  actionLabel: string;
+  code: string;
+  expiryMinutes: number;
+  activateUrl: string;
+}
+
+export function governanceActivationCodeEmail(
+  data: GovernanceActivationCodeEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Approval granted</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.firstName}, your request to <strong>${data.actionLabel}</strong> for <strong>${data.businessName}</strong> was approved.
+    </p>
+    <p style="margin:0 0 8px;font-size:15px;color:#475569;line-height:1.7;">
+      Enter this one-time activation code to complete the action:
+    </p>
+    ${renderOtpCard(data.code)}
+    <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.6;text-align:center;">
+      Valid for <strong>${data.expiryMinutes} minutes</strong>. Single use only.
+    </p>
+    ${renderButton(data.activateUrl, 'Enter Activation Code')}
+    ${renderSecurityNotice('Never share this code. If you did not request this action, contact your administrator immediately.')}
+  `;
+
+  return {
+    subject: `${data.code} — Activation code for ${data.actionLabel}`,
+    html: renderEmailLayout({
+      preheader: `Your activation code is ${data.code}`,
+      title: 'Activation code',
+      body,
+    }),
+  };
+}

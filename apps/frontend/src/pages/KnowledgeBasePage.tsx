@@ -92,7 +92,15 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export function KnowledgeBasePage() {
+export function KnowledgeBasePage({
+  embedded = false,
+  readOnly = false,
+  onApprovalRequired: _onApprovalRequired,
+}: {
+  embedded?: boolean;
+  readOnly?: boolean;
+  onApprovalRequired?: (request: import('@/lib/governance').GovernanceApprovalRequest) => void;
+} = {}) {
   const [search, setSearch] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
@@ -172,6 +180,7 @@ export function KnowledgeBasePage() {
 
   return (
     <div className="space-y-6">
+      {!embedded && (
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Knowledge Base</h1>
@@ -179,6 +188,7 @@ export function KnowledgeBasePage() {
             Upload documents to train your AI assistant
           </p>
         </div>
+        {!readOnly && (
         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
           <DialogTrigger asChild>
             <Button className="bg-accent hover:bg-accent/90">
@@ -242,7 +252,9 @@ export function KnowledgeBasePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
+      )}
 
       <Tabs defaultValue="documents" className="space-y-4">
         <TabsList>

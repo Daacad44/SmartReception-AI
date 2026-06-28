@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Upload, FileText, Loader2, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import api, { extractData } from '@/lib/api';
+import { parseMutationResponse, type GovernanceApprovalRequest } from '@/lib/governance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,7 +40,13 @@ interface BusinessProfile {
   extractionStatus?: string;
 }
 
-export function BusinessProfileSettings() {
+export function BusinessProfileSettings({
+  readOnly = false,
+  onApprovalRequired,
+}: {
+  readOnly?: boolean;
+  onApprovalRequired?: (request: GovernanceApprovalRequest) => void;
+} = {}) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Partial<BusinessProfile>>({});
@@ -57,9 +64,15 @@ export function BusinessProfileSettings() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: Partial<BusinessProfile>) =>
-      api.patch('/business-profile', payload),
-    onSuccess: () => {
+    mutationFn: async (payload: Partial<BusinessProfile>) => {
+      const response = await api.patch('/business-profile', payload);
+      return parseMutationResponse(response);
+    },
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        onApprovalRequired?.(result.request);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['business-profile'] });
       toast.success('Business Profile saved');
     },
@@ -70,11 +83,16 @@ export function BusinessProfileSettings() {
     mutationFn: async (file: File) => {
       const body = new FormData();
       body.append('file', file);
-      return api.post('/business-profile/upload-pdf', body, {
+      const response = await api.post('/business-profile/upload-pdf', body, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      return parseMutationResponse(response);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        onApprovalRequired?.(result.request);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['business-profile'] });
       toast.success('Business Profile PDF uploaded — extracting company information');
     },
@@ -90,8 +108,15 @@ export function BusinessProfileSettings() {
   });
 
   const deletePdfMutation = useMutation({
-    mutationFn: async () => api.delete('/business-profile/pdf'),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const response = await api.delete('/business-profile/pdf');
+      return parseMutationResponse(response);
+    },
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        onApprovalRequired?.(result.request);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['business-profile'] });
       toast.success('Business Profile PDF removed');
     },
@@ -99,8 +124,16 @@ export function BusinessProfileSettings() {
   });
 
   const clearProfileMutation = useMutation({
-    mutationFn: async () => extractData(await api.delete('/business-profile')),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const response = await api.delete('/business-profile');
+      return parseMutationResponse(response);
+    },
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        onApprovalRequired?.(result.request);
+        setClearDialogOpen(false);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['business-profile'] });
       setForm({});
       setClearDialogOpen(false);
@@ -137,7 +170,7 @@ export function BusinessProfileSettings() {
             }}
           />
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={readOnly}>
               {uploadMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -192,7 +225,7 @@ export function BusinessProfileSettings() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Business Name</Label>
-              <Input value={form.businessName ?? ''} onChange={(e) => set('businessName', e.target.value)} />
+              <Input value={form.businessName ?? ''} onChange={(e) => set('businessName', e.target.value)} disabled={readOnly} />
             </div>
             <div className="space-y-2">
               <Label>Brand Tone</Label>
@@ -247,6 +280,7 @@ export function BusinessProfileSettings() {
             <Label>Call To Action</Label>
             <Input value={form.callToAction ?? ''} onChange={(e) => set('callToAction', e.target.value)} placeholder="How can we help you today?" />
           </div>
+          {!readOnly && (
           <Button
             className="bg-accent hover:bg-accent/90"
             onClick={() => saveMutation.mutate(form)}
@@ -254,9 +288,11 @@ export function BusinessProfileSettings() {
           >
             Save Business Profile
           </Button>
+          )}
         </CardContent>
       </Card>
 
+      {!readOnly && (
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
@@ -280,7 +316,9 @@ export function BusinessProfileSettings() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
+      {!readOnly && (
       <Dialog
         open={clearDialogOpen}
         onOpenChange={(open) => {
@@ -328,6 +366,7 @@ export function BusinessProfileSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

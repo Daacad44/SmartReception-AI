@@ -24,6 +24,8 @@ import messageTemplatesRoutes from '../modules/message-templates/message-templat
 import employeeCommsRoutes from '../modules/employee-comms/employee-comms.routes';
 import businessProfileRoutes from '../modules/business-profile/business-profile.routes';
 import onboardingRoutes from '../modules/onboarding/onboarding.routes';
+import governanceRoutes from '../modules/governance/governance.routes';
+import aiTrainingRoutes from '../modules/ai-training/ai-training.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -64,6 +66,8 @@ licensed.use('/message-templates', messageTemplatesRoutes);
 licensed.use('/employee-comms', employeeCommsRoutes);
 licensed.use('/business-profile', businessProfileRoutes);
 licensed.use('/onboarding', onboardingRoutes);
+licensed.use('/governance', governanceRoutes);
+licensed.use('/ai-training', aiTrainingRoutes);
 
 router.use('/billing', billingRoutes);
 router.use(licensed);

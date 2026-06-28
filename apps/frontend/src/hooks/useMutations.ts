@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
+import { parseMutationResponse } from '@/lib/governance';
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
@@ -438,9 +439,15 @@ export function useConnectWhatsApp() {
       accessToken: string;
     }) => {
       const response = await api.post('/whatsapp/accounts', data);
-      return extractData(response);
+      return parseMutationResponse(response);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        toast.info('Administrator approval required', {
+          description: 'Your WhatsApp connect request was submitted for review.',
+        });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
@@ -605,15 +612,26 @@ export function useUploadDocument() {
       const response = await api.post('/knowledge/documents/upload', formData, {
         timeout: 60000,
       });
-      const document = extractData<{ id: string }>(response);
+      const result = parseMutationResponse<{ id: string }>(response);
+      if (result.kind === 'approval') {
+        return result;
+      }
+      const document = result.data;
 
       // Trigger background processing (fire-and-forget, short timeout)
       api.post(`/knowledge/documents/${document.id}/process`, undefined, { timeout: 8000 }).catch(() => undefined);
 
-      return document;
+      return { kind: 'success' as const, data: document };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result && typeof result === 'object' && 'kind' in result && result.kind === 'approval') {
+        toast.info('Administrator approval required', {
+          description: 'Your upload request was submitted for Super Admin review.',
+        });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['knowledge'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-training'] });
       toast.success('Document uploaded — processing in background');
     },
     onError: (error) => {

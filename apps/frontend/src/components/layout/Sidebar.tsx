@@ -38,7 +38,7 @@ const navItems = [
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
   { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const },
-  { to: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
+  { to: '/ai-training', icon: BookOpen, label: 'AI Training' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
@@ -51,7 +51,7 @@ const adminNavItems = [
   { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const },
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const },
-  { to: '/admin/users', icon: UsersRound, label: 'User Management', permission: 'platform:admin' as const },
+  { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const },
 ];
 
 interface SidebarProps {

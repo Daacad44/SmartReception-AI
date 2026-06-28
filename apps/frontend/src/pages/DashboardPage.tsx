@@ -333,7 +333,7 @@ export function DashboardPage() {
               { label: 'View Inbox', icon: MessageSquare, to: '/conversations' },
               { label: 'Add Customer', icon: Users, to: '/customers' },
               { label: 'Schedule Appointment', icon: Calendar, to: '/appointments' },
-              { label: 'Upload Document', icon: Plus, to: '/knowledge' },
+              { label: 'Upload Document', icon: Plus, to: '/ai-training' },
             ].map((action) => (
               <Button key={action.label} variant="outline" className="w-full justify-start" asChild>
                 <Link to={action.to}>

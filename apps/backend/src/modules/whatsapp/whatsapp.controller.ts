@@ -4,7 +4,9 @@ import { logger } from '../../core/logger';
 import { connectWhatsAppSchema, updateWhatsAppAccountSchema } from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
 import { config } from '../../config';
-import { NotFoundError } from '../../core/errors';
+import { NotFoundError, ForbiddenError } from '../../core/errors';
+import { withGovernanceGuard } from '../governance/governance.helpers';
+import { getGovernanceCapabilities } from '../governance/plan-capabilities.service';
 
 export class WhatsAppController {
   async verify(req: Request, res: Response, next: NextFunction) {
@@ -157,6 +159,17 @@ export class WhatsAppController {
 
   async getWebhookInfo(req: Request, res: Response, next: NextFunction) {
     try {
+      const caps = await getGovernanceCapabilities(req.user!.businessId!);
+      if (caps.whatsappAccess === 'hidden' && !req.user!.isSuperAdmin) {
+        res.json({
+          success: true,
+          data: {
+            managedBySuperAdmin: true,
+            message: 'WhatsApp is configured by your platform administrator.',
+          },
+        });
+        return;
+      }
       res.json({
         success: true,
         data: {
@@ -173,6 +186,17 @@ export class WhatsAppController {
   async connectAccount(req: Request, res: Response, next: NextFunction) {
     try {
       const input = connectWhatsAppSchema.parse(req.body);
+      if (
+        await withGovernanceGuard(req, res, 'WHATSAPP_CONNECT', {
+          phoneNumberId: input.phoneNumberId,
+          phoneNumber: input.phoneNumber,
+          displayName: input.displayName,
+          wabaId: input.wabaId,
+          accessToken: input.accessToken,
+        })
+      ) {
+        return;
+      }
       const account = await whatsappModuleService.connectAccount(req.user!.businessId!, input);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
@@ -182,6 +206,9 @@ export class WhatsAppController {
 
   async connectFromEnv(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!req.user!.isSuperAdmin) {
+        throw new ForbiddenError('Environment-based WhatsApp connect is restricted to Super Admin');
+      }
       const account = await whatsappModuleService.connectFromEnv(req.user!.businessId!);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
@@ -215,6 +242,13 @@ export class WhatsAppController {
 
   async disconnectAccount(req: Request, res: Response, next: NextFunction) {
     try {
+      if (
+        await withGovernanceGuard(req, res, 'WHATSAPP_DISCONNECT', {
+          accountId: routeParam(req.params.id),
+        })
+      ) {
+        return;
+      }
       await whatsappModuleService.disconnectAccount(
         req.user!.businessId!,
         routeParam(req.params.id)

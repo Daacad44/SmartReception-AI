@@ -53,6 +53,8 @@ export interface PlanFeatureFlags {
   webhookAccess: boolean;
   multiBusiness: boolean;
   whiteLabel: boolean;
+  aiTrainingManage: boolean;
+  whatsappSelfService: boolean;
 }
 
 export const DEFAULT_FEATURE_FLAGS: PlanFeatureFlags = {
@@ -67,6 +69,8 @@ export const DEFAULT_FEATURE_FLAGS: PlanFeatureFlags = {
   webhookAccess: false,
   multiBusiness: false,
   whiteLabel: false,
+  aiTrainingManage: false,
+  whatsappSelfService: false,
 };
 
 export interface AssignSubscriptionInput {

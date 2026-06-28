@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api, { extractData } from '@/lib/api';
+import type { GovernanceCapabilities } from '@/lib/governance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +23,7 @@ import {
   useUpdateWhatsAppAccount,
 } from '@/hooks/useMutations';
 import { LoadingState } from '@/components/LoadingState';
-import { Copy, Trash2, Plug, Wifi, RefreshCw } from 'lucide-react';
+import { Copy, Trash2, Plug, Wifi, RefreshCw, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -43,6 +44,14 @@ function formatStatusLabel(status: string): string {
 export function WhatsAppSettings() {
   const queryClient = useQueryClient();
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const { data: governanceCaps } = useQuery({
+    queryKey: ['governance', 'capabilities'],
+    queryFn: async () => {
+      const response = await api.get('/governance/capabilities');
+      return extractData<GovernanceCapabilities>(response);
+    },
+  });
+  const whatsappManaged = governanceCaps?.whatsappAccess === 'hidden';
   const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } =
     useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
@@ -131,6 +140,33 @@ export function WhatsAppSettings() {
 
   if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
+  }
+
+  if (whatsappManaged) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            WhatsApp Managed by Administrator
+          </CardTitle>
+          <CardDescription>
+            On your {governanceCaps?.planCode ?? 'current'} plan, WhatsApp integration is configured
+            exclusively by your Super Administrator. Connection status is shown below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Badge variant={workspaceStatus === 'CONNECTED' ? 'success' : 'secondary'}>
+            {workspaceStatus === 'CONNECTED' ? 'Connected' : 'Not Connected'}
+          </Badge>
+          {activeAccount && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Number: {activeAccount.phoneNumber} · {activeAccount.displayName}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
   const handleSaveReengagementTemplate = async (e: React.FormEvent) => {
