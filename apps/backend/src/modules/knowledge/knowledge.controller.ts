@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { routeParam } from '../../core/utils';
 import { knowledgeService } from './knowledge.service';
 import { createFaqSchema, knowledgeSearchSchema } from '@smartreception/shared';
+import { withGovernanceGuard } from '../governance/governance.helpers';
 
 export class KnowledgeController {
   async listBases(req: Request, res: Response, next: NextFunction) {
@@ -26,6 +27,14 @@ export class KnowledgeController {
     try {
       if (!req.file) {
         res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+      if (
+        await withGovernanceGuard(req, res, 'AI_UPLOAD_DOCUMENT', {
+          title: req.body.title,
+          knowledgeBaseId: req.body.knowledgeBaseId,
+        }, { file: req.file })
+      ) {
         return;
       }
       const document = await knowledgeService.uploadDocument(
@@ -53,6 +62,9 @@ export class KnowledgeController {
   async createFaq(req: Request, res: Response, next: NextFunction) {
     try {
       const input = createFaqSchema.parse(req.body);
+      if (await withGovernanceGuard(req, res, 'AI_CREATE_FAQ', input)) {
+        return;
+      }
       const faq = await knowledgeService.createFaq(
         req.user!.businessId!,
         input,
@@ -67,6 +79,14 @@ export class KnowledgeController {
   async updateFaq(req: Request, res: Response, next: NextFunction) {
     try {
       const input = createFaqSchema.partial().parse(req.body);
+      if (
+        await withGovernanceGuard(req, res, 'AI_UPDATE_FAQ', {
+          documentId: routeParam(req.params.id),
+          ...input,
+        })
+      ) {
+        return;
+      }
       const faq = await knowledgeService.updateFaq(
         req.user!.businessId!,
         routeParam(req.params.id),
@@ -81,6 +101,13 @@ export class KnowledgeController {
 
   async deleteFaq(req: Request, res: Response, next: NextFunction) {
     try {
+      if (
+        await withGovernanceGuard(req, res, 'AI_DELETE_FAQ', {
+          documentId: routeParam(req.params.id),
+        })
+      ) {
+        return;
+      }
       await knowledgeService.deleteFaq(req.user!.businessId!, routeParam(req.params.id), req.user!.userId);
       res.json({ success: true, message: 'FAQ deleted successfully' });
     } catch (error) {
@@ -114,6 +141,13 @@ export class KnowledgeController {
 
   async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
+      if (
+        await withGovernanceGuard(req, res, 'AI_DELETE_DOCUMENT', {
+          documentId: routeParam(req.params.id),
+        })
+      ) {
+        return;
+      }
       await knowledgeService.deleteDocument(
         req.user!.businessId!,
         routeParam(req.params.id),
@@ -137,6 +171,9 @@ export class KnowledgeController {
 
   async clearKnowledgeBase(req: Request, res: Response, next: NextFunction) {
     try {
+      if (await withGovernanceGuard(req, res, 'AI_CLEAR_KNOWLEDGE', {})) {
+        return;
+      }
       const data = await knowledgeService.clearKnowledgeBase(
         req.user!.businessId!,
         req.user!.userId

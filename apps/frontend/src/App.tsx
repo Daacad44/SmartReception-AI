@@ -37,8 +37,8 @@ const CustomerImportPage = lazyWithRetry(() =>
 const AppointmentsPage = lazyWithRetry(() =>
   import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
 );
-const KnowledgeBasePage = lazyWithRetry(() =>
-  import('@/pages/KnowledgeBasePage').then((m) => ({ default: m.KnowledgeBasePage }))
+const AITrainingPage = lazyWithRetry(() =>
+  import('@/pages/AITrainingPage').then((m) => ({ default: m.AITrainingPage }))
 );
 const AnalyticsPage = lazyWithRetry(() =>
   import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
@@ -60,6 +60,9 @@ const AuditLogsPage = lazyWithRetry(() =>
 );
 const SuperAdminPage = lazyWithRetry(() =>
   import('@/pages/SuperAdminPage').then((m) => ({ default: m.SuperAdminPage }))
+);
+const GovernanceAdminPage = lazyWithRetry(() =>
+  import('@/pages/GovernanceAdminPage').then((m) => ({ default: m.GovernanceAdminPage }))
 );
 const BusinessManagementPage = lazyWithRetry(() =>
   import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
@@ -249,9 +252,13 @@ export default function App() {
                   />
                   <Route
                     path="/knowledge"
+                    element={<Navigate to="/ai-training" replace />}
+                  />
+                  <Route
+                    path="/ai-training"
                     element={
                       <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
-                        <KnowledgeBasePage />
+                        <AITrainingPage />
                       </PermissionRoute>
                     }
                   />
@@ -332,6 +339,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <SubscriptionManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/governance"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <GovernanceAdminPage />
                       </PermissionRoute>
                     }
                   />

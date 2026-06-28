@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { businessProfileService } from './business-profile.service';
 import { updateBusinessProfileSchema } from '@smartreception/shared';
+import { withGovernanceGuard } from '../governance/governance.helpers';
 
 export class BusinessProfileController {
   async get(req: Request, res: Response, next: NextFunction) {
@@ -15,6 +16,9 @@ export class BusinessProfileController {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const input = updateBusinessProfileSchema.parse(req.body);
+      if (await withGovernanceGuard(req, res, 'AI_UPDATE_PROFILE', input)) {
+        return;
+      }
       const data = await businessProfileService.update(req.user!.businessId!, input);
       res.json({ success: true, data });
     } catch (error) {
@@ -26,6 +30,17 @@ export class BusinessProfileController {
     try {
       if (!req.file) {
         res.status(400).json({ success: false, error: 'PDF file required' });
+        return;
+      }
+      if (
+        await withGovernanceGuard(
+          req,
+          res,
+          'AI_UPLOAD_PROFILE_PDF',
+          { filename: req.file.originalname },
+          { file: req.file }
+        )
+      ) {
         return;
       }
       const data = await businessProfileService.uploadPdf(
@@ -50,6 +65,9 @@ export class BusinessProfileController {
 
   async deletePdf(req: Request, res: Response, next: NextFunction) {
     try {
+      if (await withGovernanceGuard(req, res, 'AI_DELETE_PROFILE_PDF', {})) {
+        return;
+      }
       await businessProfileService.deletePdf(req.user!.businessId!);
       res.json({ success: true });
     } catch (error) {
@@ -59,6 +77,9 @@ export class BusinessProfileController {
 
   async clearProfile(req: Request, res: Response, next: NextFunction) {
     try {
+      if (await withGovernanceGuard(req, res, 'AI_CLEAR_PROFILE', {})) {
+        return;
+      }
       const data = await businessProfileService.clearProfile(req.user!.businessId!);
       res.json({ success: true, data });
     } catch (error) {

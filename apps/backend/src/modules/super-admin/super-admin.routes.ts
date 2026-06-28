@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { superAdminController } from './super-admin.controller';
+import { superAdminGovernanceController } from '../governance/governance.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { requireSuperAdmin } from '../../core/middleware/super-admin.middleware';
 
@@ -55,6 +56,16 @@ router.get('/employee-comms/stats', (req, res, next) =>
 );
 router.post('/employee-comms/broadcasts/:id/pause', (req, res, next) =>
   superAdminController.pauseEmployeeBroadcast(req, res, next)
+);
+
+router.get('/governance/requests', (req, res, next) =>
+  superAdminGovernanceController.listRequests(req, res, next)
+);
+router.post('/governance/requests/:id/approve', (req, res, next) =>
+  superAdminGovernanceController.approve(req, res, next)
+);
+router.post('/governance/requests/:id/reject', (req, res, next) =>
+  superAdminGovernanceController.reject(req, res, next)
 );
 
 export default router;

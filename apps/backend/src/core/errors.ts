@@ -66,3 +66,12 @@ export class WhatsAppDeliveryError extends AppError {
     super(502, message, 'WHATSAPP_DELIVERY_FAILED');
   }
 }
+
+export class GovernanceApprovalRequiredError extends AppError {
+  constructor(
+    message = 'Administrator approval required',
+    public requestId?: string
+  ) {
+    super(202, message, 'GOVERNANCE_APPROVAL_REQUIRED');
+  }
+}
