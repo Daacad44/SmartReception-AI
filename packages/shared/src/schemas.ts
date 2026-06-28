@@ -569,9 +569,7 @@ export const enrollJourneySchema = z.object({
 export const createMessageTemplateSchema = z.object({
   name: z.string().min(1).max(100),
   content: z.string().min(1).max(4096),
-  type: z
-    .enum(['PROMOTION', 'OFFER', 'ANNOUNCEMENT', 'REMINDER', 'FOLLOW_UP', 'HOLIDAY', 'MARKETING'])
-    .default('MARKETING'),
+  type: z.enum(CAMPAIGN_TYPES).default('MARKETING'),
   variables: z.array(z.string().max(50)).optional(),
   whatsappTemplateName: z.string().max(200).optional().nullable(),
   whatsappTemplateLanguage: z.string().max(20).optional().nullable(),
