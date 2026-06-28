@@ -16,6 +16,8 @@ export const registerSchema = z
     confirmPassword: z.string().min(8).max(128),
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
+    businessName: z.string().min(2).max(200),
+    phone: z.string().min(6).max(20),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -28,15 +30,38 @@ export const checkEmailSchema = z.object({
 
 export const onboardingBusinessInfoSchema = z.object({
   name: z.string().min(1).max(200),
-  industry: z.string().min(1),
-  businessType: z.string().min(1).max(200),
-  businessCategory: z.string().min(1).max(100),
-  phone: z.string().min(1).max(20),
-  whatsappNumber: z.string().min(1).max(20),
+  industry: z.string().min(1).optional(),
+  businessType: z.string().min(1).max(200).optional(),
+  businessCategory: z.string().min(1).max(100).optional(),
+  phone: z.string().min(6).max(20),
+  whatsappNumber: z.string().min(6).max(20).optional().or(z.literal('')),
   country: z.string().min(1).max(100),
   city: z.string().min(1).max(100),
   address: z.string().min(1).max(500),
   website: z.string().url().optional().or(z.literal('')),
+});
+
+export const onboardingDescriptionSchema = z.object({
+  description: z.string().min(10).max(5000),
+});
+
+export const onboardingServicesSchema = z.object({
+  services: z.array(z.string().min(1).max(200)).min(1),
+});
+
+export const onboardingWorkingHoursSchema = z.object({
+  workingHours: z.record(
+    z.string(),
+    z.object({
+      open: z.string().min(1),
+      close: z.string().min(1),
+      closed: z.boolean().optional(),
+    })
+  ),
+});
+
+export const onboardingLanguagesSchema = z.object({
+  languages: z.array(z.enum(['so', 'en', 'ar'])).min(1),
 });
 
 export const onboardingProfileSchema = z.object({
@@ -669,6 +694,10 @@ export const transferOwnershipSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type OnboardingBusinessInfoInput = z.infer<typeof onboardingBusinessInfoSchema>;
+export type OnboardingDescriptionInput = z.infer<typeof onboardingDescriptionSchema>;
+export type OnboardingServicesInput = z.infer<typeof onboardingServicesSchema>;
+export type OnboardingWorkingHoursInput = z.infer<typeof onboardingWorkingHoursSchema>;
+export type OnboardingLanguagesInput = z.infer<typeof onboardingLanguagesSchema>;
 export type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>;
 export type OnboardingDiscoveryInput = z.infer<typeof onboardingDiscoverySchema>;
 export type OnboardingPlanInput = z.infer<typeof onboardingPlanSchema>;

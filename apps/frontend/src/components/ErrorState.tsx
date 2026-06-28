@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface ErrorStateProps {
   title?: string;
   message?: string;
+  retryLabel?: string;
   onRetry?: () => void;
   className?: string;
 }
@@ -12,6 +13,7 @@ interface ErrorStateProps {
 export function ErrorState({
   title = 'Something went wrong',
   message = 'Failed to load data. Please try again.',
+  retryLabel = 'Try again',
   onRetry,
   className,
 }: ErrorStateProps) {
@@ -24,7 +26,7 @@ export function ErrorState({
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">{message}</p>
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>
-          Try again
+          {retryLabel}
         </Button>
       )}
     </div>

@@ -19,6 +19,13 @@ import {
 } from '../../infrastructure/auth/login-lockout.service';
 import { twoFactorService } from '../two-factor/two-factor.service';
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 export class AuthService {
   async register(input: RegisterInput) {
     const existing = await authRepository.findUserByEmail(input.email);
@@ -34,6 +41,8 @@ export class AuthService {
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
+      phone: input.phone,
+      pendingBusinessName: input.businessName,
       emailOtpHash: otpService.hashCode(otpCode),
       emailOtpExpires: otpService.getExpiry(),
       emailOtpAttempts: 0,
@@ -282,8 +291,29 @@ export class AuthService {
       emailOtpAttempts: 0,
     });
 
-    const memberships = await authRepository.getUserBusinesses(user.id);
-    const businessName = memberships[0]?.business.name ?? 'your business';
+    let memberships = await authRepository.getUserBusinesses(user.id);
+
+    if (memberships.length === 0) {
+      const freshUser = await authRepository.findUserById(user.id);
+      const businessName = freshUser?.pendingBusinessName?.trim();
+      if (businessName) {
+        let slug = slugify(businessName);
+        const existingSlug = await prisma.business.findUnique({ where: { slug } });
+        if (existingSlug) slug = `${slug}-${Date.now()}`;
+
+        await authRepository.createBusinessWithOwner(user.id, {
+          name: businessName,
+          slug,
+          phone: freshUser?.phone ?? undefined,
+          onboardingStep: 0,
+        });
+
+        await authRepository.updateUser(user.id, { pendingBusinessName: null });
+        memberships = await authRepository.getUserBusinesses(user.id);
+      }
+    }
+
+    const businessName = memberships[0]?.business.name ?? 'ganacsigaaga';
 
     await emailService.sendWelcomeEmail(user.email, {
       firstName: user.firstName,

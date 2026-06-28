@@ -17,6 +17,16 @@ export function requireValidLicense() {
       return;
     }
 
+    const { prisma } = await import('../../infrastructure/database/prisma');
+    const business = await prisma.business.findUnique({
+      where: { id: req.user.businessId },
+      select: { onboardingCompletedAt: true },
+    });
+    if (!business?.onboardingCompletedAt) {
+      next();
+      return;
+    }
+
     const result = await validateBusinessLicense(req.user.businessId);
     if (!result.valid) {
       const { SubscriptionExpiredError } = await import('../errors');
