@@ -40,6 +40,16 @@ export interface DashboardBundle {
   conversationSummary?: {
     unreadTotal: number;
     aiHandlingCount: number;
+    humanNeededCount?: number;
+  };
+  handoffMetrics?: {
+    aiResolved: number;
+    humanResolved: number;
+    transferred: number;
+    pendingHumanRequests: number;
+    customerSatisfaction: number;
+    aiSatisfaction: number;
+    topEmployees: Array<{ userId: string | null; name: string; handledCount: number }>;
   };
 }
 

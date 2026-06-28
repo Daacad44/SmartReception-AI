@@ -14,6 +14,9 @@ router.get('/', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
 router.get('/dashboard', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.dashboard(req, res, next)
 );
+router.get('/handoff-metrics', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
+  analyticsController.getHandoffMetrics(req, res, next)
+);
 router.get('/dashboard-bundle', authorize(PERMISSIONS['analytics:read']), (req, res, next) =>
   analyticsController.dashboardBundle(req, res, next)
 );

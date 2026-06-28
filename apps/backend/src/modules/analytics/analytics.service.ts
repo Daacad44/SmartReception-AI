@@ -34,17 +34,30 @@ export class AnalyticsService {
     return analyticsRepository.getTeamPerformance(businessId);
   }
 
+  async getHandoffMetrics(businessId: string) {
+    return analyticsRepository.getHandoffMetrics(businessId);
+  }
+
   async getDashboardBundle(businessId: string) {
-    const [stats, revenue, customerGrowth, trends, topServices, teamPerformance, conversationSummary] =
-      await Promise.all([
-        analyticsRepository.getDashboardStats(businessId),
-        analyticsRepository.getRevenueOverview(businessId),
-        analyticsRepository.getCustomerGrowth(businessId),
-        analyticsRepository.getConversationTrends(businessId, 30),
-        analyticsRepository.getTopServices(businessId),
-        analyticsRepository.getTeamPerformance(businessId),
-        conversationsRepository.getSummary(businessId),
-      ]);
+    const [
+      stats,
+      revenue,
+      customerGrowth,
+      trends,
+      topServices,
+      teamPerformance,
+      conversationSummary,
+      handoffMetrics,
+    ] = await Promise.all([
+      analyticsRepository.getDashboardStats(businessId),
+      analyticsRepository.getRevenueOverview(businessId),
+      analyticsRepository.getCustomerGrowth(businessId),
+      analyticsRepository.getConversationTrends(businessId, 30),
+      analyticsRepository.getTopServices(businessId),
+      analyticsRepository.getTeamPerformance(businessId),
+      conversationsRepository.getSummary(businessId),
+      analyticsRepository.getHandoffMetrics(businessId),
+    ]);
 
     return {
       stats,
@@ -54,6 +67,7 @@ export class AnalyticsService {
       topServices,
       teamPerformance,
       conversationSummary,
+      handoffMetrics,
     };
   }
 }

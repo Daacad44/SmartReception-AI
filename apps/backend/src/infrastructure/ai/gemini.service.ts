@@ -142,7 +142,10 @@ Respond in JSON only:
   "language": "${params.preferEnglish ? 'en' : 'so'}"
 }
 
-Action types: none, collect_lead, book_appointment, qualify_lead, escalate
+Action types: none, collect_lead, book_appointment, qualify_lead, escalate, request_feedback
+
+Use request_feedback when the customer's issue appears resolved and you want satisfaction confirmation before closing.
+Use escalate when the customer needs human support or you cannot help further.
 For collect_lead include data: { "fullName", "businessName", "phone", "email", "service", "complete": true|false }
 
 RULES:

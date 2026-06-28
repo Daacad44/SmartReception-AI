@@ -99,3 +99,48 @@ export async function notifyKnowledge(
     data: documentId ? { documentId } : undefined,
   });
 }
+
+export async function notifyHumanHandoff(params: {
+  businessId: string;
+  conversationId: string;
+  customerName: string;
+  title: string;
+  message: string;
+  urgent?: boolean;
+}): Promise<void> {
+  await createNotification({
+    businessId: params.businessId,
+    type: 'AI_ESCALATION',
+    title: params.title,
+    message: `${params.customerName}: ${params.message}`,
+    data: {
+      conversationId: params.conversationId,
+      urgent: params.urgent ?? true,
+      sound: true,
+      desktop: true,
+    },
+  });
+}
+
+export async function notifyConversationAssignment(params: {
+  businessId: string;
+  userId: string;
+  conversationId: string;
+  customerName: string;
+  title: string;
+  message: string;
+}): Promise<void> {
+  await createNotification({
+    businessId: params.businessId,
+    userId: params.userId,
+    type: 'TEAM',
+    title: params.title,
+    message: params.message,
+    data: {
+      conversationId: params.conversationId,
+      customerName: params.customerName,
+      sound: true,
+      desktop: true,
+    },
+  });
+}

@@ -32,6 +32,13 @@ import {
   persistPipelineTiming,
   updatePipelineContext,
 } from './message-pipeline.logger';
+import { detectHumanHandoffRequest } from '../conversations/human-request-detection.service';
+import { initiateHumanHandoff, shouldAiReply } from '../conversations/conversation-handoff.service';
+import {
+  handleFeedbackInbound,
+  handlePostFeedbackHumanOffer,
+} from '../conversations/conversation-feedback.service';
+import { logConversationActivity } from '../conversations/conversation-activity.service';
 
 export interface HandleIncomingMessageParams {
   businessId: string;
@@ -50,8 +57,14 @@ export interface HandleIncomingMessageParams {
   };
 }
 
-function shouldAiRespond(conversation: { isAiEnabled: boolean }): boolean {
-  return conversation.isAiEnabled;
+function shouldAiRespond(conversation: {
+  isAiEnabled: boolean;
+  status: string;
+}): boolean {
+  return shouldAiReply({
+    isAiEnabled: conversation.isAiEnabled,
+    status: conversation.status as import('@prisma/client').ConversationStatus,
+  });
 }
 
 export async function handleIncomingMessage(params: HandleIncomingMessageParams): Promise<void> {
@@ -117,6 +130,75 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     },
   });
   timings.messageSavedMs = Date.now() - startedAt;
+
+  void logConversationActivity({
+    businessId,
+    conversationId: conversation.id,
+    type: 'MESSAGE_RECEIVED',
+    title: 'Message received',
+    description: extracted.content?.slice(0, 200),
+  }).catch(() => undefined);
+
+  const feedbackHandled = await handleFeedbackInbound({
+    businessId,
+    conversationId: conversation.id,
+    message: extracted.content?.trim() ?? '',
+    phoneNumberId,
+    customerPhone: msg.from,
+    accessToken,
+  });
+
+  if (!feedbackHandled) {
+    const humanOfferHandled = await handlePostFeedbackHumanOffer({
+      businessId,
+      conversationId: conversation.id,
+      message: extracted.content?.trim() ?? '',
+    });
+    if (humanOfferHandled) {
+      logPipelineStep(pipelineKey, 'deferred_tasks_done');
+      persistPipelineTiming(message.id, { ...timings, totalMs: Date.now() - startedAt });
+      void runDeferredInboundTasks({
+        businessId,
+        conversationId: conversation.id,
+        messageId: message.id,
+        customerName: customer.name,
+        phoneNumberId,
+        whatsappMsgId: msg.id,
+        accessToken,
+        extracted,
+        pipelineKey,
+        startedAt,
+      });
+      return;
+    }
+  }
+
+  if (
+    !feedbackHandled &&
+    detectHumanHandoffRequest(extracted.content?.trim() ?? '') &&
+    shouldAiRespond(conversation)
+  ) {
+    await initiateHumanHandoff({
+      businessId,
+      conversationId: conversation.id,
+      reason: extracted.content?.trim() ?? 'Customer requested human support',
+    });
+    logPipelineStep(pipelineKey, 'deferred_tasks_done');
+    persistPipelineTiming(message.id, { ...timings, totalMs: Date.now() - startedAt });
+    void runDeferredInboundTasks({
+      businessId,
+      conversationId: conversation.id,
+      messageId: message.id,
+      customerName: customer.name,
+      phoneNumberId,
+      whatsappMsgId: msg.id,
+      accessToken,
+      extracted,
+      pipelineKey,
+      startedAt,
+    });
+    return;
+  }
 
   updatePipelineContext(pipelineKey, {
     conversationId: conversation.id,

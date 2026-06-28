@@ -38,6 +38,27 @@ router.post('/:id/handoff', authorize(PERMISSIONS['conversations:write']), (req,
 router.post('/:id/typing', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.sendTyping(req, res, next)
 );
+router.post('/:id/assign', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.assign(req, res, next)
+);
+router.post('/:id/transfer', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.transfer(req, res, next)
+);
+router.post('/:id/resolve', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.resolve(req, res, next)
+);
+router.post('/:id/close', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.close(req, res, next)
+);
+router.post('/:id/request-human', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
+  conversationsController.requestHuman(req, res, next)
+);
+router.get('/:id/activity', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.getActivity(req, res, next)
+);
+router.get('/:id/feedback', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.getFeedback(req, res, next)
+);
 router.patch('/:id/read', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.markAsRead(req, res, next)
 );
