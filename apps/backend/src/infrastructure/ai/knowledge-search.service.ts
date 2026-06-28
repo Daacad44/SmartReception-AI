@@ -2,9 +2,11 @@ import { prisma } from '../database/prisma';
 import { generateEmbedding, cosineSimilarity } from './embedding.service';
 import { getCachedBusinessProfile } from './business-tenant-cache.service';
 import { isSmartReceptionBusiness } from './smartreception-tenant';
+import type { TrainingSnapshot, TrainingSnapshotDocument } from '../../modules/ai-training-mgmt/quality.service';
 
 const KB_CACHE_TTL_MS = 60_000;
 const kbDocumentCache = new Map<string, { docs: CachedDoc[]; loadedAt: number }>();
+const versionCache = new Map<string, { docs: CachedDoc[]; loadedAt: number }>();
 
 type CachedDoc = {
   title: string;
@@ -14,6 +16,44 @@ type CachedDoc = {
   content: string | null;
   embedding: string | null;
 };
+
+function snapshotDocToCached(doc: TrainingSnapshotDocument): CachedDoc {
+  return {
+    title: doc.title,
+    type: doc.type,
+    question: doc.question,
+    answer: doc.answer,
+    content: doc.content,
+    embedding: doc.embedding,
+  };
+}
+
+async function loadProductionSnapshotDocuments(businessId: string): Promise<CachedDoc[] | null> {
+  const workspace = await prisma.aiTrainingWorkspace.findUnique({
+    where: { businessId },
+    include: { productionVersion: { select: { snapshotData: true } } },
+  });
+  if (!workspace?.productionVersion?.snapshotData) return null;
+  const snapshot = workspace.productionVersion.snapshotData as unknown as TrainingSnapshot;
+  return (snapshot.documents ?? []).map(snapshotDocToCached);
+}
+
+async function loadVersionSnapshotDocuments(versionId: string): Promise<CachedDoc[]> {
+  const cached = versionCache.get(versionId);
+  const now = Date.now();
+  if (cached && now - cached.loadedAt < KB_CACHE_TTL_MS) {
+    return cached.docs;
+  }
+
+  const version = await prisma.aiTrainingVersion.findUnique({
+    where: { id: versionId },
+    select: { snapshotData: true },
+  });
+  const snapshot = version?.snapshotData as unknown as TrainingSnapshot | null;
+  const docs = (snapshot?.documents ?? []).map(snapshotDocToCached);
+  versionCache.set(versionId, { docs, loadedAt: now });
+  return docs;
+}
 
 /** Somali/English service keywords → boost matching KB chunks (SmartReception platform only). */
 const SMARTRECEPTION_KEYWORD_BOOSTS: Array<{ pattern: RegExp; terms: string[] }> = [
@@ -62,34 +102,15 @@ export function invalidateKnowledgeCache(businessId: string): void {
   kbDocumentCache.delete(businessId);
 }
 
-function keywordBoost(query: string, text: string, boosts: Array<{ pattern: RegExp; terms: string[] }>): number {
-  let boost = 0;
-  const textLower = text.toLowerCase();
-  for (const { pattern, terms } of boosts) {
-    if (pattern.test(query)) {
-      for (const term of terms) {
-        if (textLower.includes(term.toLowerCase())) {
-          boost = Math.max(boost, 0.35);
-        }
-      }
-    }
-  }
-  return boost;
+export function invalidateVersionKnowledgeCache(versionId: string): void {
+  versionCache.delete(versionId);
 }
 
-async function resolveKeywordBoosts(businessId: string) {
-  const { business } = await getCachedBusinessProfile(businessId);
-  if (isSmartReceptionBusiness(business)) {
-    return SMARTRECEPTION_KEYWORD_BOOSTS;
-  }
-  return GENERIC_KEYWORD_BOOSTS;
-}
-
-/** Retrieve relevant knowledge chunks for AI context (semantic + keyword fallback). */
-export async function searchKnowledgeContext(businessId: string, query: string): Promise<string> {
-  const documents = await loadIndexedDocuments(businessId);
-  if (!documents.length) return '';
-
+async function scoreDocuments(
+  documents: CachedDoc[],
+  query: string,
+  businessId: string
+): Promise<string> {
   const boosts = await resolveKeywordBoosts(businessId);
   const queryLower = query.toLowerCase();
 
@@ -163,8 +184,50 @@ export async function searchKnowledgeContext(businessId: string, query: string):
   }
 
   const top = scored.sort((a, b) => b.score - a.score).slice(0, 8);
-
   if (!top.length) return '';
-
   return top.map((s) => `[${s.source}]\n${s.text}`).join('\n\n');
 }
+
+/** Search knowledge using a specific training version snapshot (sandbox). */
+export async function searchVersionKnowledgeContext(versionId: string, query: string): Promise<string> {
+  const documents = await loadVersionSnapshotDocuments(versionId);
+  if (!documents.length) return '';
+  const version = await prisma.aiTrainingVersion.findUnique({
+    where: { id: versionId },
+    select: { businessId: true },
+  });
+  if (!version) return '';
+  return scoreDocuments(documents, query, version.businessId);
+}
+
+function keywordBoost(query: string, text: string, boosts: Array<{ pattern: RegExp; terms: string[] }>): number {
+  let boost = 0;
+  const textLower = text.toLowerCase();
+  for (const { pattern, terms } of boosts) {
+    if (pattern.test(query)) {
+      for (const term of terms) {
+        if (textLower.includes(term.toLowerCase())) {
+          boost = Math.max(boost, 0.35);
+        }
+      }
+    }
+  }
+  return boost;
+}
+
+async function resolveKeywordBoosts(businessId: string) {
+  const { business } = await getCachedBusinessProfile(businessId);
+  if (isSmartReceptionBusiness(business)) {
+    return SMARTRECEPTION_KEYWORD_BOOSTS;
+  }
+  return GENERIC_KEYWORD_BOOSTS;
+}
+
+/** Retrieve relevant knowledge chunks for AI context (semantic + keyword fallback). */
+export async function searchKnowledgeContext(businessId: string, query: string): Promise<string> {
+  const productionDocs = await loadProductionSnapshotDocuments(businessId);
+  const documents = productionDocs ?? (await loadIndexedDocuments(businessId));
+  if (!documents.length) return '';
+  return scoreDocuments(documents, query, businessId);
+}
+

@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { aiTrainingService } from './ai-training.service';
+import { aiTrainingMgmtService } from '../ai-training-mgmt/ai-training-mgmt.service';
 
 export class AiTrainingController {
   async overview(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await aiTrainingService.getOverview(req.user!.businessId!);
+      const data = await aiTrainingMgmtService.getDashboard(req.user!.businessId!);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

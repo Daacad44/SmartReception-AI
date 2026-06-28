@@ -11,6 +11,8 @@ import {
   CampaignJourneyJobData,
   EmployeeBroadcastJobData,
   EmployeeBroadcastBatchJobData,
+  AiTrainingJobData,
+  AiDeploymentJobData,
 } from './infrastructure/queue/queues';
 import { processDocumentById } from './infrastructure/documents/document-processing.service';
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
@@ -27,6 +29,19 @@ import { scheduleJourneyStep } from './modules/campaigns/campaign-journey.servic
 import { executeEmployeeBroadcastSend } from './modules/employee-comms/employee-broadcasts.service';
 import { sendEmployeeBroadcastBatch } from './modules/employee-comms/employee-broadcast-batch.service';
 import { logger } from './core/logger';
+
+async function processAiTrainingJob(job: Job<AiTrainingJobData>): Promise<void> {
+  const { executeTrainingPipeline } = await import('./modules/ai-training-mgmt/training-pipeline.service');
+  await executeTrainingPipeline(job.data);
+}
+
+async function processAiDeploymentJob(job: Job<AiDeploymentJobData>): Promise<void> {
+  const { deploymentService } = await import('./modules/ai-training-mgmt/deployment.service');
+    await deploymentService.publishToProduction(job.data.requestId, job.data.userId, {
+    businessId: job.data.businessId,
+    userId: job.data.userId,
+  });
+}
 
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
   const { businessId, conversationId, messageId, customerMessage } = job.data;
@@ -146,6 +161,8 @@ async function startWorkers(): Promise<void> {
       processEmployeeBroadcastBatchJob,
       5
     ),
+    createWorker<AiTrainingJobData>(QUEUE_NAMES.AI_TRAINING, processAiTrainingJob, 2),
+    createWorker<AiDeploymentJobData>(QUEUE_NAMES.AI_DEPLOYMENT, processAiDeploymentJob, 1),
   ].filter(Boolean);
 
   if (workers.length === 0) {
