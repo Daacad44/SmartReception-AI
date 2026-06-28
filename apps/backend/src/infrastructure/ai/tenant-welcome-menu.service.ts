@@ -6,6 +6,8 @@ import {
 } from './business-profile-cache.service';
 import { buildProfileWelcomeMessage } from './business-profile-prompt.service';
 import { isPredominantlyEnglish } from './business-language.util';
+import { SMARTRECEPTION_SERVICE_MENU } from './somali-menu';
+import { isSmartReceptionBusiness } from './smartreception-tenant';
 
 const NUMBER_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'] as const;
 
@@ -47,6 +49,11 @@ function buildSomaliProfileSummary(profile: BusinessProfile, name: string): stri
 /** Somali welcome + company profile summary + numbered services menu for tenant businesses. */
 export async function buildTenantWelcomeMenu(businessId: string): Promise<string> {
   const profile = await getCachedBusinessProfile(businessId);
+
+  if (isSmartReceptionBusiness(profile.business)) {
+    return SMARTRECEPTION_SERVICE_MENU;
+  }
+
   const record =
     (await getCachedBusinessProfileRecord(businessId)) ?? (await ensureBusinessProfile(businessId));
   const name = resolveTenantDisplayName(record, profile.business.name);
@@ -80,6 +87,11 @@ export async function buildTenantWelcomeMenu(businessId: string): Promise<string
 /** Shorter profile-only welcome (fallback). */
 export async function buildTenantProfileWelcome(businessId: string): Promise<string> {
   const profile = await getCachedBusinessProfile(businessId);
+
+  if (isSmartReceptionBusiness(profile.business)) {
+    return SMARTRECEPTION_SERVICE_MENU;
+  }
+
   const record =
     (await getCachedBusinessProfileRecord(businessId)) ?? (await ensureBusinessProfile(businessId));
   return buildProfileWelcomeMessage(record, false, profile.business.name);

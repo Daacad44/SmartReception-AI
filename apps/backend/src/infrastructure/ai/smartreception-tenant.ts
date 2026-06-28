@@ -12,7 +12,12 @@ export function isSmartReceptionBusiness(
   }
 
   const slug = business.slug.toLowerCase();
-  return SMARTRECEPTION_SLUG_PATTERNS.some((pattern) => slug.includes(pattern));
+  if (SMARTRECEPTION_SLUG_PATTERNS.some((pattern) => slug.includes(pattern))) {
+    return true;
+  }
+
+  const name = business.name.toLowerCase();
+  return name.includes('smartreception') || name.includes('smart reception');
 }
 
 /** Detect stored copy that belongs to the SmartReception platform defaults. */
