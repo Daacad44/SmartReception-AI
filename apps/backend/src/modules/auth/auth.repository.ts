@@ -47,14 +47,16 @@ export class AuthRepository {
       onboardingStep?: number;
     }
   ): Promise<{ business: Business; membership: BusinessMember }> {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const business = await tx.business.create({
         data: {
           name: businessData.name,
           slug: businessData.slug,
           industry: (businessData.industry as never) || 'OTHER',
           phone: businessData.phone,
-          onboardingStep: businessData.onboardingStep ?? 1,
+          onboardingStep: businessData.onboardingStep ?? 0,
+          licenseStatus: 'TRIAL',
+          isLicenseLocked: false,
         },
       });
 
@@ -82,16 +84,12 @@ export class AuthRepository {
           data: {
             businessId: business.id,
             planId: freePlan.id,
-            status: 'ACTIVE',
+            status: 'TRIAL',
+            isTrial: true,
             paymentStatus: 'NOT_APPLICABLE',
           },
         });
       }
-
-      await tx.business.update({
-        where: { id: business.id },
-        data: { licenseStatus: 'TRIAL', isLicenseLocked: false },
-      });
 
       await tx.aIConfiguration.create({
         data: { businessId: business.id, languages: ['so', 'en'] },
@@ -104,12 +102,22 @@ export class AuthRepository {
         },
       });
 
-      await tx.aiTrainingWorkspace.create({
-        data: { businessId: business.id },
+      await tx.businessProfile.create({
+        data: {
+          businessId: business.id,
+          businessName: businessData.name,
+          phone: businessData.phone ?? null,
+        },
       });
 
       return { business, membership };
     });
+
+    await prisma.aiTrainingWorkspace
+      .create({ data: { businessId: result.business.id } })
+      .catch(() => undefined);
+
+    return result;
   }
 
   async getUserBusinesses(userId: string) {

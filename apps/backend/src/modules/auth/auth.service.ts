@@ -295,20 +295,26 @@ export class AuthService {
 
     if (memberships.length === 0) {
       const freshUser = await authRepository.findUserById(user.id);
-      const businessName = freshUser?.pendingBusinessName?.trim();
-      if (businessName) {
-        let slug = slugify(businessName);
-        const existingSlug = await prisma.business.findUnique({ where: { slug } });
-        if (existingSlug) slug = `${slug}-${Date.now()}`;
+      const businessName =
+        freshUser?.pendingBusinessName?.trim() ||
+        [freshUser?.firstName, freshUser?.lastName].filter(Boolean).join(' ').trim() ||
+        freshUser?.email.split('@')[0] ||
+        'Ganacsigayga';
 
+      let slug = slugify(businessName) || `business-${user.id.slice(0, 8)}`;
+      const existingSlug = await prisma.business.findUnique({ where: { slug } });
+      if (existingSlug) slug = `${slug}-${Date.now()}`;
+
+      try {
         await authRepository.createBusinessWithOwner(user.id, {
           name: businessName,
           slug,
           phone: freshUser?.phone ?? undefined,
           onboardingStep: 0,
         });
-
         await authRepository.updateUser(user.id, { pendingBusinessName: null });
+        memberships = await authRepository.getUserBusinesses(user.id);
+      } catch {
         memberships = await authRepository.getUserBusinesses(user.id);
       }
     }

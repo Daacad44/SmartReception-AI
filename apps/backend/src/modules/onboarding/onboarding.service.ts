@@ -43,27 +43,14 @@ export class OnboardingService {
     });
 
     if (!membership) {
-      if (user?.pendingBusinessName) {
-        await this.ensureBusinessForUser(userId);
-        const refreshed = await authRepository.getUserBusinesses(userId);
-        if (refreshed[0]) {
-          return this.buildStatus(refreshed[0], user);
-        }
+      await this.ensureBusinessForUser(userId);
+      const refreshed = await authRepository.getUserBusinesses(userId);
+      if (refreshed[0]) {
+        return this.buildStatus(refreshed[0], user);
       }
-      return {
-        completed: false,
-        currentStep: 0,
-        totalSteps: TOTAL_STEPS,
-        hasBusiness: false,
-        welcomeSeen: Boolean(user?.welcomeSeenAt),
-        business: null,
-        whatsappConnected: false,
-        whatsappStatus: 'NOT_CONNECTED' as WhatsAppStatus,
-        onboardingData: {},
-      };
+      throw new NotFoundError('Ganacsi lama abuuri karin. Fadlan mar kale isku day.');
     }
 
-    const business = membership.business;
     return this.buildStatus(membership, user);
   }
 
@@ -125,20 +112,38 @@ export class OnboardingService {
   }
 
   private async ensureBusinessForUser(userId: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.pendingBusinessName) return;
+    const existing = await authRepository.getUserBusinesses(userId);
+    if (existing[0]) return;
 
-    let slug = slugify(user.pendingBusinessName);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundError('User not found');
+
+    const businessName =
+      user.pendingBusinessName?.trim() ||
+      [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+      user.email.split('@')[0] ||
+      'Ganacsigayga';
+
+    let slug = slugify(businessName) || `business-${userId.slice(0, 8)}`;
     const existingSlug = await prisma.business.findUnique({ where: { slug } });
     if (existingSlug) slug = `${slug}-${Date.now()}`;
 
-    await authRepository.createBusinessWithOwner(userId, {
-      name: user.pendingBusinessName,
-      slug,
-      phone: user.phone ?? undefined,
-      onboardingStep: 0,
-    });
-    await prisma.user.update({ where: { id: userId }, data: { pendingBusinessName: null } });
+    try {
+      await authRepository.createBusinessWithOwner(userId, {
+        name: businessName,
+        slug,
+        phone: user.phone ?? undefined,
+        onboardingStep: 0,
+      });
+    } catch (error) {
+      const retry = await authRepository.getUserBusinesses(userId);
+      if (retry[0]) return;
+      throw error;
+    }
+
+    await prisma.user
+      .update({ where: { id: userId }, data: { pendingBusinessName: null } })
+      .catch(() => undefined);
   }
 
   private async getOwnerBusiness(userId: string) {
