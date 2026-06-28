@@ -36,9 +36,34 @@ export interface Conversation {
   lastMessage: string;
   lastMessageAt: string;
   unreadCount: number;
-  status: 'open' | 'pending' | 'resolved' | 'ai_handling';
+  status:
+    | 'open'
+    | 'pending'
+    | 'resolved'
+    | 'ai_handling'
+    | 'human_needed'
+    | 'human_handling'
+    | 'waiting_for_customer'
+    | 'closed'
+    | 'escalated'
+    | 'transferred';
   assignedTo?: string;
+  assignedToId?: string;
+  assignedTeam?: string | null;
+  aiConfidenceScore?: number | null;
+  awaitingFeedback?: boolean;
+  resolutionMethod?: string | null;
+  hasFeedback?: boolean;
   tags: string[];
+}
+
+export interface ConversationActivity {
+  id: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  createdAt: string;
+  actorUser?: { firstName: string; lastName: string } | null;
 }
 
 export interface Message {

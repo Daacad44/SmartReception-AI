@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Send,
   MoreVertical,
   Bot,
   User,
-  Phone,
   Tag,
   CheckCheck,
   Calendar,
@@ -32,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversations, useMessages, useConversationTemplates } from '@/hooks/useApi';
-import { useSendMessage, useTakeoverConversation, useMarkConversationRead, useTransferToAi } from '@/hooks/useMutations';
+import { useSendMessage, useTakeoverConversation, useMarkConversationRead } from '@/hooks/useMutations';
 import { useConversationRealtime } from '@/hooks/useRealtime';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
@@ -40,6 +39,13 @@ import { ErrorState } from '@/components/ErrorState';
 import { cn, getInitials, formatRelativeTime, formatMessagePreview } from '@/lib/utils';
 import { isNetworkOrTimeoutError } from '@/lib/api';
 import type { Message } from '@/lib/entities';
+import type { Conversation } from '@/lib/entities';
+import {
+  CONVERSATION_STATUS_COLORS,
+  CONVERSATION_STATUS_FILTERS,
+  getStatusLabel,
+} from '@/lib/conversation-status';
+import { ConversationHandoffPanel } from '@/components/conversations/ConversationHandoffPanel';
 
 function messageStatusLabel(status: Message['status']): string {
   switch (status) {
@@ -55,19 +61,10 @@ function messageStatusLabel(status: Message['status']): string {
       return 'Message sent';
   }
 }
-import type { Conversation } from '@/lib/entities';
-
-const statusColors: Record<string, string> = {
-  open: 'bg-warning/10 text-warning border-warning/20',
-  pending: 'bg-accent/10 text-accent border-accent/20',
-  resolved: 'bg-success/10 text-success border-success/20',
-  ai_handling: 'bg-primary/10 text-primary border-primary/20',
-};
-
-const statusFilters = ['all', 'open', 'pending', 'ai_handling', 'resolved'] as const;
 
 export function ConversationsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -92,10 +89,19 @@ export function ConversationsPage() {
   const sessionClosed = whatsappSession != null && !whatsappSession.isOpen;
   const sendMessage = useSendMessage();
   const takeover = useTakeoverConversation();
-  const transferToAi = useTransferToAi();
   const markRead = useMarkConversationRead();
 
   useConversationRealtime(selectedId);
+
+  useEffect(() => {
+    const conversationParam = searchParams.get('conversation');
+    if (conversationParam) {
+      setSelectedId(conversationParam);
+      setMobilePane('chat');
+      markRead.mutate(conversationParam);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, markRead]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -156,19 +162,19 @@ export function ConversationsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex gap-1 overflow-x-auto">
-            {statusFilters.map((s) => (
+          <div className="flex gap-1 overflow-x-auto pb-1">
+            {CONVERSATION_STATUS_FILTERS.map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={cn(
-                  'rounded-full px-2.5 py-1 text-xs font-medium capitalize whitespace-nowrap transition-colors',
+                  'rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors',
                   statusFilter === s
                     ? 'bg-accent text-white'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 )}
               >
-                {s === 'ai_handling' ? 'AI' : s}
+                {s === 'all' ? 'All' : getStatusLabel(s)}
               </button>
             ))}
           </div>
@@ -224,8 +230,8 @@ export function ConversationsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={statusColors[selected.status]}>
-                  {selected.status.replace('_', ' ')}
+                <Badge className={CONVERSATION_STATUS_COLORS[selected.status] ?? ''}>
+                  {getStatusLabel(selected.status)}
                 </Badge>
                 {isTyping && (
                   <span className="text-xs text-muted-foreground animate-pulse">Agent typing...</span>
@@ -508,34 +514,7 @@ export function ConversationsPage() {
             <Separator className="my-4" />
 
             <div className="space-y-4">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Contact Info</p>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  {selected.customerPhone}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Status</p>
-                <Badge className={statusColors[selected.status]}>
-                  {selected.status.replace('_', ' ')}
-                </Badge>
-              </div>
-
-              {selected.assignedTo && (
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Assigned To</p>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-navy text-white text-[10px]">
-                        {getInitials(selected.assignedTo)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{selected.assignedTo}</span>
-                  </div>
-                </div>
-              )}
+              <ConversationHandoffPanel conversation={selected} conversationId={selected.id} />
 
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Tags</p>
@@ -569,16 +548,6 @@ export function ConversationsPage() {
                   >
                     <User className="mr-2 h-4 w-4" />
                     View Customer Profile
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => selectedId && transferToAi.mutate(selectedId)}
-                    disabled={selected.status === 'ai_handling'}
-                  >
-                    <Bot className="mr-2 h-4 w-4" />
-                    Transfer to AI
                   </Button>
                 </div>
               </div>
@@ -633,7 +602,15 @@ function ConversationItem({
             </Badge>
           )}
           {conversation.status === 'ai_handling' && (
-            <Bot className="h-3 w-3 text-success" />
+            <Bot className="h-3 w-3 text-blue-500" />
+          )}
+          {conversation.status === 'human_needed' && (
+            <Badge className="h-4 px-1 text-[9px] bg-orange-500/15 text-orange-600 border-orange-500/20">
+              Human
+            </Badge>
+          )}
+          {conversation.status === 'human_handling' && (
+            <User className="h-3 w-3 text-green-600" />
           )}
         </div>
       </div>

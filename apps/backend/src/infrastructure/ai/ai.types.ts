@@ -7,7 +7,7 @@ export interface AIResponse {
 }
 
 export interface AIAction {
-  type: 'book_appointment' | 'qualify_lead' | 'collect_lead' | 'escalate' | 'none';
+  type: 'book_appointment' | 'qualify_lead' | 'collect_lead' | 'escalate' | 'request_feedback' | 'none';
   data?: Record<string, unknown>;
 }
 

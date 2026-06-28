@@ -26,6 +26,7 @@ export function useBusinessRealtime(userId?: string | null) {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         if (convId) {
           queryClient.invalidateQueries({ queryKey: ['messages', convId] });
+          queryClient.invalidateQueries({ queryKey: ['conversation-activity', convId] });
         }
       })
       .on('broadcast', { event: 'business_update' }, (payload) => {

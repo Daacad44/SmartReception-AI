@@ -80,6 +80,15 @@ export class AnalyticsController {
     }
   }
 
+  async getHandoffMetrics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await analyticsService.getHandoffMetrics(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async whatsapp(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await analyticsService.getWhatsAppAnalytics(req.user!.businessId!);

@@ -113,6 +113,8 @@ export function DashboardPage() {
   const topServices = bundle?.topServices;
   const teamPerf = bundle?.teamPerformance;
   const aiHandlingCount = bundle?.conversationSummary?.aiHandlingCount ?? 0;
+  const humanNeededCount = bundle?.conversationSummary?.humanNeededCount ?? 0;
+  const handoff = bundle?.handoffMetrics;
   const maxBookings = topServices?.[0]?.bookingCount ?? 1;
 
   if (isError && !bundle) {
@@ -173,6 +175,56 @@ export function DashboardPage() {
           </>
         )}
       </div>
+
+      {handoff && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI + Human Handoff</CardTitle>
+            <CardDescription>Support performance over the last 30 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">AI Resolved</p>
+                <p className="mt-1 text-2xl font-bold">{handoff.aiResolved}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Human Resolved</p>
+                <p className="mt-1 text-2xl font-bold">{handoff.humanResolved}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Transferred</p>
+                <p className="mt-1 text-2xl font-bold">{handoff.transferred}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Pending Human Requests</p>
+                <p className="mt-1 text-2xl font-bold text-orange-600">{handoff.pendingHumanRequests}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Customer Satisfaction</p>
+                <p className="mt-1 text-xl font-semibold">{handoff.customerSatisfaction}/5</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground mb-2">Top Employees</p>
+                {handoff.topEmployees.length ? (
+                  <ul className="space-y-1 text-sm">
+                    {handoff.topEmployees.map((employee) => (
+                      <li key={employee.userId ?? employee.name} className="flex justify-between">
+                        <span>{employee.name}</span>
+                        <span className="text-muted-foreground">{employee.handledCount}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No assignments yet</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -392,6 +444,11 @@ export function DashboardPage() {
             <div className="rounded-lg bg-muted p-3">
               <p className="text-xs text-muted-foreground">
                 AI is actively handling {aiHandlingCount} conversation{aiHandlingCount !== 1 ? 's' : ''}.
+                {humanNeededCount > 0 && (
+                  <span className="block mt-1 text-orange-600">
+                    {humanNeededCount} conversation{humanNeededCount !== 1 ? 's' : ''} need human attention.
+                  </span>
+                )}
                 Resolution rate: {stats?.aiResolutionRate ?? 0}%
               </p>
             </div>

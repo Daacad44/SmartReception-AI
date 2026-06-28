@@ -15,6 +15,16 @@ import {
 } from '../whatsapp/whatsapp-session.service';
 import { resolveConversationTemplateSend } from '../whatsapp/conversation-template.service';
 import { logger } from '../../core/logger';
+import { listConversationActivities } from './conversation-activity.service';
+import {
+  assignConversation,
+  closeConversation,
+  initiateHumanHandoff,
+  resolveConversation,
+  transferConversation,
+} from './conversation-handoff.service';
+import { getConversationFeedback } from './conversation-feedback.service';
+import type { ConversationTeam } from '@prisma/client';
 
 export class ConversationsService {
   async list(
@@ -253,13 +263,13 @@ export class ConversationsService {
     return conversationsRepository.markAsRead(businessId, conversationId);
   }
 
-  async transferToAi(businessId: string, conversationId: string) {
+  async transferToAi(businessId: string, conversationId: string, actorUserId: string) {
     const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
 
-    return conversationsRepository.transferToAi(businessId, conversationId);
+    return conversationsRepository.transferToAi(businessId, conversationId, actorUserId);
   }
 
   async handoffToHuman(businessId: string, conversationId: string, userId: string) {
@@ -297,6 +307,106 @@ export class ConversationsService {
     });
 
     return { sent: true };
+  }
+
+  async assign(
+    businessId: string,
+    conversationId: string,
+    assigneeId: string,
+    actorUserId: string,
+    team?: ConversationTeam | null
+  ) {
+    const result = await assignConversation({
+      businessId,
+      conversationId,
+      assigneeId,
+      team,
+      actorUserId,
+    });
+    if (!result) {
+      throw new NotFoundError('Conversation or assignee not found');
+    }
+    return result;
+  }
+
+  async transfer(
+    businessId: string,
+    conversationId: string,
+    actorUserId: string,
+    assigneeId?: string | null,
+    team?: ConversationTeam | null
+  ) {
+    const result = await transferConversation({
+      businessId,
+      conversationId,
+      actorUserId,
+      assigneeId,
+      team,
+    });
+    if (!result) {
+      throw new NotFoundError('Conversation not found');
+    }
+    return result;
+  }
+
+  async resolve(businessId: string, conversationId: string, actorUserId: string) {
+    const conversation = await conversationsRepository.findById(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return resolveConversation({
+      businessId,
+      conversationId,
+      actorUserId,
+      resolutionMethod: conversation.assignedToId ? 'HUMAN' : 'AI',
+    });
+  }
+
+  async close(businessId: string, conversationId: string, actorUserId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return closeConversation({ businessId, conversationId, actorUserId });
+  }
+
+  async requestHuman(
+    businessId: string,
+    conversationId: string,
+    actorUserId: string,
+    reason?: string
+  ) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return initiateHumanHandoff({
+      businessId,
+      conversationId,
+      reason: reason ?? 'Human support requested by team',
+      actorUserId,
+    });
+  }
+
+  async getActivity(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return listConversationActivities(businessId, conversationId);
+  }
+
+  async getFeedback(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    return getConversationFeedback(businessId, conversationId);
   }
 }
 

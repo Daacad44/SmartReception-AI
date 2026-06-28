@@ -173,8 +173,44 @@ enum SubscriptionNotificationStatus {
 enum ConversationStatus {
   OPEN
   PENDING
+  AI_HANDLING
+  HUMAN_NEEDED
+  HUMAN_HANDLING
+  WAITING_FOR_CUSTOMER
   RESOLVED
   CLOSED
+  ESCALATED
+  TRANSFERRED
+}
+
+enum ConversationTeam {
+  SUPPORT
+  SALES
+  TECHNICAL
+  GENERAL
+}
+
+enum ResolutionMethod {
+  AI
+  HUMAN
+  UNRESOLVED
+}
+
+enum ConversationActivityType {
+  CREATED
+  AI_STARTED
+  CUSTOMER_REQUESTED_HUMAN
+  TRANSFERRED
+  ASSIGNED
+  TAKEOVER
+  RETURNED_TO_AI
+  RESOLVED
+  CLOSED
+  FEEDBACK_SUBMITTED
+  FEEDBACK_PROMPTED
+  STATUS_CHANGED
+  ESCALATED
+  MESSAGE_RECEIVED
 }
 
 enum MessageDirection {
@@ -457,6 +493,8 @@ model Business {
   customers         Customer[]
   customerTags      CustomerTag[]
   conversations     Conversation[]
+  conversationActivities ConversationActivity[]
+  conversationFeedback ConversationFeedback[]
   appointments      Appointment[]
   appointmentNotifications AppointmentNotification[]
   services          Service[]
@@ -529,6 +567,7 @@ model User {
   refreshTokens       RefreshToken[]
   sentMessages        Message[]          @relation("SentByUser")
   assignedConversations Conversation[]   @relation("AssignedAgent")
+  conversationActivities ConversationActivity[] @relation("ConversationActivityActor")
   assignedAppointments Appointment[]     @relation("AssignedStaff")
   appointmentNotes    AppointmentInternalNote[] @relation("AppointmentNoteAuthor")
   createdAppointments Appointment[]           @relation("AppointmentCreator")
@@ -699,13 +738,21 @@ model Conversation {
   businessId      String
   customerId      String
   whatsappAccountId String?
-  status          ConversationStatus @default(OPEN)
+  status          ConversationStatus @default(AI_HANDLING)
   assignedToId    String?
+  assignedTeam    ConversationTeam?
   isAiEnabled     Boolean            @default(true)
   isTyping        Boolean            @default(false)
   unreadCount     Int                @default(0)
   lastMessageAt   DateTime?
   resolvedAt      DateTime?
+  aiStartTime     DateTime?
+  humanStartTime  DateTime?
+  transferTime    DateTime?
+  aiConfidenceScore Float?
+  resolutionMethod ResolutionMethod?
+  awaitingFeedback Boolean           @default(false)
+  feedbackPromptedAt DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -714,12 +761,15 @@ model Conversation {
   whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id])
   assignedTo      User?            @relation("AssignedAgent", fields: [assignedToId], references: [id])
   messages        Message[]
+  activities      ConversationActivity[]
+  feedback        ConversationFeedback[]
 
   @@index([businessId])
   @@index([businessId, status])
   @@index([businessId, lastMessageAt])
   @@index([businessId, assignedToId])
   @@index([businessId, customerId, status])
+  @@index([businessId, assignedTeam])
   @@index([customerId])
   @@index([assignedToId])
   @@map("conversations")
@@ -748,6 +798,47 @@ model Message {
   @@index([whatsappMsgId])
   @@index([direction])
   @@map("messages")
+}
+
+model ConversationActivity {
+  id             String                   @id @default(uuid())
+  businessId     String
+  conversationId String
+  type           ConversationActivityType
+  title          String
+  description    String?
+  actorUserId    String?
+  metadata       Json?
+  createdAt      DateTime                 @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actorUser    User?        @relation("ConversationActivityActor", fields: [actorUserId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([businessId, createdAt])
+  @@map("conversation_activities")
+}
+
+model ConversationFeedback {
+  id                String            @id @default(uuid())
+  businessId        String
+  conversationId    String
+  rating            Int?
+  helpful           Boolean?
+  resolutionMethod  ResolutionMethod?
+  resolutionTimeMs  Int?
+  employeeName      String?
+  aiConfidenceScore Float?
+  comment           String?
+  createdAt         DateTime          @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([businessId, createdAt])
+  @@map("conversation_feedback")
 }
 
 // ─── APPOINTMENTS & SERVICES ─────────────────────────────────────────────────

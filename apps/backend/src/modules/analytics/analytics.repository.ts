@@ -582,6 +582,121 @@ export class AnalyticsRepository {
 
     return performance.sort((a, b) => b.conversationCount - a.conversationCount);
   }
+
+  async getHandoffMetrics(businessId: string) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [
+      aiResolved,
+      humanResolved,
+      transferred,
+      pendingHuman,
+      feedbackAgg,
+      avgAiResponse,
+      avgHumanResponse,
+    ] = await Promise.all([
+      prisma.conversation.count({
+        where: {
+          businessId,
+          status: 'RESOLVED',
+          resolutionMethod: 'AI',
+          resolvedAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          status: 'RESOLVED',
+          resolutionMethod: 'HUMAN',
+          resolvedAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: {
+          businessId,
+          status: { in: ['TRANSFERRED', 'HUMAN_NEEDED', 'ESCALATED'] },
+          transferTime: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.conversation.count({
+        where: { businessId, status: 'HUMAN_NEEDED' },
+      }),
+      prisma.conversationFeedback.aggregate({
+        where: { businessId, createdAt: { gte: thirtyDaysAgo } },
+        _avg: { rating: true },
+        _count: { id: true },
+      }),
+      prisma.message.aggregate({
+        where: {
+          conversation: { businessId },
+          isAiGenerated: true,
+          direction: 'OUTBOUND',
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _count: { id: true },
+      }),
+      prisma.message.aggregate({
+        where: {
+          conversation: { businessId },
+          isAiGenerated: false,
+          direction: 'OUTBOUND',
+          sentByUserId: { not: null },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const totalFeedback = feedbackAgg._count.id;
+    const customerSatisfaction = feedbackAgg._avg.rating
+      ? Math.round(feedbackAgg._avg.rating * 10) / 10
+      : 0;
+
+    const topEmployees = await prisma.conversation.groupBy({
+      by: ['assignedToId'],
+      where: {
+        businessId,
+        assignedToId: { not: null },
+        status: { in: ['RESOLVED', 'CLOSED', 'HUMAN_HANDLING'] },
+        updatedAt: { gte: thirtyDaysAgo },
+      },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 5,
+    });
+
+    const employeeIds = topEmployees
+      .map((row) => row.assignedToId)
+      .filter((id): id is string => Boolean(id));
+    const users = employeeIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: employeeIds } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return {
+      aiResolved,
+      humanResolved,
+      transferred,
+      pendingHumanRequests: pendingHuman,
+      customerSatisfaction,
+      aiSatisfaction: customerSatisfaction,
+      totalFeedback,
+      avgAiMessages: avgAiResponse._count.id,
+      avgHumanMessages: avgHumanResponse._count.id,
+      topEmployees: topEmployees.map((row) => {
+        const user = row.assignedToId ? userMap.get(row.assignedToId) : undefined;
+        return {
+          userId: row.assignedToId,
+          name: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+          handledCount: row._count.id,
+        };
+      }),
+    };
+  }
 }
 
 export const analyticsRepository = new AnalyticsRepository();

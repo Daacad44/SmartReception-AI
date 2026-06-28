@@ -15,6 +15,7 @@ import { buildDefaultLeadThankYou } from '../../infrastructure/ai/smartreception
 import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenant-cache.service';
 import type { LeadData } from '../../infrastructure/ai/ai.types';
 import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
+import { shouldAiReply } from '../conversations/conversation-handoff.service';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -103,7 +104,7 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     include: { customer: true, whatsappAccount: true },
   });
 
-  if (!conversation || !conversation.isAiEnabled) {
+  if (!conversation || !shouldAiReply({ isAiEnabled: conversation.isAiEnabled, status: conversation.status })) {
     logger.debug(`Skipping AI reply for conversation ${conversationId}`);
     return;
   }
@@ -190,7 +191,11 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
 
   void prisma.conversation.update({
     where: conversationScope(conversationId, businessId),
-    data: { isTyping: false, lastMessageAt: new Date() },
+    data: {
+      isTyping: false,
+      lastMessageAt: new Date(),
+      aiConfidenceScore: aiResponse.confidence,
+    },
   });
 
   void broadcastConversationEvent(businessId, { conversationId, type: 'message' }).catch(
@@ -211,9 +216,23 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   }
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {
-    await prisma.conversation.update({
-      where: conversationScope(conversationId, businessId),
-      data: { isAiEnabled: false, status: 'PENDING' },
+    const { initiateHumanHandoff } = await import('../conversations/conversation-handoff.service');
+    await initiateHumanHandoff({
+      businessId,
+      conversationId,
+      reason: 'AI escalated conversation to human support',
+    });
+  }
+
+  if (aiResponse.actions.some((a) => a.type === 'request_feedback')) {
+    const { sendFeedbackPrompt } = await import('../conversations/conversation-feedback.service');
+    await sendFeedbackPrompt({
+      businessId,
+      conversationId,
+      phoneNumberId,
+      customerPhone,
+      accessToken,
+      preferSomali: aiResponse.language === 'so',
     });
   }
 

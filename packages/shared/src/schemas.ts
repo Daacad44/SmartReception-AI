@@ -269,6 +269,16 @@ export const sendMessageSchema = z
     message: 'Message content or templateId is required',
   });
 
+export const conversationAssignSchema = z.object({
+  assigneeId: z.string().uuid(),
+  team: z.enum(['SUPPORT', 'SALES', 'TECHNICAL', 'GENERAL']).optional().nullable(),
+});
+
+export const conversationTransferSchema = z.object({
+  assigneeId: z.string().uuid().optional().nullable(),
+  team: z.enum(['SUPPORT', 'SALES', 'TECHNICAL', 'GENERAL']).optional().nullable(),
+});
+
 export const inviteTeamMemberSchema = z.object({
   email: z.string().email(),
   role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF']),
@@ -671,6 +681,8 @@ export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type ConversationAssignInput = z.infer<typeof conversationAssignSchema>;
+export type ConversationTransferInput = z.infer<typeof conversationTransferSchema>;
 export type InviteTeamMemberInput = z.infer<typeof inviteTeamMemberSchema>;
 export type UpdateTeamMemberInput = z.infer<typeof updateTeamMemberSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;

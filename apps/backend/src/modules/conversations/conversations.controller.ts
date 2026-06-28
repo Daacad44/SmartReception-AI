@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { routeParam } from '../../core/utils';
 import { conversationsService } from './conversations.service';
-import { paginationSchema, sendMessageSchema } from '@smartreception/shared';
+import { paginationSchema, sendMessageSchema, conversationAssignSchema, conversationTransferSchema } from '@smartreception/shared';
 
 export class ConversationsController {
   async list(req: Request, res: Response, next: NextFunction) {
@@ -106,7 +106,8 @@ export class ConversationsController {
     try {
       const conversation = await conversationsService.transferToAi(
         req.user!.businessId!,
-        routeParam(req.params.id)
+        routeParam(req.params.id),
+        req.user!.userId
       );
       res.json({ success: true, data: conversation });
     } catch (error) {
@@ -134,6 +135,103 @@ export class ConversationsController {
         routeParam(req.params.id)
       );
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async assign(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = conversationAssignSchema.parse(req.body);
+      const conversation = await conversationsService.assign(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        input.assigneeId,
+        req.user!.userId,
+        input.team
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async transfer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = conversationTransferSchema.parse(req.body);
+      const conversation = await conversationsService.transfer(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId,
+        input.assigneeId,
+        input.team
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resolve(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.resolve(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async close(req: Request, res: Response, next: NextFunction) {
+    try {
+      const conversation = await conversationsService.close(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async requestHuman(req: Request, res: Response, next: NextFunction) {
+    try {
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+      const conversation = await conversationsService.requestHuman(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId,
+        reason
+      );
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getActivity(req: Request, res: Response, next: NextFunction) {
+    try {
+      const activities = await conversationsService.getActivity(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: activities });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getFeedback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const feedback = await conversationsService.getFeedback(
+        req.user!.businessId!,
+        routeParam(req.params.id)
+      );
+      res.json({ success: true, data: feedback });
     } catch (error) {
       next(error);
     }

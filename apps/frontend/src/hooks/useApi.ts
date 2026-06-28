@@ -31,6 +31,11 @@ import type {
   TopService,
   TeamPerformance,
 } from '@/lib/types';
+import {
+  mapDbConversationStatus,
+  toApiConversationStatus,
+} from '@/lib/conversation-status';
+import type { ConversationActivity } from '@/lib/entities';
 
 export { isInitialLoading };
 
@@ -41,10 +46,9 @@ function mapConversationStatus(
   isAiEnabled?: boolean,
   assignedToId?: string | null
 ): Conversation['status'] {
-  if (status === 'PENDING') return 'pending';
-  if (status === 'RESOLVED' || status === 'CLOSED') return 'resolved';
   if (status === 'OPEN' && isAiEnabled && !assignedToId) return 'ai_handling';
-  return 'open';
+  if (status === 'OPEN' && assignedToId) return 'human_handling';
+  return mapDbConversationStatus(status);
 }
 
 function mapMessageStatus(status: string | null | undefined): Message['status'] {
@@ -105,6 +109,12 @@ export function transformConversation(raw: any): Conversation {
     unreadCount: raw.unreadCount ?? 0,
     status: mapConversationStatus(raw.status, raw.isAiEnabled, raw.assignedToId),
     assignedTo: assignedTo ? `${assignedTo.firstName} ${assignedTo.lastName}` : undefined,
+    assignedToId: raw.assignedToId ?? assignedTo?.id,
+    assignedTeam: raw.assignedTeam ?? null,
+    aiConfidenceScore: raw.aiConfidenceScore ?? null,
+    awaitingFeedback: raw.awaitingFeedback ?? false,
+    resolutionMethod: raw.resolutionMethod ?? null,
+    hasFeedback: Boolean(raw.feedback?.length),
     tags: raw.tags?.map((t: { name: string } | string) => (typeof t === 'string' ? t : t.name)) ?? [],
   };
 }
@@ -368,10 +378,7 @@ export function useTeamPerformance() {
 }
 
 export function useConversations(params?: { status?: string; search?: string }) {
-  const apiStatus =
-    params?.status && params.status !== 'all' && params.status !== 'ai_handling'
-      ? params.status.toUpperCase()
-      : undefined;
+  const apiStatus = toApiConversationStatus(params?.status ?? '');
 
   return useAuthQuery<Conversation[]>({
     queryKey: ['conversations', params],
@@ -386,19 +393,36 @@ export function useConversations(params?: { status?: string; search?: string }) 
       });
       const data = extractData(response);
       const items = Array.isArray(data) ? data : (data as { data?: unknown[] })?.data ?? [];
-      let conversations = (Array.isArray(items) ? items : []).map(transformConversation);
-      if (params?.status === 'ai_handling') {
-        conversations = conversations.filter((c) => c.status === 'ai_handling');
-      }
-      return conversations;
+      return (Array.isArray(items) ? items : []).map(transformConversation);
     },
     staleTime: 5_000,
     refetchInterval: conversationPollInterval,
   });
 }
 
+export function useConversationActivity(conversationId: string | null) {
+  return useAuthQuery<ConversationActivity[]>({
+    queryKey: ['conversation-activity', conversationId],
+    queryFn: async () => {
+      const response = await api.get(`/conversations/${conversationId}/activity`, {
+        timeout: CONVERSATIONS_TIMEOUT,
+      });
+      const data = extractData<Array<Record<string, unknown>>>(response);
+      return data.map((item) => ({
+        id: String(item.id),
+        type: String(item.type),
+        title: String(item.title),
+        description: (item.description as string | null) ?? null,
+        createdAt: String(item.createdAt),
+        actorUser: item.actorUser as ConversationActivity['actorUser'],
+      }));
+    },
+    enabled: Boolean(conversationId),
+  });
+}
+
 export function useConversationSummary() {
-  return useAuthQuery<{ unreadTotal: number; aiHandlingCount: number }>({
+  return useAuthQuery<{ unreadTotal: number; aiHandlingCount: number; humanNeededCount: number }>({
     queryKey: ['conversations', 'summary'],
     queryFn: async () => {
       const response = await api.get('/conversations/summary', {

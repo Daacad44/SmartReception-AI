@@ -72,12 +72,23 @@ export class WhatsAppRepository {
     customerId: string,
     whatsappAccountId: string
   ): Promise<{ conversation: Awaited<ReturnType<typeof prisma.conversation.create>>; isNew: boolean }> {
+    const activeStatuses = [
+      'AI_HANDLING',
+      'HUMAN_NEEDED',
+      'HUMAN_HANDLING',
+      'WAITING_FOR_CUSTOMER',
+      'OPEN',
+      'PENDING',
+      'ESCALATED',
+      'TRANSFERRED',
+    ] as const;
+
     const existing = await prisma.conversation.findFirst({
       where: {
         businessId,
         customerId,
         whatsappAccountId,
-        status: { in: ['OPEN', 'PENDING'] },
+        status: { in: [...activeStatuses] },
       },
     });
 
@@ -89,7 +100,7 @@ export class WhatsAppRepository {
       where: {
         businessId,
         customerId,
-        status: { in: ['OPEN', 'PENDING'] },
+        status: { in: [...activeStatuses] },
       },
     });
 
@@ -106,11 +117,20 @@ export class WhatsAppRepository {
         businessId,
         customerId,
         whatsappAccountId,
-        status: 'OPEN',
+        status: 'AI_HANDLING',
         isAiEnabled: true,
+        aiStartTime: new Date(),
       },
     });
     console.log('[WhatsApp] Conversation created');
+
+    const { markConversationCreated } = await import(
+      '../conversations/conversation-handoff.service'
+    );
+    void markConversationCreated({ businessId, conversationId: conversation.id, isNew: true }).catch(
+      () => undefined
+    );
+
     return { conversation, isNew: true };
   }
 

@@ -44,7 +44,7 @@ async function getBusinessChannel(businessId: string): Promise<RealtimeChannel |
 /** Push instant UI updates via Supabase broadcast (complements postgres_changes). */
 export async function broadcastConversationEvent(
   businessId: string,
-  payload: { conversationId: string; type: 'message' | 'conversation' }
+  payload: { conversationId: string; type: string }
 ): Promise<void> {
   const channel = await getBusinessChannel(businessId);
   if (!channel) return;

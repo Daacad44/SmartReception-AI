@@ -174,7 +174,8 @@ export function useTakeoverConversation() {
     onSuccess: (_data, conversationId) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-      toast.success('Conversation taken over');
+      queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+      toast.success('You took over this conversation');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -210,11 +211,115 @@ export function useTransferToAi() {
     onSuccess: (_data, conversationId) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-      toast.success('Conversation transferred to AI');
+      queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+      toast.success('Conversation returned to AI');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
+  });
+}
+
+function invalidateConversationQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string
+) {
+  queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+  queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+}
+
+export function useAssignConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      assigneeId: string;
+      team?: 'SUPPORT' | 'SALES' | 'TECHNICAL' | 'GENERAL';
+    }) => {
+      const response = await api.post(`/conversations/${params.conversationId}/assign`, {
+        assigneeId: params.assigneeId,
+        team: params.team,
+      });
+      return extractData(response);
+    },
+    onSuccess: (_data, params) => {
+      invalidateConversationQueries(queryClient, params.conversationId);
+      toast.success('Conversation assigned');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+}
+
+export function useTransferConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      assigneeId?: string;
+      team?: 'SUPPORT' | 'SALES' | 'TECHNICAL' | 'GENERAL';
+    }) => {
+      const response = await api.post(`/conversations/${params.conversationId}/transfer`, {
+        assigneeId: params.assigneeId,
+        team: params.team,
+      });
+      return extractData(response);
+    },
+    onSuccess: (_data, params) => {
+      invalidateConversationQueries(queryClient, params.conversationId);
+      toast.success('Conversation transferred');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+}
+
+export function useResolveConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await api.post(`/conversations/${conversationId}/resolve`);
+      return extractData(response);
+    },
+    onSuccess: (_data, conversationId) => {
+      invalidateConversationQueries(queryClient, conversationId);
+      toast.success('Conversation resolved');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+}
+
+export function useCloseConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await api.post(`/conversations/${conversationId}/close`);
+      return extractData(response);
+    },
+    onSuccess: (_data, conversationId) => {
+      invalidateConversationQueries(queryClient, conversationId);
+      toast.success('Conversation closed');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+}
+
+export function useRequestHuman() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await api.post(`/conversations/${conversationId}/request-human`);
+      return extractData(response);
+    },
+    onSuccess: (_data, conversationId) => {
+      invalidateConversationQueries(queryClient, conversationId);
+      toast.success('Human support requested');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 }
 
