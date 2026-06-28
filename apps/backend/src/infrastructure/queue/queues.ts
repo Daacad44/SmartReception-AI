@@ -27,6 +27,9 @@ export const QUEUE_NAMES = {
   SUBSCRIPTION_REMINDER: 'subscription-reminder',
   SUBSCRIPTION_LOCK: 'subscription-lock',
   SUBSCRIPTION_NOTIFICATION: 'subscription-notification',
+  AI_TRAINING: 'ai-training',
+  AI_EMBEDDING: 'ai-embedding',
+  AI_DEPLOYMENT: 'ai-deployment',
 } as const;
 
 let whatsappQueue: Queue | null = null;
@@ -39,6 +42,9 @@ let campaignBatchQueue: Queue | null = null;
 let campaignJourneyQueue: Queue | null = null;
 let employeeBroadcastQueue: Queue | null = null;
 let employeeBroadcastBatchQueue: Queue | null = null;
+let aiTrainingQueue: Queue | null = null;
+let aiEmbeddingQueue: Queue | null = null;
+let aiDeploymentQueue: Queue | null = null;
 
 export function getWhatsappQueue(): Queue | null {
   const conn = getConnection();
@@ -111,6 +117,27 @@ export function getEmployeeBroadcastBatchQueue(): Queue | null {
   return employeeBroadcastBatchQueue;
 }
 
+export function getAiTrainingQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!aiTrainingQueue) aiTrainingQueue = new Queue(QUEUE_NAMES.AI_TRAINING, conn);
+  return aiTrainingQueue;
+}
+
+export function getAiEmbeddingQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!aiEmbeddingQueue) aiEmbeddingQueue = new Queue(QUEUE_NAMES.AI_EMBEDDING, conn);
+  return aiEmbeddingQueue;
+}
+
+export function getAiDeploymentQueue(): Queue | null {
+  const conn = getConnection();
+  if (!conn) return null;
+  if (!aiDeploymentQueue) aiDeploymentQueue = new Queue(QUEUE_NAMES.AI_DEPLOYMENT, conn);
+  return aiDeploymentQueue;
+}
+
 export interface WhatsAppJobData {
   businessId: string;
   conversationId: string;
@@ -178,6 +205,22 @@ export interface EmployeeBroadcastBatchJobData {
 
 export interface SubscriptionScanJobData {
   type: 'expiration' | 'reminders';
+}
+
+export interface AiTrainingJobData {
+  jobId: string;
+  businessId: string;
+  userId?: string;
+  trainerId?: string;
+  trainingNotes?: string;
+  documentIds?: string[];
+}
+
+export interface AiDeploymentJobData {
+  requestId: string;
+  businessId: string;
+  versionId: string;
+  userId: string;
 }
 
 export function createWorker<T>(

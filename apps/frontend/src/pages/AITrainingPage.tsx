@@ -9,6 +9,12 @@ import {
   RefreshCw,
   Shield,
   Sparkles,
+  Rocket,
+  History,
+  BarChart3,
+  Lightbulb,
+  ScrollText,
+  FlaskConical,
 } from 'lucide-react';
 import api, { extractData } from '@/lib/api';
 import type { GovernanceApprovalRequest, GovernanceCapabilities } from '@/lib/governance';
@@ -23,6 +29,8 @@ import { BusinessProfileSettings } from '@/components/settings/BusinessProfileSe
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { ActivationCodeDialog } from '@/components/governance/ActivationCodeDialog';
 import { GovernanceApprovalBanner } from '@/components/governance/GovernanceApprovalBanner';
+import { SandboxChat } from '@/components/ai-training/SandboxChat';
+import { DeploymentPanel, AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
 
@@ -37,6 +45,20 @@ interface AiTrainingOverview {
     lastUpdated: string;
   };
   pendingApprovals: GovernanceApprovalRequest[];
+  pendingGovernance?: GovernanceApprovalRequest[];
+  workspace?: {
+    aiReadinessScore?: number;
+    knowledgeScore?: number;
+    confidenceScore?: number;
+    sandboxVersion?: { id: string; versionNumber: number };
+  };
+  aiHealth?: { status: string; readinessScore: number };
+  insights?: Array<{ id: string; title: string; description: string; severity: string }>;
+  analytics?: {
+    conversations: { aiResolutionRate: number; humanHandoverRate: number };
+    quality: { failedQuestions: number };
+  };
+  recentJobs?: Array<{ id: string; status: string; type: string; progress: number }>;
 }
 
 export function AITrainingPage() {
@@ -57,7 +79,7 @@ export function AITrainingPage() {
 
   const capabilities = data?.capabilities;
   const isReadOnly = capabilities?.aiTrainingAccess === 'readonly';
-  const pendingApproval = data?.pendingApprovals?.find(
+  const pendingApproval = (data?.pendingApprovals ?? data?.pendingGovernance)?.find(
     (r) => r.status === 'PENDING' || r.status === 'APPROVED'
   );
 
@@ -102,11 +124,11 @@ export function AITrainingPage() {
         <div>
           <div className="flex items-center gap-2">
             <Brain className="h-7 w-7 text-accent" />
-            <h1 className="text-2xl font-bold">AI Training</h1>
+            <h1 className="text-2xl font-bold">AI Training Management</h1>
           </div>
           <p className="mt-1 text-muted-foreground">
-            The single source where your AI learns about your business — profile, documents, FAQs,
-            and sync status.
+            Enterprise AI workspace — business profile, knowledge library, training, sandbox,
+            versioning, and deployment for your business AI.
           </p>
         </div>
         {capabilities && (
@@ -162,12 +184,49 @@ export function AITrainingPage() {
             </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="h-4 w-4" />
-              Documents & FAQs
+              Knowledge Library
+            </TabsTrigger>
+            <TabsTrigger value="training" className="gap-2">
+              <History className="h-4 w-4" />
+              Training
+            </TabsTrigger>
+            <TabsTrigger value="sandbox" className="gap-2">
+              <FlaskConical className="h-4 w-4" />
+              Sandbox
+            </TabsTrigger>
+            <TabsTrigger value="deployment" className="gap-2">
+              <Rocket className="h-4 w-4" />
+              Production
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="gap-2">
+              <Lightbulb className="h-4 w-4" />
+              Insights
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="gap-2">
+              <ScrollText className="h-4 w-4" />
+              AI Logs
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    AI Readiness
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{data?.workspace?.aiReadinessScore ?? 0}%</p>
+                  <Badge variant="outline" className="mt-1">
+                    {data?.aiHealth?.status ?? 'unknown'}
+                  </Badge>
+                </CardContent>
+              </Card>
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -255,6 +314,112 @@ export function AITrainingPage() {
               readOnly={isReadOnly}
               onApprovalRequired={handleApprovalRequired}
             />
+          </TabsContent>
+
+          <TabsContent value="training">
+            <AiTrainingVersionsPanel />
+            {data?.recentJobs && data.recentJobs.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle>Training Queue</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {data.recentJobs.map((job) => (
+                    <div key={job.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                      <span>{job.type}</span>
+                      <Badge variant="outline">{job.status}</Badge>
+                      <span>{job.progress}%</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="sandbox">
+            {data?.workspace?.sandboxVersion ? (
+              <SandboxChat versionId={data.workspace.sandboxVersion.id} readOnly={isReadOnly} />
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Complete a training run to create a sandbox version for testing.
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="deployment">
+            <DeploymentPanel readOnly={isReadOnly} />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">AI Resolution Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{data?.analytics?.conversations.aiResolutionRate ?? 0}%</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">Human Handover</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{data?.analytics?.conversations.humanHandoverRate ?? 0}%</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">Failed Questions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{data?.analytics?.quality.failedQuestions ?? 0}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="insights">
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Recommendations</CardTitle>
+                <CardDescription>Intelligent suggestions to improve your business AI</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(data?.insights ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No insights yet. Train your AI to generate recommendations.</p>
+                ) : (
+                  data?.insights?.map((insight) => (
+                    <div key={insight.id} className="rounded-lg border p-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={insight.severity === 'high' ? 'destructive' : 'secondary'}>
+                          {insight.severity}
+                        </Badge>
+                        <p className="font-medium">{insight.title}</p>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{insight.description}</p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="logs">
+            <Card>
+              <CardHeader>
+                <CardTitle>Training Audit Logs</CardTitle>
+                <CardDescription>Immutable record of all AI training actions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  View detailed audit logs in Settings → Audit Logs, or use the API at{' '}
+                  <code className="text-xs">/ai-training-mgmt/audit-logs</code>.
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       )}

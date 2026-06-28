@@ -64,6 +64,23 @@ const SuperAdminPage = lazyWithRetry(() =>
 const GovernanceAdminPage = lazyWithRetry(() =>
   import('@/pages/GovernanceAdminPage').then((m) => ({ default: m.GovernanceAdminPage }))
 );
+const AiDeploymentsAdminPage = lazyWithRetry(() =>
+  import('@/pages/AiDeploymentsAdminPage').then((m) => ({ default: m.AiDeploymentsAdminPage }))
+);
+import { TrainerLoginPage } from '@/pages/TrainerLoginPage';
+import {
+  TrainerLayout,
+  TrainerProtectedRoute,
+} from '@/components/layout/TrainerLayout';
+const TrainerDashboardPage = lazyWithRetry(() =>
+  import('@/pages/TrainerPortalPage').then((m) => ({ default: m.TrainerDashboardPage }))
+);
+const TrainerJobsPage = lazyWithRetry(() =>
+  import('@/pages/TrainerPortalPage').then((m) => ({ default: m.TrainerJobsPage }))
+);
+const TrainerSandboxPage = lazyWithRetry(() =>
+  import('@/pages/TrainerPortalPage').then((m) => ({ default: m.TrainerSandboxPage }))
+);
 const BusinessManagementPage = lazyWithRetry(() =>
   import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
 );
@@ -183,6 +200,19 @@ export default function App() {
                     </PublicRoute>
                   }
                 />
+                <Route path="/trainer/login" element={<TrainerLoginPage />} />
+                <Route
+                  path="/trainer"
+                  element={
+                    <TrainerProtectedRoute>
+                      <TrainerLayout />
+                    </TrainerProtectedRoute>
+                  }
+                >
+                  <Route index element={<TrainerDashboardPage />} />
+                  <Route path="jobs" element={<TrainerJobsPage />} />
+                  <Route path="sandbox" element={<TrainerSandboxPage />} />
+                </Route>
                 <Route
                   element={
                     <SubscriptionGate>
@@ -347,6 +377,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <GovernanceAdminPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/ai-deployments"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <AiDeploymentsAdminPage />
                       </PermissionRoute>
                     }
                   />

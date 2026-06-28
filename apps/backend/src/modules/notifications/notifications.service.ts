@@ -17,6 +17,8 @@ const TYPE_MAP: Record<NotificationType, 'info' | 'success' | 'warning' | 'error
   CAMPAIGN_DELIVERED: 'success',
   CAMPAIGN_FAILED: 'error',
   GOVERNANCE_APPROVAL: 'warning',
+  AI_DEPLOYMENT_REQUEST: 'warning',
+  AI_TRAINING_COMPLETE: 'success',
 };
 
 function mapNotification(notification: {

@@ -26,6 +26,9 @@ import businessProfileRoutes from '../modules/business-profile/business-profile.
 import onboardingRoutes from '../modules/onboarding/onboarding.routes';
 import governanceRoutes from '../modules/governance/governance.routes';
 import aiTrainingRoutes from '../modules/ai-training/ai-training.routes';
+import aiTrainingMgmtRoutes from '../modules/ai-training-mgmt/ai-training-mgmt.routes';
+import aiTrainingAdminRoutes from '../modules/ai-training-mgmt/ai-training-admin.routes';
+import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -37,8 +40,10 @@ import { requireBusiness } from '../core/middleware/authorize.middleware';
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/trainer-portal', trainerPortalRoutes);
 router.use('/webhooks', webhooksRoutes);
 router.use('/super-admin', superAdminRoutes);
+router.use('/super-admin/ai-training', aiTrainingAdminRoutes);
 router.use('/super-admin/subscriptions', subscriptionAdminRoutes);
 router.use('/subscription', subscriptionRoutes);
 
@@ -68,6 +73,7 @@ licensed.use('/business-profile', businessProfileRoutes);
 licensed.use('/onboarding', onboardingRoutes);
 licensed.use('/governance', governanceRoutes);
 licensed.use('/ai-training', aiTrainingRoutes);
+licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);
 
 router.use('/billing', billingRoutes);
 router.use(licensed);

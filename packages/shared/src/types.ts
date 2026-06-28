@@ -25,7 +25,8 @@ export interface JwtPayload {
   role?: string;
   isSuperAdmin?: boolean;
   impersonating?: boolean;
-  purpose?: 'access' | '2fa';
+  purpose?: 'access' | '2fa' | 'ai_trainer';
+  trainerId?: string;
 }
 
 export interface DashboardStats {

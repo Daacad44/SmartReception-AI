@@ -275,6 +275,10 @@ enum DocumentType {
   DOCX
   TXT
   FAQ
+  CSV
+  XLSX
+  MARKDOWN
+  HTML
 }
 
 enum DocumentStatus {
@@ -301,6 +305,8 @@ enum NotificationType {
   CAMPAIGN_DELIVERED
   CAMPAIGN_FAILED
   GOVERNANCE_APPROVAL
+  AI_DEPLOYMENT_REQUEST
+  AI_TRAINING_COMPLETE
 }
 
 enum CustomerType {
@@ -558,6 +564,13 @@ model Business {
   employeeConversations EmployeeConversation[]
   employeeImportJobs EmployeeImportJob[]
   governanceApprovalRequests GovernanceApprovalRequest[]
+  aiTrainingWorkspace      AiTrainingWorkspace?
+  aiTrainingVersions       AiTrainingVersion[]
+  aiTrainingJobs           AiTrainingJob[]
+  aiDeploymentRequests     AiDeploymentRequest[]
+  aiSandboxSessions        AiSandboxSession[]
+  aiTrainingInsights       AiTrainingInsight[]
+  aiTrainerAssignments     AiTrainerBusiness[]
 
   @@index([slug])
   @@index([isActive])
@@ -621,6 +634,13 @@ model User {
   governanceRequestsSubmitted GovernanceApprovalRequest[] @relation("GovernanceRequester")
   governanceRequestsApproved GovernanceApprovalRequest[] @relation("GovernanceApprover")
   governanceRequestsRejected GovernanceApprovalRequest[] @relation("GovernanceRejecter")
+  aiVersionsTrained            AiTrainingVersion[]         @relation("AiVersionTrainedByUser")
+  aiTrainingJobsCreated        AiTrainingJob[]             @relation("AiJobCreatedByUser")
+  aiDeploymentRequests         AiDeploymentRequest[]       @relation("AiDeploymentRequester")
+  aiDeploymentApprovals        AiDeploymentRequest[]       @relation("AiDeploymentApprover")
+  aiDeploymentRejections       AiDeploymentRequest[]       @relation("AiDeploymentRejecter")
+  aiSandboxSessions            AiSandboxSession[]          @relation("AiSandboxUser")
+  aiTrainingAuditLogs          AiTrainingAuditLog[]        @relation("AiTrainingAuditUser")
 
   @@index([email])
   @@index([isActive])
@@ -2107,4 +2127,329 @@ model GovernanceApprovalRequest {
   @@index([actionType])
   @@index([createdAt])
   @@map("governance_approval_requests")
+}
+
+// ─── AI TRAINING MANAGEMENT PLATFORM ─────────────────────────────────────────
+
+enum AiTrainingJobType {
+  FULL_TRAIN
+  RETRAIN
+  PARTIAL_RETRAIN
+  INCREMENTAL_RETRAIN
+  EMBED_DOCUMENTS
+  REINDEX
+  EVALUATE
+}
+
+enum AiTrainingJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AiTrainingVersionStatus {
+  DRAFT
+  SANDBOX
+  PENDING_APPROVAL
+  PRODUCTION
+  ARCHIVED
+}
+
+enum AiDeploymentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  DEPLOYED
+  CANCELLED
+}
+
+enum AiSandboxMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum AiTrainingAuditAction {
+  TRAIN_STARTED
+  TRAIN_COMPLETED
+  TRAIN_FAILED
+  VERSION_CREATED
+  SANDBOX_TEST
+  DEPLOYMENT_REQUESTED
+  DEPLOYMENT_APPROVED
+  DEPLOYMENT_REJECTED
+  DEPLOYMENT_PUBLISHED
+  VERSION_ROLLBACK
+  DOCUMENT_UPLOADED
+  TRAINER_LOGIN
+}
+
+model AiTrainingWorkspace {
+  id                  String    @id @default(uuid())
+  businessId          String    @unique
+  productionVersionId String?
+  sandboxVersionId    String?
+  lastTrainedAt       DateTime?
+  aiReadinessScore    Float?
+  knowledgeScore      Float?
+  confidenceScore     Float?
+  embeddingCount      Int       @default(0)
+  documentCount       Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  business          Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productionVersion AiTrainingVersion?  @relation("ProductionVersion", fields: [productionVersionId], references: [id], onDelete: SetNull)
+  sandboxVersion    AiTrainingVersion?  @relation("SandboxVersion", fields: [sandboxVersionId], references: [id], onDelete: SetNull)
+  versions          AiTrainingVersion[] @relation("WorkspaceVersions")
+  jobs              AiTrainingJob[]
+
+  @@index([businessId])
+  @@map("ai_training_workspaces")
+}
+
+model AiTrainingVersion {
+  id                 String                  @id @default(uuid())
+  workspaceId        String
+  businessId         String
+  versionNumber      Int
+  status             AiTrainingVersionStatus @default(DRAFT)
+  trainingNotes      String?
+  trainedByUserId    String?
+  trainedByTrainerId String?
+  knowledgeScore     Float?
+  confidenceScore    Float?
+  readinessScore     Float?
+  hallucinationRisk  Float?
+  embeddingVersion   String?
+  snapshotData       Json?
+  documentCount      Int                     @default(0)
+  chunkCount         Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  workspace            AiTrainingWorkspace     @relation("WorkspaceVersions", fields: [workspaceId], references: [id], onDelete: Cascade)
+  business             Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  trainedByUser        User?                   @relation("AiVersionTrainedByUser", fields: [trainedByUserId], references: [id], onDelete: SetNull)
+  trainedByTrainer     AiTrainer?              @relation(fields: [trainedByTrainerId], references: [id], onDelete: SetNull)
+  productionWorkspaces AiTrainingWorkspace[]   @relation("ProductionVersion")
+  sandboxWorkspaces    AiTrainingWorkspace[]   @relation("SandboxVersion")
+  jobs                 AiTrainingJob[]
+  deploymentRequests   AiDeploymentRequest[]
+  sandboxSessions      AiSandboxSession[]
+  auditLogs            AiTrainingAuditLog[]
+
+  @@unique([businessId, versionNumber])
+  @@index([businessId])
+  @@index([workspaceId])
+  @@index([status])
+  @@map("ai_training_versions")
+}
+
+model AiTrainingJob {
+  id                 String              @id @default(uuid())
+  businessId         String
+  workspaceId        String
+  versionId          String?
+  type               AiTrainingJobType
+  status             AiTrainingJobStatus @default(QUEUED)
+  progress           Int                 @default(0)
+  totalSteps         Int                 @default(0)
+  currentStep        String?
+  error              String?
+  payload            Json?
+  result             Json?
+  bullJobId          String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdByUserId    String?
+  createdByTrainerId String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  business         Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  workspace        AiTrainingWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  version          AiTrainingVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  createdByUser    User?               @relation("AiJobCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByTrainer AiTrainer?          @relation(fields: [createdByTrainerId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ai_training_jobs")
+}
+
+model AiDeploymentRequest {
+  id                   String                    @id @default(uuid())
+  businessId           String
+  versionId            String
+  status               AiDeploymentRequestStatus @default(PENDING)
+  requestedByTrainerId   String?
+  requestedByUserId    String?
+  approvedByUserId     String?
+  rejectedByUserId     String?
+  knowledgeScore       Float?
+  confidenceScore      Float?
+  readinessScore       Float?
+  sandboxTestSummary   Json?
+  deploymentSummary    String?
+  rejectionReason      String?
+  changeRequestNotes   String?
+  requestedAt          DateTime                  @default(now())
+  reviewedAt           DateTime?
+  deployedAt           DateTime?
+  ipAddress            String?
+  userAgent            String?
+
+  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  version           AiTrainingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  requestedByTrainer AiTrainer?       @relation(fields: [requestedByTrainerId], references: [id], onDelete: SetNull)
+  requestedByUser   User?             @relation("AiDeploymentRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedByUser      User?             @relation("AiDeploymentApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedByUser      User?             @relation("AiDeploymentRejecter", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([versionId])
+  @@index([status])
+  @@map("ai_deployment_requests")
+}
+
+model AiSandboxSession {
+  id         String   @id @default(uuid())
+  businessId String
+  versionId  String
+  trainerId  String?
+  userId     String?
+  label      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  version  AiTrainingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  trainer  AiTrainer?        @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  user     User?             @relation("AiSandboxUser", fields: [userId], references: [id], onDelete: SetNull)
+  messages AiSandboxMessage[]
+
+  @@index([businessId])
+  @@index([versionId])
+  @@map("ai_sandbox_sessions")
+}
+
+model AiSandboxMessage {
+  id                String               @id @default(uuid())
+  sessionId         String
+  role              AiSandboxMessageRole
+  content           String
+  confidence        Float?
+  sources           Json?
+  hallucinationRisk Float?
+  missingKnowledge  Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+
+  session AiSandboxSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("ai_sandbox_messages")
+}
+
+model AiTrainer {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  email        String?
+  isActive     Boolean   @default(true)
+  permissions  Json      @default("{}")
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  businessAssignments AiTrainerBusiness[]
+  loginHistory        AiTrainerLoginHistory[]
+  versions            AiTrainingVersion[]
+  jobs                AiTrainingJob[]
+  deploymentRequests  AiDeploymentRequest[]
+  sandboxSessions     AiSandboxSession[]
+  auditLogs           AiTrainingAuditLog[]
+
+  @@map("ai_trainers")
+}
+
+model AiTrainerBusiness {
+  trainerId  String
+  businessId String
+  assignedAt DateTime @default(now())
+
+  trainer  AiTrainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@id([trainerId, businessId])
+  @@index([businessId])
+  @@map("ai_trainer_businesses")
+}
+
+model AiTrainerLoginHistory {
+  id        String   @id @default(uuid())
+  trainerId String
+  ipAddress String?
+  userAgent String?
+  deviceLabel String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  trainer AiTrainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@index([createdAt])
+  @@map("ai_trainer_login_history")
+}
+
+model AiTrainingInsight {
+  id          String    @id @default(uuid())
+  businessId  String
+  type        String
+  title       String
+  description String
+  severity    String    @default("medium")
+  metadata    Json?
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([type])
+  @@map("ai_training_insights")
+}
+
+model AiTrainingAuditLog {
+  id          String                @id @default(uuid())
+  businessId  String
+  versionId   String?
+  trainerId   String?
+  userId      String?
+  action      AiTrainingAuditAction
+  entity      String?
+  entityId    String?
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+  deviceLabel String?
+  createdAt   DateTime              @default(now())
+
+  version AiTrainingVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  trainer AiTrainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  user    User?              @relation("AiTrainingAuditUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([versionId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("ai_training_audit_logs")
 }
