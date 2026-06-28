@@ -792,6 +792,7 @@ export function useWhatsAppAccounts() {
           isActive: boolean;
           reengagementTemplateName?: string | null;
           reengagementTemplateLanguage?: string | null;
+          reengagementTemplateHasBodyVariable?: boolean;
         }>
       >(response);
     },

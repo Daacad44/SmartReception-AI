@@ -272,7 +272,7 @@ export class ConversationsService {
   }
 
   async listTemplates(businessId: string) {
-    return messageTemplatesService.list(businessId);
+    return messageTemplatesService.listForInbox(businessId);
   }
 
   async sendTypingIndicator(businessId: string, conversationId: string) {

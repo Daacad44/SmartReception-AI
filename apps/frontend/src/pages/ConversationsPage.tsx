@@ -424,7 +424,9 @@ export function ConversationsPage() {
                       <DropdownMenuItem disabled>Loading templates…</DropdownMenuItem>
                     )}
                     {!templatesLoading && !templates?.length && (
-                      <DropdownMenuItem disabled>No templates available</DropdownMenuItem>
+                      <DropdownMenuItem disabled>
+                        No templates — add one in Campaigns → Templates
+                      </DropdownMenuItem>
                     )}
                     {templates?.map((tpl) => (
                       <DropdownMenuItem

@@ -405,7 +405,11 @@ export function useUpdateWhatsAppAccount() {
       data,
     }: {
       accountId: string;
-      data: { reengagementTemplateName?: string | null; reengagementTemplateLanguage?: string | null };
+      data: {
+        reengagementTemplateName?: string | null;
+        reengagementTemplateLanguage?: string | null;
+        reengagementTemplateHasBodyVariable?: boolean;
+      };
     }) => {
       const response = await api.patch(`/whatsapp/accounts/${accountId}`, data);
       return extractData(response);

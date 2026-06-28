@@ -802,6 +802,7 @@ export class WhatsAppModuleService {
       data: {
         reengagementTemplateName: input.reengagementTemplateName,
         reengagementTemplateLanguage: input.reengagementTemplateLanguage,
+        reengagementTemplateHasBodyVariable: input.reengagementTemplateHasBodyVariable,
       },
       select: {
         id: true,
@@ -810,6 +811,7 @@ export class WhatsAppModuleService {
         displayName: true,
         reengagementTemplateName: true,
         reengagementTemplateLanguage: true,
+        reengagementTemplateHasBodyVariable: true,
         isActive: true,
       },
     });

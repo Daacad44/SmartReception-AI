@@ -115,7 +115,9 @@ export class WhatsAppService {
           template: {
             name: params.templateName,
             language: { code: params.templateLanguage ?? 'en' },
-            components: params.templateComponents ?? [],
+            ...(params.templateComponents?.length
+              ? { components: params.templateComponents }
+              : {}),
           },
         };
         break;

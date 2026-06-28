@@ -249,6 +249,7 @@ export const connectWhatsAppSchema = z.object({
 export const updateWhatsAppAccountSchema = z.object({
   reengagementTemplateName: z.string().max(200).optional().nullable(),
   reengagementTemplateLanguage: z.string().max(20).optional().nullable(),
+  reengagementTemplateHasBodyVariable: z.boolean().optional(),
 });
 
 export const knowledgeSearchSchema = z.object({

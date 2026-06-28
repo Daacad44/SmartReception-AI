@@ -65,6 +65,7 @@ export function WhatsAppSettings() {
   const [reengagementForm, setReengagementForm] = useState({
     reengagementTemplateName: '',
     reengagementTemplateLanguage: 'en',
+    reengagementTemplateHasBodyVariable: false,
   });
 
   const [form, setForm] = useState({
@@ -117,9 +118,16 @@ export function WhatsAppSettings() {
       setReengagementForm({
         reengagementTemplateName: activeAccount.reengagementTemplateName ?? '',
         reengagementTemplateLanguage: activeAccount.reengagementTemplateLanguage ?? 'en',
+        reengagementTemplateHasBodyVariable:
+          activeAccount.reengagementTemplateHasBodyVariable ?? false,
       });
     }
-  }, [activeAccount?.id, activeAccount?.reengagementTemplateName, activeAccount?.reengagementTemplateLanguage]);
+  }, [
+    activeAccount?.id,
+    activeAccount?.reengagementTemplateName,
+    activeAccount?.reengagementTemplateLanguage,
+    activeAccount?.reengagementTemplateHasBodyVariable,
+  ]);
 
   if (accountsLoading || healthLoading) {
     return <LoadingState rows={4} />;
@@ -133,6 +141,7 @@ export function WhatsAppSettings() {
       data: {
         reengagementTemplateName: reengagementForm.reengagementTemplateName.trim() || null,
         reengagementTemplateLanguage: reengagementForm.reengagementTemplateLanguage.trim() || 'en',
+        reengagementTemplateHasBodyVariable: reengagementForm.reengagementTemplateHasBodyVariable,
       },
     });
   };
@@ -367,8 +376,9 @@ export function WhatsAppSettings() {
           <CardHeader>
             <CardTitle>Re-engagement Template</CardTitle>
             <CardDescription>
-              Meta-approved template name for sending prepared messages outside the 24-hour session.
-              Create a template in Meta Business Manager with one body variable (e.g. &quot;Message: {'{{1}}'}&quot;).
+              Meta-approved template for messages outside the 24-hour session. Use the exact name from
+              WhatsApp Manager (e.g. <code className="text-xs">smartreception_welcome</code>).
+              Fixed templates without {'{{1}}'} should leave the body-variable option unchecked.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -380,7 +390,7 @@ export function WhatsAppSettings() {
                   onChange={(e) =>
                     setReengagementForm({ ...reengagementForm, reengagementTemplateName: e.target.value })
                   }
-                  placeholder="e.g. customer_follow_up"
+                  placeholder="smartreception_welcome"
                 />
               </div>
               <div className="space-y-2">
@@ -395,7 +405,27 @@ export function WhatsAppSettings() {
                   }
                   placeholder="en"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Must match Meta exactly (e.g. <code>en</code> or <code>en_US</code> for hello_world).
+                </p>
               </div>
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={reengagementForm.reengagementTemplateHasBodyVariable}
+                  onChange={(e) =>
+                    setReengagementForm({
+                      ...reengagementForm,
+                      reengagementTemplateHasBodyVariable: e.target.checked,
+                    })
+                  }
+                />
+                <span className="text-sm leading-snug">
+                  Meta template has a body variable {'{{1}}'} (custom message text). Leave unchecked
+                  for fixed templates like smartreception_welcome.
+                </span>
+              </label>
               <Button type="submit" disabled={updateWhatsAppAccount.isPending}>
                 Save Template Settings
               </Button>
