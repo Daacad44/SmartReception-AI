@@ -104,6 +104,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/ai-training': PERMISSIONS['knowledge:read'],
   '/knowledge': PERMISSIONS['knowledge:read'],
   '/analytics': PERMISSIONS['analytics:read'],
+  '/ai-analytics': PERMISSIONS['analytics:read'],
   '/team': PERMISSIONS['team:read'],
   '/settings': PERMISSIONS['settings:read'],
   '/billing': PERMISSIONS['billing:read'],

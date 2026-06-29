@@ -29,6 +29,7 @@ import aiTrainingRoutes from '../modules/ai-training/ai-training.routes';
 import aiTrainingMgmtRoutes from '../modules/ai-training-mgmt/ai-training-mgmt.routes';
 import aiTrainingAdminRoutes from '../modules/ai-training-mgmt/ai-training-admin.routes';
 import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
+import aiAnalyticsRoutes from '../modules/ai-analytics/ai-analytics.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -75,6 +76,7 @@ licensed.use('/employee-comms', employeeCommsRoutes);
 licensed.use('/business-profile', businessProfileRoutes);
 licensed.use('/governance', governanceRoutes);
 licensed.use('/ai-training', aiTrainingRoutes);
+licensed.use('/ai-analytics', aiAnalyticsRoutes);
 licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);
 
 router.use('/billing', billingRoutes);

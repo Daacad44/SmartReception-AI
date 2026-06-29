@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticate, requireSuperAdmin);
 
 router.get('/stats', (req, res, next) => superAdminController.stats(req, res, next));
+router.get('/ai-analytics', (req, res, next) => superAdminController.aiAnalytics(req, res, next));
 
 router.get('/businesses', (req, res, next) => superAdminController.businesses(req, res, next));
 router.post('/businesses', (req, res, next) => superAdminController.createBusiness(req, res, next));

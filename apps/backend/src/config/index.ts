@@ -98,8 +98,13 @@ export const config = {
   ai: {
     provider: (process.env.AI_PROVIDER || 'gemini').toLowerCase(),
     geminiApiKey: process.env.GEMINI_API_KEY || '',
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
+    ragTopK: parseInt(process.env.AI_RAG_TOP_K || '5', 10),
+    memoryRawExchanges: parseInt(process.env.AI_MEMORY_RAW_EXCHANGES || '4', 10),
+    summaryMaxChars: parseInt(process.env.AI_SUMMARY_MAX_CHARS || '1200', 10),
   },
 
   whatsapp: {

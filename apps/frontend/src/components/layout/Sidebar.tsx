@@ -39,6 +39,7 @@ const navItems = [
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
   { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const },
   { to: '/ai-training', icon: BookOpen, label: 'AI Training' },
+  { to: '/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'analytics:read' as const },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/team', icon: UsersRound, label: 'Team' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
