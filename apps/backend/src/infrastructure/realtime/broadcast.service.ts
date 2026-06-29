@@ -63,7 +63,7 @@ export async function broadcastConversationEvent(
 export async function broadcastBusinessEvent(
   businessId: string,
   payload: {
-    type: 'appointment' | 'campaign' | 'customer' | 'notification';
+    type: 'appointment' | 'campaign' | 'customer' | 'notification' | 'ai_analytics';
     appointmentId?: string;
     campaignId?: string;
     customerId?: string;
@@ -82,4 +82,8 @@ export async function broadcastBusinessEvent(
   } catch (error) {
     logger.debug('Business broadcast failed (non-fatal)', { error, businessId });
   }
+}
+
+export async function broadcastAiAnalyticsUpdate(businessId: string): Promise<void> {
+  await broadcastBusinessEvent(businessId, { type: 'ai_analytics', action: 'updated' });
 }

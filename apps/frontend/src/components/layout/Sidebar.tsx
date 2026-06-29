@@ -50,6 +50,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const },
+  { to: '/admin/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'platform:admin' as const },
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const },
   { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const },

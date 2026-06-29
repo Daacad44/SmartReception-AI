@@ -81,6 +81,9 @@ class UsageTrackerService {
     void this.updateRollups(input, totalTokens, Number(estimatedCostUsd), tokenSavingsPercent).catch(
       () => undefined
     );
+    void import('./business-snapshot.service').then(({ businessSnapshotService }) =>
+      businessSnapshotService.refresh(input.businessId)
+    );
   }
 
   private async updateRollups(

@@ -114,5 +114,6 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/employee-comms': PERMISSIONS['employee-comms:read'],
   '/super-admin': PERMISSIONS['platform:admin'],
   '/admin/businesses': PERMISSIONS['platform:admin'],
+  '/admin/ai-analytics': PERMISSIONS['platform:admin'],
   '/admin/users': PERMISSIONS['platform:admin'],
 };

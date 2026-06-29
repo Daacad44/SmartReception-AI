@@ -576,6 +576,7 @@ model Business {
   aiDailyRollups           AiDailyRollup[]
   aiConversationMetrics    AiConversationMetric[]
   aiCustomerMetrics        AiCustomerMetric[]
+  aiBusinessSnapshot       AiBusinessSnapshot?
 
   @@index([slug])
   @@index([isActive])
@@ -2614,4 +2615,42 @@ model AiCustomerMetric {
   @@unique([businessId, customerId])
   @@index([businessId])
   @@map("ai_customer_metrics")
+}
+
+model AiBusinessSnapshot {
+  businessId              String   @id
+  totalCustomers          Int      @default(0)
+  activeCustomers         Int      @default(0)
+  returningCustomers      Int      @default(0)
+  totalConversations      Int      @default(0)
+  totalCustomerMessages   Int      @default(0)
+  totalAiMessages         Int      @default(0)
+  inputTokens             Int      @default(0)
+  outputTokens            Int      @default(0)
+  totalTokens             Int      @default(0)
+  dailyTokens             Int      @default(0)
+  weeklyTokens            Int      @default(0)
+  monthlyTokens           Int      @default(0)
+  lifetimeTokens          Int      @default(0)
+  estimatedAiCost         Decimal  @default(0) @db.Decimal(12, 4)
+  monthlyAiCost           Decimal  @default(0) @db.Decimal(12, 4)
+  lifetimeAiCost          Decimal  @default(0) @db.Decimal(12, 4)
+  avgTokensPerConversation Float   @default(0)
+  avgTokensPerCustomer    Float    @default(0)
+  avgResponseTimeMs       Int      @default(0)
+  topProvider             String?
+  knowledgeBaseSize       Int      @default(0)
+  trainingStatus          String?
+  lastTrainingAt          DateTime?
+  healthScore             Float?
+  automationSuccessRate   Float    @default(0)
+  tokenSavingsPercent     Float    @default(0)
+  tokenSavingsTokens      Int      @default(0)
+  lastActivityAt          DateTime?
+  backfilledAt            DateTime?
+  updatedAt               DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("ai_business_snapshots")
 }
