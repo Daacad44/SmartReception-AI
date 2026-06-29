@@ -218,31 +218,50 @@ interface AppointmentEmailData {
   time: string;
   meetingLink?: string;
   details?: string;
+  businessName?: string;
+  bookingNumber?: string;
+  location?: string;
+  logoUrl?: string;
+  calendarLinks?: { google?: string; outlook?: string; apple?: string };
 }
 
 export function appointmentConfirmationEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const business = data.businessName ?? BRAND.productName;
   const body = `
+    ${data.logoUrl ? `<img src="${data.logoUrl}" alt="${business}" style="max-height:48px;margin-bottom:16px;" />` : ''}
     <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Appointment Confirmation</h1>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      Hello ${data.customerName}, your appointment has been successfully scheduled.
+      Hello ${data.customerName}, your appointment with <strong>${business}</strong> has been confirmed.
     </p>
     <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
       <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Reference:</strong> ${data.bookingNumber ?? '—'}<br />
         <strong>Full Name:</strong> ${data.customerName}<br />
         <strong>Service:</strong> ${data.serviceName}<br />
         <strong>Date:</strong> ${data.date}<br />
         <strong>Time:</strong> ${data.time}
+        ${data.location ? `<br /><strong>Location:</strong> ${data.location}` : ''}
         ${data.meetingLink ? `<br /><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:${BRAND.accentColor};">${data.meetingLink}</a>` : ''}
         ${data.details ? `<br /><strong>Details:</strong> ${data.details}` : ''}
       </td></tr>
     </table>
+    ${
+      data.calendarLinks
+        ? `<p style="margin:16px 0;font-size:14px;color:#475569;">
+        Add to calendar:
+        ${data.calendarLinks.google ? `<a href="${data.calendarLinks.google}" style="color:${BRAND.accentColor};margin-right:12px;">Google</a>` : ''}
+        ${data.calendarLinks.outlook ? `<a href="${data.calendarLinks.outlook}" style="color:${BRAND.accentColor};margin-right:12px;">Outlook</a>` : ''}
+        ${data.calendarLinks.apple ? `<a href="${data.calendarLinks.apple}" style="color:${BRAND.accentColor};">Apple</a>` : ''}
+      </p>`
+        : ''
+    }
     <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
-      We look forward to speaking with you. You will receive reminders before your appointment.
+      You will receive reminders before your appointment. Reply to reschedule or cancel.
     </p>
   `;
 
   return {
-    subject: 'Appointment Confirmation – SmartReception',
+    subject: `Appointment Confirmation – ${business}`,
     html: renderEmailLayout({
       preheader: `Your appointment on ${data.date} at ${data.time} is confirmed`,
       title: 'Appointment Confirmation',

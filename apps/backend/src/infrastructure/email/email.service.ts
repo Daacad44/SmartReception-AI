@@ -32,6 +32,15 @@ export class EmailService {
   }
 
   async send(to: string, subject: string, html: string): Promise<void> {
+    await this.sendWithAttachment(to, subject, html);
+  }
+
+  async sendWithAttachment(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; content: string; contentType: string }>
+  ): Promise<void> {
     const resend = getResend();
 
     if (resend) {
@@ -40,6 +49,11 @@ export class EmailService {
         to,
         subject,
         html,
+        attachments: attachments?.map((a) => ({
+          filename: a.filename,
+          content: Buffer.from(a.content).toString('base64'),
+          content_type: a.contentType,
+        })),
       });
 
       if (error) {
@@ -56,6 +70,11 @@ export class EmailService {
         to,
         subject,
         html,
+        attachments: attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
       });
       logger.info(`Email sent via SMTP to ${to}: ${subject}`);
       return;
