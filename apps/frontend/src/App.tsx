@@ -73,6 +73,12 @@ const AiDeploymentsAdminPage = lazyWithRetry(() =>
 const AiAnalyticsAdminPage = lazyWithRetry(() =>
   import('@/pages/AiAnalyticsAdminPage').then((m) => ({ default: m.AiAnalyticsAdminPage }))
 );
+const AiTrainingCenterAdminPage = lazyWithRetry(() =>
+  import('@/pages/AiTrainingCenterAdminPage').then((m) => ({ default: m.AiTrainingCenterAdminPage }))
+);
+const BusinessTrainingDetailPage = lazyWithRetry(() =>
+  import('@/pages/BusinessTrainingDetailPage').then((m) => ({ default: m.BusinessTrainingDetailPage }))
+);
 const BusinessAiAnalyticsDetailPage = lazyWithRetry(() =>
   import('@/pages/BusinessAiAnalyticsDetailPage').then((m) => ({ default: m.BusinessAiAnalyticsDetailPage }))
 );
@@ -362,6 +368,22 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <SuperAdminPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/ai-training"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <AiTrainingCenterAdminPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/ai-training/:businessId"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <BusinessTrainingDetailPage />
                       </PermissionRoute>
                     }
                   />

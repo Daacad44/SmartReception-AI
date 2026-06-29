@@ -577,6 +577,7 @@ model Business {
   aiConversationMetrics    AiConversationMetric[]
   aiCustomerMetrics        AiCustomerMetric[]
   aiBusinessSnapshot       AiBusinessSnapshot?
+  aiTrainingSessionLogs    AiTrainingSessionLog[]
 
   @@index([slug])
   @@index([isActive])
@@ -648,6 +649,8 @@ model User {
   aiDeploymentRejections       AiDeploymentRequest[]       @relation("AiDeploymentRejecter")
   aiSandboxSessions            AiSandboxSession[]          @relation("AiSandboxUser")
   aiTrainingAuditLogs          AiTrainingAuditLog[]        @relation("AiTrainingAuditUser")
+  aiTrainingVerifications      AiTrainingVerificationRequest[] @relation("AiTrainingVerificationUser")
+  aiTrainingSessionsOperated   AiTrainingSessionLog[]      @relation("AiTrainingSessionOperator")
 
   @@index([email])
   @@index([isActive])
@@ -2196,6 +2199,39 @@ enum AiTrainingAuditAction {
   VERSION_ROLLBACK
   DOCUMENT_UPLOADED
   TRAINER_LOGIN
+  TRAINING_OTP_REQUESTED
+  TRAINING_OTP_VERIFIED
+  TRAINING_OTP_FAILED
+  TRAINING_VALIDATED
+  INCREMENTAL_RETRAIN
+  REINDEX_STARTED
+  EMBEDDINGS_REBUILT
+  KNOWLEDGE_OPTIMIZED
+}
+
+enum AiTrainingOperation {
+  TRAIN_ONE
+  RETRAIN_ONE
+  TRAIN_MULTIPLE
+  TRAIN_ALL
+  REBUILD_EMBEDDINGS
+  REINDEX
+  VALIDATE
+  OPTIMIZE
+  DELETE_OLD_EMBEDDINGS
+  GENERATE_EMBEDDINGS
+  PREVIEW
+  ROLLBACK
+  COMPARE_VERSIONS
+}
+
+enum AiTrainingVerificationStatus {
+  PENDING_OTP
+  VERIFIED
+  EXPIRED
+  FAILED
+  EXECUTED
+  CANCELLED
 }
 
 model AiTrainingWorkspace {
@@ -2204,6 +2240,7 @@ model AiTrainingWorkspace {
   productionVersionId String?
   sandboxVersionId    String?
   lastTrainedAt       DateTime?
+  lastRetrainedAt     DateTime?
   aiReadinessScore    Float?
   knowledgeScore      Float?
   confidenceScore     Float?
@@ -2286,12 +2323,79 @@ model AiTrainingJob {
   version          AiTrainingVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
   createdByUser    User?               @relation("AiJobCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByTrainer AiTrainer?          @relation(fields: [createdByTrainerId], references: [id], onDelete: SetNull)
+  sessionLog       AiTrainingSessionLog?
 
   @@index([businessId])
   @@index([workspaceId])
   @@index([status])
   @@index([createdAt])
   @@map("ai_training_jobs")
+}
+
+model AiTrainingVerificationRequest {
+  id            String                       @id @default(uuid())
+  userId        String
+  operation     AiTrainingOperation
+  jobType       AiTrainingJobType?
+  businessIds   String[]                     @default([])
+  payload       Json?
+  otpHash       String?
+  otpExpiresAt  DateTime?
+  otpAttempts   Int                          @default(0)
+  status        AiTrainingVerificationStatus @default(PENDING_OTP)
+  verifiedAt    DateTime?
+  executedAt    DateTime?
+  failureReason String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+
+  user User @relation("AiTrainingVerificationUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ai_training_verification_requests")
+}
+
+model AiTrainingSessionLog {
+  id                 String              @id @default(uuid())
+  jobId              String?             @unique
+  businessId         String
+  operatorUserId     String?
+  startedAt          DateTime
+  finishedAt         DateTime?
+  durationMs         Int?
+  trainingType       AiTrainingJobType
+  knowledgeCount     Int                 @default(0)
+  documentsCount     Int                 @default(0)
+  faqCount           Int                 @default(0)
+  productCount       Int                 @default(0)
+  serviceCount       Int                 @default(0)
+  embeddingsCreated  Int                 @default(0)
+  embeddingsUpdated  Int                 @default(0)
+  embeddingsDeleted  Int                 @default(0)
+  tokensUsed         Int                 @default(0)
+  estimatedCost      Decimal             @default(0) @db.Decimal(12, 4)
+  warnings           Json?
+  errors             Json?
+  validationResult   Json?
+  qualityScore       Float?
+  status             AiTrainingJobStatus
+  metadata           Json?
+  createdAt          DateTime            @default(now())
+
+  business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  job      AiTrainingJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  operator User?          @relation("AiTrainingSessionOperator", fields: [operatorUserId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([operatorUserId])
+  @@index([trainingType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ai_training_session_logs")
 }
 
 model AiDeploymentRequest {

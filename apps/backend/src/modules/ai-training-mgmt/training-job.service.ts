@@ -51,6 +51,7 @@ export class TrainingJobService {
         {
           jobId: job.id,
           businessId: input.businessId,
+          jobType: input.type,
           userId: input.userId,
           trainerId: input.trainerId,
           trainingNotes: input.trainingNotes,
@@ -67,6 +68,7 @@ export class TrainingJobService {
       void executeTrainingPipeline({
         businessId: input.businessId,
         jobId: job.id,
+        jobType: input.type,
         userId: input.userId,
         trainerId: input.trainerId,
         trainingNotes: input.trainingNotes,
