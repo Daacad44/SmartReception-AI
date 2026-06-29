@@ -1,9 +1,43 @@
 import { prisma } from '../../infrastructure/database/prisma';
+import type { AiBusinessSnapshot } from '@prisma/client';
 import { aiAnalyticsRepository, startOfDay, daysAgo } from './ai-analytics.repository';
 import { broadcastAiAnalyticsUpdate } from '../../infrastructure/realtime/broadcast.service';
-import { estimateCostUsd } from '../../infrastructure/ai/providers/types';
+
+const SNAPSHOT_STALE_MS = 60_000;
+const refreshInFlight = new Map<string, Promise<void>>();
 
 export class BusinessSnapshotService {
+  /**
+   * Fast read path: return cached snapshot immediately.
+   * Refresh in background when stale; block only when no snapshot exists yet.
+   */
+  async getSnapshotForRead(businessId: string): Promise<AiBusinessSnapshot | null> {
+    const existing = await prisma.aiBusinessSnapshot.findUnique({ where: { businessId } });
+
+    if (!existing) {
+      await this.refresh(businessId);
+      return prisma.aiBusinessSnapshot.findUnique({ where: { businessId } });
+    }
+
+    const ageMs = Date.now() - existing.updatedAt.getTime();
+    if (ageMs > SNAPSHOT_STALE_MS) {
+      void this.refreshDeduped(businessId).catch(() => undefined);
+    }
+
+    return existing;
+  }
+
+  async refreshDeduped(businessId: string): Promise<void> {
+    const pending = refreshInFlight.get(businessId);
+    if (pending) return pending;
+
+    const job = this.refresh(businessId).finally(() => {
+      refreshInFlight.delete(businessId);
+    });
+    refreshInFlight.set(businessId, job);
+    return job;
+  }
+
   async refresh(businessId: string): Promise<void> {
     const now = new Date();
     const todayStart = startOfDay(now);

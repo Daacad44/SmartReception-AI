@@ -12,35 +12,38 @@ export type { AnalyticsFilters };
 
 export class AiAnalyticsService {
   async getBusinessDashboard(businessId: string) {
-    await businessSnapshotService.refresh(businessId);
-    const snapshot = await prisma.aiBusinessSnapshot.findUnique({ where: { businessId } });
     const monthAgo = daysAgo(30);
 
     const [
+      snapshot,
       dailySeries,
-      customers,
-      conversations,
-      tokenIntel,
-      costIntel,
+      providerUsage,
       peakHours,
-      peakDays,
+      customerGrowth,
+      conversationGrowth,
       topDocuments,
     ] = await Promise.all([
+      businessSnapshotService.getSnapshotForRead(businessId),
       aiAnalyticsRepository.getDailyTokenSeries(businessId, 30),
-      aiAnalyticsRepository.listCustomersWithAnalytics(businessId),
-      aiAnalyticsRepository.listConversationsWithAnalytics(businessId),
-      this.getTokenIntelligence(businessId),
-      this.getCostIntelligence(businessId),
+      this.getProviderUsage(businessId, monthAgo),
       this.getPeakHours(businessId, monthAgo),
-      this.getPeakDays(businessId, monthAgo),
+      this.getCustomerGrowth(businessId),
+      this.getConversationGrowth(businessId),
       this.getTopRetrievedDocuments(businessId),
     ]);
 
     const now = new Date();
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthlyCost = Number(snapshot?.monthlyAiCost ?? 0);
     const predictedEndOfMonthCost =
-      dayOfMonth > 0 ? (snapshot?.monthlyAiCost ? Number(snapshot.monthlyAiCost) / dayOfMonth * daysInMonth : 0) : 0;
+      dayOfMonth > 0 ? (monthlyCost / dayOfMonth) * daysInMonth : 0;
+
+    const lifetimeCost = Number(snapshot?.lifetimeAiCost ?? 0);
+    const totalCustomers = snapshot?.totalCustomers ?? 0;
+    const totalConversations = snapshot?.totalConversations ?? 0;
+    const totalMessages =
+      (snapshot?.totalCustomerMessages ?? 0) + (snapshot?.totalAiMessages ?? 0);
 
     return {
       snapshot,
@@ -52,27 +55,27 @@ export class AiAnalyticsService {
         thisWeek: { totalTokens: snapshot?.weeklyTokens ?? 0 },
         thisMonth: {
           totalTokens: snapshot?.monthlyTokens ?? 0,
-          estimatedCostUsd: Number(snapshot?.monthlyAiCost ?? 0),
+          estimatedCostUsd: monthlyCost,
         },
         lifetime: {
           totalTokens: snapshot?.lifetimeTokens ?? 0,
-          estimatedCostUsd: Number(snapshot?.lifetimeAiCost ?? 0),
+          estimatedCostUsd: lifetimeCost,
         },
         predictedEndOfMonthCost,
         projectedAnnualCost: predictedEndOfMonthCost * 12,
       },
       customers: {
-        total: snapshot?.totalCustomers ?? 0,
+        total: totalCustomers,
         active: snapshot?.activeCustomers ?? 0,
         returning: snapshot?.returningCustomers ?? 0,
-        list: customers.slice(0, 20),
+        list: [],
       },
       conversations: {
-        total: snapshot?.totalConversations ?? 0,
+        total: totalConversations,
         totalCustomerMessages: snapshot?.totalCustomerMessages ?? 0,
         totalAiMessages: snapshot?.totalAiMessages ?? 0,
         avgTokensPerConversation: snapshot?.avgTokensPerConversation ?? 0,
-        list: conversations.slice(0, 20),
+        list: [],
       },
       performance: {
         avgResponseTimeMs: snapshot?.avgResponseTimeMs ?? 0,
@@ -88,19 +91,41 @@ export class AiAnalyticsService {
         lastTrainingAt: snapshot?.lastTrainingAt,
         topDocuments,
       },
-      tokenIntelligence: tokenIntel,
-      costIntelligence: costIntel,
+      tokenIntelligence: {
+        inputTokens: snapshot?.inputTokens ?? 0,
+        outputTokens: snapshot?.outputTokens ?? 0,
+        knowledgeTokens: 0,
+        summaryTokens: 0,
+        averagePromptSize: 0,
+        averageResponseSize: 0,
+        compressionPercent: snapshot?.tokenSavingsPercent ?? 0,
+        tokenSavingsPercent: snapshot?.tokenSavingsPercent ?? 0,
+        estimatedSavings: snapshot?.tokenSavingsTokens ?? 0,
+        dailySavings: 0,
+        monthlySavings: 0,
+        lifetimeSavings: snapshot?.tokenSavingsTokens ?? 0,
+      },
+      costIntelligence: {
+        todayCost: Number(snapshot?.estimatedAiCost ?? 0),
+        weeklyCost: 0,
+        monthlyCost,
+        lifetimeCost,
+        costPerCustomer: totalCustomers > 0 ? lifetimeCost / totalCustomers : 0,
+        costPerConversation: totalConversations > 0 ? lifetimeCost / totalConversations : 0,
+        costPerMessage: totalMessages > 0 ? lifetimeCost / totalMessages : 0,
+        predictedEndOfMonthCost,
+        projectedAnnualCost:
+          monthlyCost > 0 ? (monthlyCost / Math.max(dayOfMonth, 1)) * 365 : 0,
+      },
       charts: {
         dailyTokens: dailySeries,
-        monthlyTokens: await aiAnalyticsRepository.getDailyTokenSeries(businessId, 365),
-        conversationGrowth: await this.getConversationGrowth(businessId),
-        customerGrowth: await this.getCustomerGrowth(businessId),
-        providerUsage: await this.getProviderUsage(businessId, monthAgo),
+        providerUsage,
         peakHours,
-        peakDays,
+        customerGrowth,
+        conversationGrowth,
         tokenSavings: dailySeries.map((d) => ({
           date: d.date,
-          savings: Math.max(0, d.tokens * 0.7),
+          savings: Math.max(0, d.tokens * ((snapshot?.tokenSavingsPercent ?? 0) / 100)),
         })),
       },
     };
@@ -185,7 +210,6 @@ export class AiAnalyticsService {
   }
 
   async getBusinessDetailAnalytics(businessId: string, filters: AnalyticsFilters = {}) {
-    await businessSnapshotService.refresh(businessId);
     const dashboard = await this.getBusinessDashboard(businessId);
 
     const [customers, conversations, events, trainingJobs] = await Promise.all([
