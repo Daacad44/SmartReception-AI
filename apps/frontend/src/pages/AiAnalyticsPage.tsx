@@ -10,13 +10,21 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Bot, Coins, Gauge, Layers, Sparkles, Users, Zap } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import api, { extractData } from '@/lib/api';
 import type { AiAnalyticsDashboard } from '@/lib/ai-analytics-types';
 import { formatNumber } from '@/lib/utils';
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
+
+function ChartEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
 
 function MetricCard({
   title,
@@ -50,7 +58,9 @@ export function AiAnalyticsPage() {
     queryKey: ['ai-analytics-dashboard'],
     queryFn: async () =>
       extractData<AiAnalyticsDashboard>(await api.get('/ai-analytics/dashboard')),
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
   });
 
   if (isError && !data) {
@@ -67,7 +77,7 @@ export function AiAnalyticsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
+        {isLoading && !data ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
@@ -86,7 +96,7 @@ export function AiAnalyticsPage() {
             <MetricCard
               title="Token Savings (RAG)"
               value={`${(data?.performance.tokenSavingsPercent ?? 0).toFixed(1)}%`}
-              subtitle={`${formatNumber(data?.tokenIntelligence.lifetimeSavings ?? 0)} tokens saved`}
+              subtitle={`${formatNumber(data?.tokenIntelligence?.lifetimeSavings ?? 0)} tokens saved`}
               icon={Sparkles}
             />
             <MetricCard
@@ -100,7 +110,7 @@ export function AiAnalyticsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
+        {isLoading && !data ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
@@ -125,7 +135,7 @@ export function AiAnalyticsPage() {
             <MetricCard
               title="Lifetime Cost"
               value={`$${(data?.usage.lifetime.estimatedCostUsd ?? 0).toFixed(4)}`}
-              subtitle={`$${(data?.costIntelligence.costPerConversation ?? 0).toFixed(4)} per conversation`}
+              subtitle={`$${(data?.costIntelligence?.costPerConversation ?? 0).toFixed(4)} per conversation`}
               icon={Coins}
             />
           </>
@@ -139,8 +149,10 @@ export function AiAnalyticsPage() {
             <CardDescription>Last 30 days from database records</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
-            {isLoading ? (
+            {isLoading && !data ? (
               <Skeleton className="h-full w-full" />
+            ) : (data?.charts.dailyTokens ?? []).length === 0 ? (
+              <ChartEmptyState message="No token usage recorded yet." />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data?.charts.dailyTokens ?? []}>
@@ -161,8 +173,10 @@ export function AiAnalyticsPage() {
             <CardDescription>Tokens by provider this month</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
-            {isLoading ? (
+            {isLoading && !data ? (
               <Skeleton className="h-full w-full" />
+            ) : (data?.charts.providerUsage ?? []).length === 0 ? (
+              <ChartEmptyState message="No provider usage this month." />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data?.charts.providerUsage ?? []}>
@@ -185,8 +199,10 @@ export function AiAnalyticsPage() {
             <CardDescription>New customers over 90 days</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
-            {isLoading ? (
+            {isLoading && !data ? (
               <Skeleton className="h-full w-full" />
+            ) : (data?.charts.customerGrowth ?? []).length === 0 ? (
+              <ChartEmptyState message="No customer growth data yet." />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data?.charts.customerGrowth ?? []}>
@@ -207,8 +223,10 @@ export function AiAnalyticsPage() {
             <CardDescription>Message volume by hour</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
-            {isLoading ? (
+            {isLoading && !data ? (
               <Skeleton className="h-full w-full" />
+            ) : (data?.charts.peakHours ?? []).length === 0 ? (
+              <ChartEmptyState message="No message activity recorded yet." />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data?.charts.peakHours ?? []}>
@@ -248,15 +266,15 @@ export function AiAnalyticsPage() {
           <CardContent className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Input</span>
-              <span>{formatNumber(data?.tokenIntelligence.inputTokens ?? 0)}</span>
+              <span>{formatNumber(data?.tokenIntelligence?.inputTokens ?? 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Output</span>
-              <span>{formatNumber(data?.tokenIntelligence.outputTokens ?? 0)}</span>
+              <span>{formatNumber(data?.tokenIntelligence?.outputTokens ?? 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Knowledge</span>
-              <span>{formatNumber(data?.tokenIntelligence.knowledgeTokens ?? 0)}</span>
+              <span>{formatNumber(data?.tokenIntelligence?.knowledgeTokens ?? 0)}</span>
             </div>
           </CardContent>
         </Card>
