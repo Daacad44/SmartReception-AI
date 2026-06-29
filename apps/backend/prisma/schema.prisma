@@ -640,6 +640,8 @@ model Business {
   aiCustomerMetrics        AiCustomerMetric[]
   aiBusinessSnapshot       AiBusinessSnapshot?
   aiTrainingSessionLogs    AiTrainingSessionLog[]
+  platformFeatureScopes    PlatformFeatureBusinessScope[]
+  platformFeatureAuditLogs PlatformFeatureAuditLog[]
 
   @@index([slug])
   @@index([isActive])
@@ -713,6 +715,10 @@ model User {
   aiTrainingAuditLogs          AiTrainingAuditLog[]        @relation("AiTrainingAuditUser")
   aiTrainingVerifications      AiTrainingVerificationRequest[] @relation("AiTrainingVerificationUser")
   aiTrainingSessionsOperated   AiTrainingSessionLog[]      @relation("AiTrainingSessionOperator")
+  platformFeaturesCreated      PlatformFeature[]           @relation("PlatformFeatureCreatedBy")
+  platformFeaturesModified     PlatformFeature[]           @relation("PlatformFeatureModifiedBy")
+  platformFeatureVerifications PlatformFeatureVerificationRequest[] @relation("PlatformFeatureVerificationUser")
+  platformFeatureAuditLogs     PlatformFeatureAuditLog[]   @relation("PlatformFeatureAuditUser")
 
   @@index([email])
   @@index([isActive])
@@ -3089,4 +3095,209 @@ model AiBusinessSnapshot {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@map("ai_business_snapshots")
+}
+
+// ─── PLATFORM FEATURE MANAGEMENT ─────────────────────────────────────────────
+
+enum PlatformFeatureStatus {
+  DISABLED
+  ENABLED
+  HIDDEN
+  INTERNAL
+  BETA
+  COMING_SOON
+  EXPERIMENTAL
+  DEPRECATED
+  ARCHIVED
+}
+
+enum PlatformFeatureVisibility {
+  PUBLIC
+  INTERNAL
+  SUPER_ADMIN
+  HIDDEN
+}
+
+enum PlatformFeatureReleaseType {
+  STANDARD
+  BETA
+  PREMIUM
+  EXPERIMENTAL
+  FUTURE
+  INTERNAL
+}
+
+enum PlatformFeatureScope {
+  PLATFORM_WIDE
+  BUSINESS_SPECIFIC
+}
+
+enum PlatformFeatureVerificationAction {
+  ENABLE
+  DISABLE
+  STATUS_CHANGE
+  MOVE_FROM_FUTURE
+}
+
+enum PlatformFeatureVerificationStatus {
+  PENDING_OTP
+  VERIFIED
+  EXPIRED
+  FAILED
+  CANCELLED
+  EXECUTED
+}
+
+enum PlatformFeatureAuditAction {
+  FEATURE_CREATED
+  FEATURE_UPDATED
+  ACTIVATION_REQUESTED
+  ACTIVATION_VERIFIED
+  ACTIVATION_FAILED
+  DEACTIVATION_REQUESTED
+  DEACTIVATION_VERIFIED
+  STATUS_CHANGED
+  DEPENDENCY_ADDED
+  DEPENDENCY_REMOVED
+  MOVED_FROM_FUTURE
+  NOTES_UPDATED
+}
+
+model PlatformFeature {
+  id               String                     @id @default(uuid())
+  featureKey       String                     @unique
+  name             String
+  description      String
+  category         String
+  version          String                     @default("1.0.0")
+  module           String
+  status           PlatformFeatureStatus      @default(DISABLED)
+  visibility       PlatformFeatureVisibility  @default(PUBLIC)
+  releaseType      PlatformFeatureReleaseType @default(STANDARD)
+  scope            PlatformFeatureScope       @default(PLATFORM_WIDE)
+  routePath        String?
+  apiPrefix        String?
+  navLabel         String?
+  isNavItem        Boolean                    @default(false)
+  blocksAi         Boolean                    @default(false)
+  blocksJobs       Boolean                    @default(false)
+  notes            String?
+  activationDate   DateTime?
+  deactivationDate DateTime?
+  createdById      String?
+  lastModifiedById String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  createdBy      User? @relation("PlatformFeatureCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lastModifiedBy User? @relation("PlatformFeatureModifiedBy", fields: [lastModifiedById], references: [id], onDelete: SetNull)
+
+  dependencies         PlatformFeatureDependency[] @relation("FeatureDependencies")
+  dependents           PlatformFeatureDependency[] @relation("FeatureDependents")
+  verificationRequests PlatformFeatureVerificationRequest[]
+  auditLogs            PlatformFeatureAuditLog[]
+  businessScopes       PlatformFeatureBusinessScope[]
+
+  @@index([category])
+  @@index([status])
+  @@index([releaseType])
+  @@index([module])
+  @@map("platform_features")
+}
+
+model PlatformFeatureDependency {
+  id                  String @id @default(uuid())
+  featureId           String
+  dependsOnFeatureId  String
+
+  feature          PlatformFeature @relation("FeatureDependencies", fields: [featureId], references: [id], onDelete: Cascade)
+  dependsOnFeature PlatformFeature @relation("FeatureDependents", fields: [dependsOnFeatureId], references: [id], onDelete: Cascade)
+
+  @@unique([featureId, dependsOnFeatureId])
+  @@index([dependsOnFeatureId])
+  @@map("platform_feature_dependencies")
+}
+
+model PlatformFeatureBusinessScope {
+  id         String                @id @default(uuid())
+  featureId  String
+  businessId String
+  status     PlatformFeatureStatus @default(DISABLED)
+  enabledAt  DateTime?
+  disabledAt DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  feature  PlatformFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([featureId, businessId])
+  @@index([businessId])
+  @@map("platform_feature_business_scopes")
+}
+
+model PlatformFeatureVerificationRequest {
+  id              String                            @id @default(uuid())
+  featureId       String
+  userId          String
+  action          PlatformFeatureVerificationAction
+  targetStatus    PlatformFeatureStatus
+  previousStatus  PlatformFeatureStatus
+  reason          String?
+  otpHash         String
+  otpExpiresAt    DateTime
+  otpAttempts     Int                               @default(0)
+  status          PlatformFeatureVerificationStatus @default(PENDING_OTP)
+  ipAddress       String?
+  userAgent       String?
+  browser         String?
+  operatingSystem String?
+  verifiedAt      DateTime?
+  executedAt      DateTime?
+  failureReason   String?
+  createdAt       DateTime                          @default(now())
+  updatedAt       DateTime                          @updatedAt
+
+  feature   PlatformFeature           @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  user      User                      @relation("PlatformFeatureVerificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  auditLogs PlatformFeatureAuditLog[]
+
+  @@index([featureId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("platform_feature_verification_requests")
+}
+
+model PlatformFeatureAuditLog {
+  id                   String                     @id @default(uuid())
+  featureId            String
+  featureKey           String
+  featureName          String
+  businessId           String?
+  action               PlatformFeatureAuditAction
+  previousStatus       PlatformFeatureStatus?
+  newStatus            PlatformFeatureStatus?
+  superAdminId         String?
+  verificationStatus   String?
+  verificationCodeId   String?
+  ipAddress            String?
+  userAgent            String?
+  browser              String?
+  operatingSystem      String?
+  reason               String?
+  metadata             Json?
+  createdAt            DateTime                   @default(now())
+
+  feature              PlatformFeature                     @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  superAdmin           User?                               @relation("PlatformFeatureAuditUser", fields: [superAdminId], references: [id], onDelete: SetNull)
+  verificationRequest  PlatformFeatureVerificationRequest? @relation(fields: [verificationCodeId], references: [id], onDelete: SetNull)
+  business             Business?                           @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([featureId])
+  @@index([featureKey])
+  @@index([superAdminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("platform_feature_audit_logs")
 }

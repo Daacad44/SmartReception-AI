@@ -21,6 +21,7 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { AcceptInvitePage } from '@/pages/AcceptInvitePage';
 import { PermissionRoute } from '@/components/PermissionRoute';
+import { FeatureRoute } from '@/components/FeatureRoute';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
@@ -119,6 +120,9 @@ const SubscriptionDetailsPage = lazyWithRetry(() =>
 );
 const SubscriptionExpiredPage = lazyWithRetry(() =>
   import('@/pages/SubscriptionExpiredPage').then((m) => ({ default: m.SubscriptionExpiredPage }))
+);
+const FeatureManagementAdminPage = lazyWithRetry(() =>
+  import('@/pages/FeatureManagementAdminPage').then((m) => ({ default: m.FeatureManagementAdminPage }))
 );
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 
@@ -278,7 +282,9 @@ export default function App() {
                     path="/appointments/automation"
                     element={
                       <PermissionRoute permission={PERMISSIONS['appointments:read']}>
-                        <AppointmentAutomationPage />
+                        <FeatureRoute featureKey="appointment-automation">
+                          <AppointmentAutomationPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
@@ -294,7 +300,9 @@ export default function App() {
                     path="/campaigns"
                     element={
                       <PermissionRoute permission={PERMISSIONS['campaigns:read']}>
-                        <CampaignsPage />
+                        <FeatureRoute featureKey="campaigns">
+                          <CampaignsPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
@@ -302,7 +310,9 @@ export default function App() {
                     path="/employee-comms"
                     element={
                       <PermissionRoute permission={PERMISSIONS['employee-comms:read']}>
-                        <EmployeeCommunicationPage />
+                        <FeatureRoute featureKey="employee-comms">
+                          <EmployeeCommunicationPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
@@ -330,7 +340,9 @@ export default function App() {
                     path="/ai-analytics"
                     element={
                       <PermissionRoute permission={PERMISSIONS['analytics:read']}>
-                        <AiAnalyticsPage />
+                        <FeatureRoute featureKey="ai-analytics">
+                          <AiAnalyticsPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
@@ -442,7 +454,19 @@ export default function App() {
                     path="/admin/governance"
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
-                        <GovernanceAdminPage />
+                        <FeatureRoute featureKey="governance-admin">
+                          <GovernanceAdminPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/feature-management"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="feature-management">
+                          <FeatureManagementAdminPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />

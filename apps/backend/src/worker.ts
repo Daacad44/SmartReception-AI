@@ -46,6 +46,12 @@ async function processAiDeploymentJob(job: Job<AiDeploymentJobData>): Promise<vo
 async function processAIJob(job: Job<AIJobData>): Promise<void> {
   const { businessId, conversationId, messageId, customerMessage } = job.data;
 
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('ai-chat', businessId))) {
+    logger.debug(`Skipping AI job — ai-chat feature disabled for business ${businessId}`);
+    return;
+  }
+
   const { isWhatsAppAutomationAllowed } = await import('./modules/subscription/subscription-license.service');
   if (!(await isWhatsAppAutomationAllowed(businessId))) {
     logger.debug(`Skipping AI job — subscription invalid for business ${businessId}`);
@@ -119,28 +125,62 @@ async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
 
 async function processReminderJobHandler(job: Job<ReminderJobData>): Promise<void> {
   const { appointmentId, businessId, interval = '30m' } = job.data;
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('appointment-automation', businessId))) {
+    logger.debug(`Skipping appointment reminder — automation feature disabled`);
+    return;
+  }
   await processReminderJob(appointmentId, businessId, interval);
 }
 
 async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
   const { campaignId, businessId } = job.data;
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('campaigns', businessId))) {
+    logger.debug(`Skipping campaign job — campaigns feature disabled for business ${businessId}`);
+    return;
+  }
   await executeCampaignSend(campaignId, businessId);
 }
 
 async function processCampaignBatchJob(job: Job<CampaignBatchJobData>): Promise<void> {
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('campaigns', job.data.businessId))) {
+    logger.debug(`Skipping campaign batch — campaigns feature disabled`);
+    return;
+  }
   await sendCampaignBatch(job.data);
 }
 
 async function processCampaignJourneyJob(job: Job<CampaignJourneyJobData>): Promise<void> {
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  const enrollment = await prisma.campaignJourneyEnrollment.findUnique({
+    where: { id: job.data.enrollmentId },
+    select: { businessId: true },
+  });
+  if (enrollment && !(await assertFeatureEnabled('campaigns', enrollment.businessId))) {
+    logger.debug(`Skipping campaign journey — campaigns feature disabled`);
+    return;
+  }
   await scheduleJourneyStep(job.data.enrollmentId);
 }
 
 async function processEmployeeBroadcastJob(job: Job<EmployeeBroadcastJobData>): Promise<void> {
   const { broadcastId, businessId } = job.data;
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('employee-comms', businessId))) {
+    logger.debug(`Skipping employee broadcast — feature disabled for business ${businessId}`);
+    return;
+  }
   await executeEmployeeBroadcastSend(broadcastId, businessId);
 }
 
 async function processEmployeeBroadcastBatchJob(job: Job<EmployeeBroadcastBatchJobData>): Promise<void> {
+  const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
+  if (!(await assertFeatureEnabled('employee-comms', job.data.businessId))) {
+    logger.debug(`Skipping employee broadcast batch — feature disabled`);
+    return;
+  }
   await sendEmployeeBroadcastBatch(job.data);
 }
 

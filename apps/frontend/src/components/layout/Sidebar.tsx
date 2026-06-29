@@ -21,6 +21,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Workflow,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -29,34 +30,36 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversationSummary, useBilling, useAppointments } from '@/hooks/useApi';
 import { usePermissions } from '@/hooks/usePermissions';
+import { usePlatformFeatures } from '@/hooks/usePlatformFeatures';
 import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const },
-  { to: '/customers', icon: Users, label: 'Customers' },
-  { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const },
-  { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
-  { to: '/appointments/automation', icon: Workflow, label: 'Workflow Builder', permission: 'appointments:write' as const },
-  { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
-  { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const },
-  { to: '/ai-training', icon: BookOpen, label: 'AI Training' },
-  { to: '/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'analytics:read' as const },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/team', icon: UsersRound, label: 'Team' },
-  { to: '/notifications', icon: Bell, label: 'Notifications' },
-  { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-  { to: '/billing', icon: CreditCard, label: 'Billing' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', featureKey: 'dashboard' },
+  { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const, featureKey: 'conversations' },
+  { to: '/customers', icon: Users, label: 'Customers', featureKey: 'customers' },
+  { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const, featureKey: 'customer-import' },
+  { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const, featureKey: 'appointments' },
+  { to: '/appointments/automation', icon: Workflow, label: 'Workflow Builder', permission: 'appointments:write' as const, featureKey: 'appointment-automation' },
+  { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const, featureKey: 'campaigns' },
+  { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const, featureKey: 'employee-comms' },
+  { to: '/ai-training', icon: BookOpen, label: 'AI Training', featureKey: 'ai-training' },
+  { to: '/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'analytics:read' as const, featureKey: 'ai-analytics' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics', featureKey: 'analytics' },
+  { to: '/team', icon: UsersRound, label: 'Team', featureKey: 'team' },
+  { to: '/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
+  { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const, featureKey: 'audit-logs' },
+  { to: '/settings', icon: Settings, label: 'Settings', featureKey: 'settings' },
+  { to: '/billing', icon: CreditCard, label: 'Billing', featureKey: 'billing' },
 ];
 
 const adminNavItems = [
-  { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const },
-  { to: '/admin/ai-training', icon: BookOpen, label: 'AI Training Center', permission: 'platform:admin' as const },
-  { to: '/admin/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'platform:admin' as const },
-  { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const },
-  { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const },
-  { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const },
+  { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
+  { to: '/admin/ai-training', icon: BookOpen, label: 'AI Training Center', permission: 'platform:admin' as const, featureKey: 'ai-training-center' },
+  { to: '/admin/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'platform:admin' as const, featureKey: 'ai-analytics-admin' },
+  { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
+  { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
+  { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
+  { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
 ];
 
 interface SidebarProps {
@@ -70,6 +73,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
   const { hasPermission } = usePermissions();
+  const { isFeatureEnabled } = usePlatformFeatures();
   const unreadCount = summary?.unreadTotal ?? 0;
   const upcomingAppointments =
     appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
@@ -90,7 +94,9 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
       'permission' in item && item.permission
         ? PERMISSIONS[item.permission]
         : ROUTE_PERMISSIONS[item.to];
-    return permission ? hasPermission(permission) : true;
+    if (permission && !hasPermission(permission)) return false;
+    if ('featureKey' in item && item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+    return true;
   });
 
   return (

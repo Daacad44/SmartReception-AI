@@ -33,6 +33,7 @@ import aiTrainingCenterRoutes from '../modules/ai-training-mgmt/ai-training-cent
 import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
 import aiAnalyticsAdminRoutes from '../modules/ai-analytics/ai-analytics-admin.routes';
 import aiAnalyticsRoutes from '../modules/ai-analytics/ai-analytics.routes';
+import featureManagementRoutes from '../modules/feature-management/feature-management.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -47,6 +48,7 @@ router.use('/auth', authRoutes);
 router.use('/trainer-portal', trainerPortalRoutes);
 router.use('/webhooks', webhooksRoutes);
 router.use('/super-admin', superAdminRoutes);
+router.use('/super-admin/feature-management', featureManagementRoutes);
 router.use('/super-admin/ai-training', aiTrainingAdminRoutes);
 router.use('/super-admin/ai-training-center', aiTrainingCenterRoutes);
 router.use('/super-admin/ai-analytics', aiAnalyticsAdminRoutes);

@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { aiController } from './ai.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { requirePlatformFeature } from '../../core/middleware/platform-feature.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
 
-router.use(authenticate, requireBusiness);
+router.use(authenticate, requireBusiness, requirePlatformFeature('ai-chat'));
 
 router.get('/config', authorize(PERMISSIONS['ai:configure']), (req, res, next) =>
   aiController.getConfig(req, res, next)
