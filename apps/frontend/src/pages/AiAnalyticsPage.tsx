@@ -9,43 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Bot, Coins, Gauge, Layers, Sparkles, Zap } from 'lucide-react';
+import { Bot, Coins, Gauge, Layers, Sparkles, Users, Zap } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import api, { extractData } from '@/lib/api';
+import type { AiAnalyticsDashboard } from '@/lib/ai-analytics-types';
 import { formatNumber } from '@/lib/utils';
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface AiAnalyticsDashboard {
-  usage: {
-    today: { totalRequests: number; totalTokens: number; estimatedCostUsd: number };
-    thisWeek: { totalRequests: number; totalTokens: number; estimatedCostUsd: number };
-    thisMonth: { totalRequests: number; totalTokens: number; estimatedCostUsd: number; tokenSavingsPercent: number };
-    lifetime: { totalRequests: number; totalTokens: number; estimatedCostUsd: number };
-    predictedEndOfMonthCost: number;
-  };
-  performance: {
-    avgResponseTimeMs: number;
-    tokenSavingsPercent: number;
-    searchSuccessRate: number;
-    fallbackRate: number;
-    avgTokensPerConversation: number;
-  };
-  charts: {
-    dailyTokens: Array<{ date: string; tokens: number; cost: number }>;
-    providerUsage: Record<string, number>;
-    peakHours: Array<{ hour: number; count: number }>;
-    topCategories: Array<{ category: string | null; count: number }>;
-  };
-  knowledge: { chunkCount: number; avgRetrievedChunks: number };
-  topCustomers: Array<{
-    customerId: string;
-    conversationCount: number;
-    totalTokens: number;
-    estimatedCostUsd: number;
-  }>;
-}
 
 function MetricCard({
   title,
@@ -79,23 +50,19 @@ export function AiAnalyticsPage() {
     queryKey: ['ai-analytics-dashboard'],
     queryFn: async () =>
       extractData<AiAnalyticsDashboard>(await api.get('/ai-analytics/dashboard')),
+    refetchInterval: 15_000,
   });
 
   if (isError && !data) {
     return <ErrorState message="Unable to load AI analytics." onRetry={() => refetch()} />;
   }
 
-  const providerData = Object.entries(data?.charts.providerUsage ?? {}).map(([name, value]) => ({
-    name,
-    value,
-  }));
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">AI Analytics</h1>
         <p className="text-muted-foreground">
-          Token usage, RAG performance, and cost intelligence for your AI receptionist
+          Real-time token usage, RAG performance, and cost intelligence from your database
         </p>
       </div>
 
@@ -105,9 +72,9 @@ export function AiAnalyticsPage() {
         ) : (
           <>
             <MetricCard
-              title="AI Requests (Today)"
-              value={formatNumber(data?.usage.today.totalRequests ?? 0)}
-              subtitle={`${formatNumber(data?.usage.today.totalTokens ?? 0)} tokens`}
+              title="Tokens (Today)"
+              value={formatNumber(data?.usage.today.totalTokens ?? 0)}
+              subtitle={`$${(data?.usage.today.estimatedCostUsd ?? 0).toFixed(4)} estimated cost`}
               icon={Bot}
             />
             <MetricCard
@@ -119,14 +86,47 @@ export function AiAnalyticsPage() {
             <MetricCard
               title="Token Savings (RAG)"
               value={`${(data?.performance.tokenSavingsPercent ?? 0).toFixed(1)}%`}
-              subtitle="vs full knowledge base injection"
+              subtitle={`${formatNumber(data?.tokenIntelligence.lifetimeSavings ?? 0)} tokens saved`}
               icon={Sparkles}
             />
             <MetricCard
               title="Avg Response Time"
               value={`${data?.performance.avgResponseTimeMs ?? 0}ms`}
-              subtitle={`${(data?.performance.searchSuccessRate ?? 0).toFixed(0)}% retrieval success`}
+              subtitle={`${(data?.performance.automationSuccessRate ?? 0).toFixed(0)}% automation success`}
               icon={Gauge}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+        ) : (
+          <>
+            <MetricCard
+              title="Customers"
+              value={formatNumber(data?.customers.total ?? 0)}
+              subtitle={`${data?.customers.active ?? 0} active · ${data?.customers.returning ?? 0} returning`}
+              icon={Users}
+            />
+            <MetricCard
+              title="Conversations"
+              value={formatNumber(data?.conversations.total ?? 0)}
+              subtitle={`${formatNumber(data?.conversations.totalAiMessages ?? 0)} AI messages`}
+              icon={Bot}
+            />
+            <MetricCard
+              title="Lifetime Tokens"
+              value={formatNumber(data?.usage.lifetime.totalTokens ?? 0)}
+              subtitle={`${formatNumber(data?.usage.thisWeek.totalTokens ?? 0)} this week`}
+              icon={Zap}
+            />
+            <MetricCard
+              title="Lifetime Cost"
+              value={`$${(data?.usage.lifetime.estimatedCostUsd ?? 0).toFixed(4)}`}
+              subtitle={`$${(data?.costIntelligence.costPerConversation ?? 0).toFixed(4)} per conversation`}
+              icon={Coins}
             />
           </>
         )}
@@ -136,7 +136,7 @@ export function AiAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Daily Token Usage</CardTitle>
-            <CardDescription>Last 30 days</CardDescription>
+            <CardDescription>Last 30 days from database records</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             {isLoading ? (
@@ -158,19 +158,65 @@ export function AiAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>AI Provider Usage</CardTitle>
-            <CardDescription>Requests by provider this month</CardDescription>
+            <CardDescription>Tokens by provider this month</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             {isLoading ? (
               <Skeleton className="h-full w-full" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={providerData}>
+                <BarChart data={data?.charts.providerUsage ?? []}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" />
+                  <XAxis dataKey="provider" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="value" fill="#651147" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="tokens" fill="#651147" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Growth</CardTitle>
+            <CardDescription>New customers over 90 days</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64">
+            {isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data?.charts.customerGrowth ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#651147" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Peak Usage Hours</CardTitle>
+            <CardDescription>Message volume by hour</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64">
+            {isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.charts.peakHours ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="hour" tickFormatter={(h) => `${h}:00`} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#D97706" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -182,13 +228,13 @@ export function AiAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Layers className="h-4 w-4" /> Knowledge Chunks
+              <Layers className="h-4 w-4" /> Knowledge Base
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{formatNumber(data?.knowledge.chunkCount ?? 0)}</p>
             <p className="text-sm text-muted-foreground">
-              Avg retrieved: {(data?.knowledge.avgRetrievedChunks ?? 0).toFixed(1)} chunks/request
+              Status: {data?.knowledge.trainingStatus ?? 'NOT_STARTED'}
             </p>
           </CardContent>
         </Card>
@@ -196,24 +242,34 @@ export function AiAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-4 w-4" /> Compression
+              <Zap className="h-4 w-4" /> Token Intelligence
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{(data?.performance.fallbackRate ?? 0).toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">Fallback rate when retrieval misses</p>
+          <CardContent className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Input</span>
+              <span>{formatNumber(data?.tokenIntelligence.inputTokens ?? 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Output</span>
+              <span>{formatNumber(data?.tokenIntelligence.outputTokens ?? 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Knowledge</span>
+              <span>{formatNumber(data?.tokenIntelligence.knowledgeTokens ?? 0)}</span>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Top Categories</CardTitle>
+            <CardTitle>Top Retrieved Documents</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(data?.charts.topCategories ?? []).slice(0, 5).map((item) => (
-              <div key={item.category ?? 'general'} className="flex justify-between text-sm">
-                <span>{item.category ?? 'general'}</span>
-                <span className="font-medium">{item.count}</span>
+            {(data?.knowledge.topDocuments ?? []).slice(0, 5).map((doc) => (
+              <div key={doc.id} className="flex justify-between text-sm">
+                <span className="truncate pr-2">{doc.title}</span>
+                <span className="font-medium">{doc.count}</span>
               </div>
             ))}
           </CardContent>

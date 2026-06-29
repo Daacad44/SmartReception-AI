@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { config, validateProductionConfig } from './config';
 import { connectDatabase, disconnectDatabase } from './infrastructure/database/prisma';
 import { logger } from './core/logger';
+import { historicalBackfillService } from './modules/ai-analytics/historical-backfill.service';
 
 async function startServer(): Promise<void> {
   validateProductionConfig();
@@ -10,6 +11,9 @@ async function startServer(): Promise<void> {
   const app = createApp();
   const server = app.listen(config.port, () => {
     logger.info(`Server running on port ${config.port} in ${config.env} mode`);
+    void historicalBackfillService.backfillAll().catch((error) => {
+      logger.warn('AI analytics historical backfill failed on startup', { error });
+    });
   });
 
   const shutdown = async (signal: string) => {
