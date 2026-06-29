@@ -20,6 +20,7 @@ import {
   Radio,
   PanelLeftClose,
   PanelLeft,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ const navItems = [
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const },
+  { to: '/appointments/automation', icon: Workflow, label: 'Workflow Builder', permission: 'appointments:write' as const },
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const },
   { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const },
   { to: '/ai-training', icon: BookOpen, label: 'AI Training' },

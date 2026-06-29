@@ -37,6 +37,9 @@ const CustomerImportPage = lazyWithRetry(() =>
 const AppointmentsPage = lazyWithRetry(() =>
   import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage }))
 );
+const AppointmentAutomationPage = lazyWithRetry(() =>
+  import('@/pages/AppointmentAutomationPage').then((m) => ({ default: m.AppointmentAutomationPage }))
+);
 const AITrainingPage = lazyWithRetry(() =>
   import('@/pages/AITrainingPage').then((m) => ({ default: m.AITrainingPage }))
 );
@@ -268,6 +271,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['customers:write']}>
                         <CustomerImportPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/appointments/automation"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['appointments:read']}>
+                        <AppointmentAutomationPage />
                       </PermissionRoute>
                     }
                   />
