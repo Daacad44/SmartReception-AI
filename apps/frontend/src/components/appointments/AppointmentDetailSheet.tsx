@@ -26,7 +26,10 @@ import {
   FileText,
   Sparkles,
   Bell,
+  GitBranch,
+  QrCode,
 } from 'lucide-react';
+import type { TimelineEvent } from '@/lib/appointment-automation-types';
 
 interface AppointmentDetailProps {
   appointmentId: string | null;
@@ -75,6 +78,15 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
           errorMessage?: string | null;
         }>
       >(res);
+    },
+  });
+
+  const { data: timeline } = useQuery({
+    queryKey: ['appointment', appointmentId, 'timeline'],
+    enabled: Boolean(appointmentId && open),
+    queryFn: async () => {
+      const res = await api.get(`/appointment-automation/appointments/${appointmentId}/timeline`);
+      return extractData<TimelineEvent[]>(res);
     },
   });
 
@@ -177,7 +189,20 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
                 <div><dt className="text-muted-foreground">Priority</dt><dd className="uppercase">{String(detail.priority ?? 'MEDIUM')}</dd></div>
                 <div><dt className="text-muted-foreground">Created By</dt><dd>{createdBy ? `${createdBy.firstName} ${createdBy.lastName}` : '—'}</dd></div>
                 <div><dt className="text-muted-foreground">Created Date</dt><dd>{detail.createdAt ? new Date(String(detail.createdAt)).toLocaleString() : '—'}</dd></div>
+                {detail.bookingNumber != null && (
+                  <div><dt className="text-muted-foreground">Booking #</dt><dd className="font-mono">{String(detail.bookingNumber)}</dd></div>
+                )}
+                {detail.workflowStageKey != null && (
+                  <div><dt className="text-muted-foreground">Workflow Stage</dt><dd className="capitalize">{String(detail.workflowStageKey).replace(/_/g, ' ').toLowerCase()}</dd></div>
+                )}
               </dl>
+              {detail.qrCodeData != null && (
+                <div className="mt-3 flex items-center gap-3 rounded-lg border p-3">
+                  <QrCode className="h-5 w-5 text-muted-foreground" />
+                  <img src={String(detail.qrCodeData)} alt="Booking QR" className="h-16 w-16 rounded" />
+                  <p className="text-xs text-muted-foreground">Scan for appointment check-in</p>
+                </div>
+              )}
             </section>
 
             {aiSummary && (
@@ -222,13 +247,32 @@ export function AppointmentDetailSheet({ appointmentId, open, onClose }: Appoint
 
             <Separator />
 
-            <Tabs defaultValue="whatsapp">
-              <TabsList className="w-full">
+            <Tabs defaultValue="timeline">
+              <TabsList className="w-full flex-wrap">
+                <TabsTrigger value="timeline" className="flex-1"><GitBranch className="mr-1 h-3 w-3" />Timeline</TabsTrigger>
                 <TabsTrigger value="whatsapp" className="flex-1"><MessageSquare className="mr-1 h-3 w-3" />WhatsApp</TabsTrigger>
                 <TabsTrigger value="notifications" className="flex-1"><Bell className="mr-1 h-3 w-3" />Alerts</TabsTrigger>
                 <TabsTrigger value="history" className="flex-1"><Calendar className="mr-1 h-3 w-3" />History</TabsTrigger>
                 <TabsTrigger value="notes" className="flex-1"><FileText className="mr-1 h-3 w-3" />Notes</TabsTrigger>
               </TabsList>
+              <TabsContent value="timeline" className="mt-3 max-h-56 space-y-2 overflow-y-auto">
+                {!timeline?.length ? (
+                  <p className="text-sm text-muted-foreground">No workflow events yet.</p>
+                ) : (
+                  timeline.map((event) => (
+                    <div key={event.id} className="rounded-lg border p-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium">{event.eventType.replace(/_/g, ' ')}</p>
+                        <Badge variant="outline" className="text-[10px]">{event.actorType}</Badge>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        {formatRelativeTime(event.createdAt)}
+                        {event.channel ? ` · ${event.channel}` : ''}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </TabsContent>
               <TabsContent value="whatsapp" className="mt-3 max-h-56 space-y-2 overflow-y-auto">
                 {messages.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No WhatsApp messages.</p>

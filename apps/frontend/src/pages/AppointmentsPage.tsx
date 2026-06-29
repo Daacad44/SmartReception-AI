@@ -5,7 +5,9 @@ import {
   Plus,
   List,
   CalendarDays,
+  Workflow,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -277,6 +279,12 @@ export function AppointmentsPage() {
           <p className="text-muted-foreground">Manage and schedule customer appointments</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/appointments/automation">
+              <Workflow className="h-4 w-4 mr-1" />
+              Workflow Builder
+            </Link>
+          </Button>
           <div className="flex rounded-lg border p-0.5">
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'ghost'}

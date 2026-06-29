@@ -270,6 +270,62 @@ enum AppointmentNotificationStatus {
   SKIPPED
 }
 
+enum AppointmentWorkflowEventType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_UPDATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REJECTED
+  APPOINTMENT_EXPIRED
+  REMINDER_SCHEDULED
+  REMINDER_SENT
+  CUSTOMER_ARRIVED
+  CUSTOMER_CHECKED_IN
+  APPOINTMENT_STARTED
+  APPOINTMENT_COMPLETED
+  APPOINTMENT_NO_SHOW
+  FOLLOW_UP_SCHEDULED
+  FEEDBACK_REQUESTED
+  FEEDBACK_RECEIVED
+  PAYMENT_AWAITING
+  PAYMENT_RECEIVED
+  PAYMENT_REFUNDED
+  STAGE_CHANGED
+}
+
+enum AppointmentWorkflowActionType {
+  SEND_WHATSAPP
+  SEND_EMAIL
+  SEND_SMS
+  SEND_PUSH
+  SEND_WEBHOOK
+  SCHEDULE_REMINDER
+  UPDATE_CRM
+  UPDATE_ANALYTICS
+  ASSIGN_EMPLOYEE
+  REQUEST_FEEDBACK
+  GENERATE_SURVEY
+  TRIGGER_MARKETING
+  GENERATE_CALENDAR
+  GENERATE_ICS
+  GENERATE_QR
+  AI_ANALYZE
+  AI_SUGGEST_TIMES
+  AI_PREDICT_NO_SHOW
+  RELEASE_TIME_SLOT
+  NOTIFY_EMPLOYEE
+  CHANGE_STAGE
+}
+
+enum AppointmentTimelineActorType {
+  SYSTEM
+  USER
+  AI
+  CUSTOMER
+  WEBHOOK
+}
+
 enum DocumentType {
   PDF
   DOCX
@@ -534,6 +590,12 @@ model Business {
   conversationActivities ConversationActivity[]
   conversationFeedback ConversationFeedback[]
   appointments      Appointment[]
+  appointmentWorkflows AppointmentWorkflow[]
+  appointmentReminderConfigs AppointmentReminderConfig[]
+  appointmentAutomationSettings AppointmentAutomationSettings?
+  appointmentAnalyticsSnapshot AppointmentAnalyticsSnapshot?
+  appointmentTimelineEvents AppointmentTimelineEvent[]
+  appointmentWorkflowExecutions AppointmentWorkflowExecution[]
   appointmentNotifications AppointmentNotification[]
   services          Service[]
   knowledgeBases    KnowledgeBase[]
@@ -938,6 +1000,22 @@ model Appointment {
   serviceId              String?
   assignedToId           String?
   createdById            String?
+  workflowId             String?
+  workflowStageId        String?
+  workflowStageKey       String?
+  bookingNumber          String?
+  qrCodeData             String?
+  icsContent             String?
+  calendarEventId        String?
+  location               String?
+  primaryPhone           String?
+  secondaryPhone         String?
+  guardianPhone          String?
+  companyPhone           String?
+  primaryEmail           String?
+  secondaryEmail         String?
+  guardianEmail          String?
+  businessEmail          String?
   title                  String
   description            String?
   serviceRequested       String?
@@ -975,15 +1053,22 @@ model Appointment {
   service       Service?                  @relation(fields: [serviceId], references: [id])
   assignedTo    User?                     @relation("AssignedStaff", fields: [assignedToId], references: [id])
   createdBy     User?                     @relation("AppointmentCreator", fields: [createdById], references: [id])
+  workflow      AppointmentWorkflow?      @relation(fields: [workflowId], references: [id])
+  workflowStage AppointmentWorkflowStage? @relation(fields: [workflowStageId], references: [id])
   internalNotes AppointmentInternalNote[]
   notifications AppointmentNotification[]
+  timelineEvents AppointmentTimelineEvent[]
+  workflowExecutions AppointmentWorkflowExecution[]
 
   @@index([businessId])
   @@index([businessId, startTime])
   @@index([businessId, status])
+  @@index([businessId, workflowStageKey])
+  @@index([businessId, bookingNumber])
   @@index([customerId])
   @@index([assignedToId])
   @@index([createdById])
+  @@index([workflowId])
   @@index([priority])
   @@map("appointments")
 }
@@ -1024,6 +1109,243 @@ model AppointmentNotification {
   @@index([businessId, status])
   @@index([scheduledAt, status])
   @@map("appointment_notifications")
+}
+
+// ─── APPOINTMENT AUTOMATION PLATFORM ─────────────────────────────────────────
+
+model AppointmentWorkflow {
+  id          String   @id @default(uuid())
+  businessId  String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  templateKey String?
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business     Business                      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stages       AppointmentWorkflowStage[]
+  transitions  AppointmentWorkflowTransition[]
+  rules        AppointmentWorkflowRule[]
+  appointments Appointment[]
+  executions   AppointmentWorkflowExecution[]
+  reminderConfigs AppointmentReminderConfig[]
+
+  @@index([businessId])
+  @@index([businessId, isDefault])
+  @@map("appointment_workflows")
+}
+
+model AppointmentWorkflowStage {
+  id               String   @id @default(uuid())
+  workflowId       String
+  businessId       String
+  key              String
+  label            String
+  color            String   @default("#651147")
+  sortOrder        Int      @default(0)
+  isEnabled        Boolean  @default(true)
+  isTerminal       Boolean  @default(false)
+  requiresApproval Boolean  @default(false)
+  positionX        Float    @default(0)
+  positionY        Float    @default(0)
+  defaultActions   Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workflow         AppointmentWorkflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  transitionsFrom  AppointmentWorkflowTransition[] @relation("TransitionFrom")
+  transitionsTo    AppointmentWorkflowTransition[] @relation("TransitionTo")
+
+  @@unique([workflowId, key])
+  @@index([businessId])
+  @@index([workflowId, sortOrder])
+  @@map("appointment_workflow_stages")
+}
+
+model AppointmentWorkflowTransition {
+  id           String   @id @default(uuid())
+  workflowId   String
+  businessId   String
+  fromStageId  String
+  toStageId    String
+  triggerEvent AppointmentWorkflowEventType
+  conditions   Json?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflow  AppointmentWorkflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromStage AppointmentWorkflowStage @relation("TransitionFrom", fields: [fromStageId], references: [id], onDelete: Cascade)
+  toStage   AppointmentWorkflowStage @relation("TransitionTo", fields: [toStageId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([businessId])
+  @@index([triggerEvent])
+  @@map("appointment_workflow_transitions")
+}
+
+model AppointmentWorkflowRule {
+  id           String                       @id @default(uuid())
+  workflowId   String
+  businessId   String
+  name         String
+  triggerEvent AppointmentWorkflowEventType
+  conditions   Json                         @default("[]")
+  actions      Json                         @default("[]")
+  priority     Int                          @default(0)
+  isActive     Boolean                      @default(true)
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  workflow AppointmentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([businessId])
+  @@index([triggerEvent])
+  @@map("appointment_workflow_rules")
+}
+
+model AppointmentWorkflowTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  industry    String
+  name        String
+  description String
+  definition  Json
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([industry])
+  @@map("appointment_workflow_templates")
+}
+
+model AppointmentTimelineEvent {
+  id            String                       @id @default(uuid())
+  businessId    String
+  appointmentId String
+  eventType     String
+  actorType     AppointmentTimelineActorType @default(SYSTEM)
+  actorId       String?
+  customerId    String?
+  employeeId    String?
+  channel       String?
+  status        String?
+  metadata      Json?
+  createdAt     DateTime                     @default(now())
+
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId, createdAt])
+  @@index([businessId, createdAt])
+  @@map("appointment_timeline_events")
+}
+
+model AppointmentWorkflowExecution {
+  id                 String   @id @default(uuid())
+  businessId         String
+  workflowId         String
+  appointmentId      String
+  triggerEvent       String
+  executedActions    Json     @default("[]")
+  notificationStatus Json?
+  deliveryStatus     Json?
+  retryCount         Int      @default(0)
+  executionTimeMs    Int?
+  errors             Json?
+  warnings           Json?
+  operatorId         String?
+  ipAddress          String?
+  device             String?
+  createdAt          DateTime @default(now())
+
+  business    Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  workflow    AppointmentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  appointment Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([workflowId])
+  @@map("appointment_workflow_executions")
+}
+
+model AppointmentReminderConfig {
+  id            String   @id @default(uuid())
+  businessId    String
+  workflowId    String?
+  label         String
+  offsetMinutes Int
+  channels      String[] @default(["WHATSAPP", "EMAIL"])
+  template      String?
+  isEnabled     Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  business Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  workflow AppointmentWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([workflowId])
+  @@map("appointment_reminder_configs")
+}
+
+model AppointmentAutomationSettings {
+  id                String   @id @default(uuid())
+  businessId        String   @unique
+  activeWorkflowId  String?
+  workingHours      Json?
+  holidays          Json?
+  bufferMinutes     Int      @default(0)
+  defaultDuration   Int      @default(30)
+  bookingRules      Json?
+  cancellationRules Json?
+  rescheduleRules   Json?
+  assignmentRules   Json?
+  aiRules           Json?
+  calendarSync      Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_automation_settings")
+}
+
+model AppointmentAnalyticsSnapshot {
+  id                      String   @id @default(uuid())
+  businessId              String   @unique
+  appointmentsCreated     Int      @default(0)
+  appointmentsConfirmed   Int      @default(0)
+  appointmentsCancelled   Int      @default(0)
+  appointmentsCompleted   Int      @default(0)
+  appointmentsRescheduled Int      @default(0)
+  noShows                 Int      @default(0)
+  avgDurationMinutes      Float    @default(0)
+  avgBookingTimeMinutes   Float    @default(0)
+  avgConfirmationMinutes  Float    @default(0)
+  reminderSuccessRate     Float    @default(0)
+  notificationSuccessRate Float    @default(0)
+  emailDeliveryRate       Float    @default(0)
+  whatsappDeliveryRate    Float    @default(0)
+  attendanceRate          Float    @default(0)
+  completionRate          Float    @default(0)
+  customerSatisfaction    Float    @default(0)
+  revenueGenerated        Decimal  @default(0) @db.Decimal(12, 2)
+  followUpSuccessRate     Float    @default(0)
+  workflowSuccessRate     Float    @default(0)
+  automationSuccessRate   Float    @default(0)
+  updatedAt               DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_analytics_snapshots")
 }
 
 // ─── CUSTOMER SEGMENTS & CAMPAIGNS ───────────────────────────────────────────

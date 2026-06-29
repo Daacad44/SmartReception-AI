@@ -26,6 +26,7 @@ import {
 } from '../../infrastructure/appointments/appointment-notification.service';
 import { appointmentNotificationRepository } from '../../infrastructure/appointments/appointment-notification.repository';
 import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
+import { appointmentWorkflowEngineService } from '../appointment-automation/workflow-engine.service';
 
 export class AppointmentsService {
   async list(
@@ -171,6 +172,7 @@ export class AppointmentsService {
     });
 
     void sendAppointmentConfirmation(appointment.id, businessId).catch(() => undefined);
+    void appointmentWorkflowEngineService.bootstrapAppointment(businessId, appointment.id).catch(() => undefined);
 
     await prisma.auditLog.create({
       data: {
@@ -398,6 +400,18 @@ export class AppointmentsService {
     });
 
     void broadcastBusinessEvent(businessId, { type: 'appointment', appointmentId: id, action });
+
+    const workflowEvent = appointmentWorkflowEngineService.mapActionToEvent(action);
+    if (workflowEvent) {
+      void appointmentWorkflowEngineService
+        .emitEvent({
+          businessId,
+          appointmentId: id,
+          triggerEvent: workflowEvent,
+          operatorId: userId,
+        })
+        .catch(() => undefined);
+    }
 
     return appointment;
   }
