@@ -33,6 +33,7 @@ export class WorkspaceService {
       embeddingCount?: number;
       documentCount?: number;
       lastTrainedAt?: Date;
+      lastRetrainedAt?: Date;
       sandboxVersionId?: string;
       productionVersionId?: string;
     }

@@ -210,6 +210,7 @@ export interface SubscriptionScanJobData {
 export interface AiTrainingJobData {
   jobId: string;
   businessId: string;
+  jobType?: import('@prisma/client').AiTrainingJobType;
   userId?: string;
   trainerId?: string;
   trainingNotes?: string;
