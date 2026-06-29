@@ -43,6 +43,9 @@ const AITrainingPage = lazyWithRetry(() =>
 const AnalyticsPage = lazyWithRetry(() =>
   import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
 );
+const AiAnalyticsPage = lazyWithRetry(() =>
+  import('@/pages/AiAnalyticsPage').then((m) => ({ default: m.AiAnalyticsPage }))
+);
 const TeamPage = lazyWithRetry(() =>
   import('@/pages/TeamPage').then((m) => ({ default: m.TeamPage }))
 );
@@ -297,6 +300,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['analytics:read']}>
                         <AnalyticsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/ai-analytics"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
+                        <AiAnalyticsPage />
                       </PermissionRoute>
                     }
                   />

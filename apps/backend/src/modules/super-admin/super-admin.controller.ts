@@ -12,6 +12,8 @@ import {
 import { routeParam } from '../../core/utils';
 import { z } from 'zod';
 
+import { aiAnalyticsService } from '../ai-analytics/ai-analytics.service';
+
 export class SuperAdminController {
   async stats(_req: Request, res: Response, next: NextFunction) {
     try {
@@ -258,6 +260,15 @@ export class SuperAdminController {
   async listKnowledgeBases(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await superAdminService.listKnowledgeBases(routeParam(req.params.businessId));
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async aiAnalytics(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await aiAnalyticsService.getPlatformDashboard();
       res.json({ success: true, data });
     } catch (error) {
       next(error);

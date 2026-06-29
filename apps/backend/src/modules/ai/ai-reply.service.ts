@@ -129,6 +129,8 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     {
       preferEnglish: params.preferEnglish,
       isFirstCustomerMessage: params.isFirstCustomerMessage,
+      customerId: conversation.customerId,
+      messageId: inboundMessageId,
     }
   );
   if (params.pipelineKey) {
