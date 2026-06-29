@@ -1,30 +1,16 @@
 import { prisma } from '../../database/prisma';
 import { resolveEmbeddingProvider } from '../providers/provider-factory';
 import { logger } from '../../../core/logger';
+import { config } from '../../../config';
+import { intelligentChunkText } from './intelligent-chunking.service';
+import { invalidateRagCaches } from './retrieval-cache.service';
 
-const CHUNK_SIZE = 1200;
 const embeddingCache = new Map<string, { embedding: number[]; loadedAt: number }>();
 const EMBEDDING_CACHE_TTL_MS = 300_000;
 
+/** @deprecated Use intelligentChunkText — kept for compatibility */
 export function chunkText(text: string): string[] {
-  const chunks: string[] = [];
-  const paragraphs = text.split(/\n{2,}/);
-  let current = '';
-
-  for (const paragraph of paragraphs) {
-    const trimmed = paragraph.trim();
-    if (!trimmed) continue;
-
-    if ((current + '\n\n' + trimmed).length > CHUNK_SIZE && current) {
-      chunks.push(current.trim());
-      current = trimmed;
-    } else {
-      current = current ? `${current}\n\n${trimmed}` : trimmed;
-    }
-  }
-
-  if (current.trim()) chunks.push(current.trim());
-  return chunks.length ? chunks : [text.slice(0, CHUNK_SIZE)];
+  return intelligentChunkText(text);
 }
 
 function inferTags(text: string, category?: string | null): string[] {
@@ -54,23 +40,31 @@ export async function indexDocumentChunks(params: {
   content: string;
   question?: string | null;
   answer?: string | null;
+  versionId?: string | null;
+  knowledgeVersion?: number;
 }): Promise<number> {
   await prisma.knowledgeChunk.updateMany({
     where: { documentId: params.documentId },
-    data: { isActive: false },
+    data: { isActive: false, status: 'ARCHIVED' },
   });
 
-  const segments: Array<{ content: string; title: string; priority: number }> = [];
+  const segments: Array<{ content: string; title: string; priority: number; description?: string }> = [];
 
   if (params.type === 'FAQ' && params.question) {
     segments.push({
       content: `Q: ${params.question}\nA: ${params.answer ?? ''}`,
       title: params.title,
+      description: params.question,
       priority: 10,
     });
   } else {
-    for (const [index, chunk] of chunkText(params.content).entries()) {
-      segments.push({ content: chunk, title: `${params.title} #${index + 1}`, priority: 0 });
+    for (const [index, chunk] of intelligentChunkText(params.content).entries()) {
+      segments.push({
+        content: chunk,
+        title: `${params.title} #${index + 1}`,
+        description: chunk.slice(0, 120),
+        priority: 0,
+      });
     }
   }
 
@@ -78,11 +72,14 @@ export async function indexDocumentChunks(params: {
 
   const provider = resolveEmbeddingProvider();
   const embedResult = await provider.embed({ texts: segments.map((s) => s.content) });
+  const embeddingVersion = config.ai.embeddingModel;
 
   const rows = segments.map((segment, index) => ({
     businessId: params.businessId,
     documentId: params.documentId,
+    versionId: params.versionId ?? undefined,
     title: segment.title,
+    description: segment.description,
     category: params.category ?? params.type,
     tags: inferTags(segment.content, params.category),
     language: 'so',
@@ -91,6 +88,11 @@ export async function indexDocumentChunks(params: {
     priority: segment.priority,
     chunkIndex: index,
     isActive: true,
+    status: 'ACTIVE',
+    source: params.type,
+    embeddingVersion,
+    knowledgeVersion: params.knowledgeVersion,
+    confidenceScore: segment.priority >= 10 ? 0.9 : 0.7,
   }));
 
   await prisma.knowledgeChunk.createMany({
@@ -99,6 +101,8 @@ export async function indexDocumentChunks(params: {
       embedding: row.embedding ?? undefined,
     })),
   });
+
+  invalidateRagCaches(params.businessId);
 
   logger.info('Indexed knowledge chunks', {
     businessId: params.businessId,
@@ -110,16 +114,25 @@ export async function indexDocumentChunks(params: {
 }
 
 export async function deactivateDocumentChunks(documentId: string): Promise<void> {
+  const chunks = await prisma.knowledgeChunk.findMany({
+    where: { documentId },
+    select: { businessId: true },
+    take: 1,
+  });
   await prisma.knowledgeChunk.updateMany({
     where: { documentId },
-    data: { isActive: false },
+    data: { isActive: false, status: 'ARCHIVED' },
   });
+  if (chunks[0]?.businessId) {
+    invalidateRagCaches(chunks[0].businessId);
+  }
 }
 
 export function invalidateEmbeddingCache(businessId: string): void {
   for (const key of embeddingCache.keys()) {
     if (key.startsWith(`${businessId}:`)) embeddingCache.delete(key);
   }
+  invalidateRagCaches(businessId);
 }
 
 export async function getQueryEmbedding(businessId: string, query: string): Promise<number[] | null> {
@@ -139,7 +152,9 @@ export async function getQueryEmbedding(businessId: string, query: string): Prom
 }
 
 export async function backfillChunksFromLegacyDocuments(businessId: string): Promise<number> {
-  const existing = await prisma.knowledgeChunk.count({ where: { businessId, isActive: true } });
+  const existing = await prisma.knowledgeChunk.count({
+    where: { businessId, isActive: true, status: 'ACTIVE' },
+  });
   if (existing > 0) return existing;
 
   const docs = await prisma.knowledgeDocument.findMany({
@@ -167,7 +182,7 @@ export async function backfillChunksFromLegacyDocuments(businessId: string): Pro
         if (parsed.chunks?.length) {
           await prisma.knowledgeChunk.updateMany({
             where: { documentId: doc.id },
-            data: { isActive: false },
+            data: { isActive: false, status: 'ARCHIVED' },
           });
           await prisma.knowledgeChunk.createMany({
             data: parsed.chunks.map((chunk, index) => ({
@@ -182,6 +197,10 @@ export async function backfillChunksFromLegacyDocuments(businessId: string): Pro
               priority: doc.type === 'FAQ' ? 10 : 0,
               chunkIndex: index,
               isActive: true,
+              status: 'ACTIVE',
+              source: doc.type,
+              embeddingVersion: config.ai.embeddingModel,
+              confidenceScore: doc.type === 'FAQ' ? 0.9 : 0.7,
             })),
           });
           total += parsed.chunks.length;
@@ -206,6 +225,7 @@ export async function backfillChunksFromLegacyDocuments(businessId: string): Pro
     }
   }
 
+  invalidateRagCaches(businessId);
   return total;
 }
 
