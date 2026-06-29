@@ -3,11 +3,12 @@ import { campaignsController } from './campaigns.controller';
 import { campaignJourneyController } from './campaign-journey.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { requirePlatformFeature } from '../../core/middleware/platform-feature.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
 
-router.use(authenticate, requireBusiness);
+router.use(authenticate, requireBusiness, requirePlatformFeature('campaigns'));
 
 router.get('/', authorize(PERMISSIONS['campaigns:read']), (req, res, next) =>
   campaignsController.list(req, res, next)

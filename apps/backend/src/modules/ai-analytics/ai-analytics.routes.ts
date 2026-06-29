@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { aiAnalyticsController } from './ai-analytics.controller';
 import { authorize } from '../../core/middleware/authorize.middleware';
+import { requirePlatformFeature } from '../../core/middleware/platform-feature.middleware';
 
 const router = Router();
+
+router.use(requirePlatformFeature('ai-analytics'));
 
 router.get('/dashboard', authorize('analytics:read'), (req, res, next) =>
   aiAnalyticsController.businessDashboard(req, res, next)

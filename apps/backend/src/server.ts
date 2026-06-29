@@ -4,6 +4,7 @@ import { connectDatabase, disconnectDatabase } from './infrastructure/database/p
 import { logger } from './core/logger';
 import { historicalBackfillService } from './modules/ai-analytics/historical-backfill.service';
 import { appointmentWorkflowBuilderService } from './modules/appointment-automation/workflow-builder.service';
+import { featureRegistryService } from './modules/feature-management/feature-registry.service';
 
 async function startServer(): Promise<void> {
   validateProductionConfig();
@@ -17,6 +18,9 @@ async function startServer(): Promise<void> {
     });
     void appointmentWorkflowBuilderService.seedGlobalTemplates().catch((error) => {
       logger.warn('Appointment workflow template seed failed on startup', { error });
+    });
+    void featureRegistryService.seedRegistry().catch((error) => {
+      logger.warn('Platform feature registry seed failed on startup', { error });
     });
   });
 

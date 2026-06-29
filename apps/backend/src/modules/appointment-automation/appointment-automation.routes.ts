@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { appointmentAutomationController } from './appointment-automation.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { requirePlatformFeature } from '../../core/middleware/platform-feature.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
 
-router.use(authenticate, requireBusiness);
+router.use(authenticate, requireBusiness, requirePlatformFeature('appointment-automation'));
 
 router.get('/templates', authorize(PERMISSIONS['appointments:read']), (req, res, next) =>
   appointmentAutomationController.listTemplates(req, res, next)

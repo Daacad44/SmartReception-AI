@@ -3,6 +3,7 @@ import multer from 'multer';
 import { employeeCommsController } from './employee-comms.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { authorize, requireBusiness } from '../../core/middleware/authorize.middleware';
+import { requirePlatformFeature } from '../../core/middleware/platform-feature.middleware';
 import { PERMISSIONS } from '@smartreception/shared';
 
 const router = Router();
@@ -11,7 +12,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-router.use(authenticate, requireBusiness);
+router.use(authenticate, requireBusiness, requirePlatformFeature('employee-comms'));
 
 // Employees
 router.get('/employees', authorize(PERMISSIONS['employees:read']), (req, res, next) =>
