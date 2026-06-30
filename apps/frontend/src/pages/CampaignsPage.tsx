@@ -338,7 +338,7 @@ export function CampaignsPage() {
       resetWizard();
       toast.success('Campaign created');
     },
-    onError: () => toast.error('Failed to create campaign'),
+    onError: (error) => toast.error(getErrorMessage(error) || 'Failed to create campaign'),
   });
 
   const sendMutation = useMutation({
@@ -1272,7 +1272,7 @@ export function CampaignsPage() {
                   type="button"
                   className="bg-accent hover:bg-accent/90"
                   disabled={!validateStep(4) || createMutation.isPending}
-                  onClick={() => handleSubmit(form.deliveryMode === 'now')}
+                  onClick={() => handleSubmit(true)}
                 >
                   <Send className="mr-1 h-4 w-4" />
                   {form.deliveryMode === 'now' ? 'Send Now' : 'Send Now Anyway'}

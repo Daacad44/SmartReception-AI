@@ -21,11 +21,29 @@ const PLAN_LIMITS: Record<SubscriptionPlan, CampaignPlanLimits> = {
 };
 
 export async function getCampaignPlanLimits(businessId: string): Promise<CampaignPlanLimits> {
-  const subscription = await prisma.subscription.findUnique({
+  const businessSub = await prisma.businessSubscription.findUnique({
+    where: { businessId },
+    include: { plan: true },
+  });
+
+  if (businessSub?.plan) {
+    const base = PLAN_LIMITS[businessSub.plan.code] ?? PLAN_LIMITS.FREE;
+    const catalogCampaignLimit = businessSub.plan.campaignLimit ?? 0;
+    return {
+      ...base,
+      maxActiveCampaigns:
+        catalogCampaignLimit > 0
+          ? Math.max(catalogCampaignLimit, base.maxActiveCampaigns)
+          : base.maxActiveCampaigns,
+    };
+  }
+
+  const legacy = await prisma.subscription.findUnique({
     where: { businessId },
     select: { plan: true },
   });
-  return PLAN_LIMITS[subscription?.plan ?? 'FREE'];
+
+  return PLAN_LIMITS[legacy?.plan ?? 'FREE'];
 }
 
 export async function assertCampaignCreateAllowed(
