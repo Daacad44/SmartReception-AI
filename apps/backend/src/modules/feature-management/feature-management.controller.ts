@@ -69,9 +69,9 @@ export class FeatureManagementController {
     }
   }
 
-  async publicMap(_req: Request, res: Response, next: NextFunction) {
+  async publicMap(req: Request, res: Response, next: NextFunction) {
     try {
-      const map = await featureRegistryService.getPublicFeatureMap();
+      const map = await featureRegistryService.getPublicFeatureMap(req.user?.businessId);
       res.json({ success: true, data: map });
     } catch (error) {
       next(error);

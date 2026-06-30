@@ -330,7 +330,8 @@ export function CampaignsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => api.post('/campaigns', payload),
+    mutationFn: async (payload: Record<string, unknown>) =>
+      api.post('/campaigns', payload, { timeout: 60_000 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['campaign-analytics'] });
