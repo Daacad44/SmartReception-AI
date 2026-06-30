@@ -39,6 +39,9 @@ router.post('/accounts', authorize(PERMISSIONS['settings:write']), (req, res, ne
 router.post('/connect-env', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   whatsappController.connectFromEnv(req, res, next)
 );
+router.get('/meta-templates', authorize(PERMISSIONS['settings:read']), (req, res, next) =>
+  whatsappController.listMetaTemplates(req, res, next)
+);
 router.post('/test', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   whatsappController.testConnection(req, res, next)
 );

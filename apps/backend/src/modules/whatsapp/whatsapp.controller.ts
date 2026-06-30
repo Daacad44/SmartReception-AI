@@ -226,6 +226,19 @@ export class WhatsAppController {
     }
   }
 
+  async listMetaTemplates(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
+      const result = await whatsappModuleService.listMetaTemplates(
+        req.user!.businessId!,
+        accountId
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateAccount(req: Request, res: Response, next: NextFunction) {
     try {
       const input = updateWhatsAppAccountSchema.parse(req.body);

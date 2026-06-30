@@ -64,6 +64,9 @@ export function formatSessionExpiryMessage(window: WhatsAppSessionWindow): strin
 /** Meta error codes that indicate session / re-engagement issues. */
 export const WHATSAPP_SESSION_ERROR_CODES = new Set([131047, 131026]);
 
+/** Meta error when template name/language is missing on the connected WABA. */
+export const WHATSAPP_TEMPLATE_NOT_FOUND_CODE = 132001;
+
 export function parseWhatsAppDeliveryError(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== 'object') return null;
   const meta = metadata as Record<string, unknown>;
@@ -71,6 +74,10 @@ export function parseWhatsAppDeliveryError(metadata: unknown): string | null {
   const graphError = meta.graphApiError as { code?: number | string; message?: string } | undefined;
   if (graphError?.code && WHATSAPP_SESSION_ERROR_CODES.has(Number(graphError.code))) {
     return graphError.message ?? 'WhatsApp session expired (24-hour window)';
+  }
+
+  if (graphError && Number(graphError.code) === WHATSAPP_TEMPLATE_NOT_FOUND_CODE) {
+    return graphError.message ?? 'WhatsApp template not found on connected account';
   }
 
   const deliveryErrors = meta.deliveryErrors as

@@ -14,6 +14,7 @@ import {
   useWhatsAppWebhookHealth,
   useWhatsAppDebug,
   useWhatsAppStatus,
+  useWhatsAppMetaTemplates,
 } from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
@@ -121,6 +122,15 @@ export function WhatsAppSettings() {
   const webhookDisplayStatus = webhookIsVerified ? 'verified' : webhookHealth?.status ?? 'not_configured';
 
   const activeAccount = accounts?.find((a) => a.isActive);
+  const { data: metaTemplates, isLoading: metaTemplatesLoading } = useWhatsAppMetaTemplates(
+    activeAccount?.id
+  );
+
+  const configuredTemplateOnWaba = metaTemplates?.templates.some(
+    (template) =>
+      template.name === reengagementForm.reengagementTemplateName.trim() &&
+      template.language === reengagementForm.reengagementTemplateLanguage.trim()
+  );
 
   useEffect(() => {
     if (activeAccount) {
@@ -466,6 +476,55 @@ export function WhatsAppSettings() {
                 Save Template Settings
               </Button>
             </form>
+
+            <div className="mt-6 space-y-3 rounded-lg border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Templates on connected WABA</p>
+                  <p className="text-xs text-muted-foreground">
+                    Only templates approved on WABA {metaTemplates?.wabaId ?? activeAccount.wabaId ?? '—'}{' '}
+                    can be sent from this phone number.
+                  </p>
+                </div>
+                {reengagementForm.reengagementTemplateName.trim() && metaTemplates && (
+                  <Badge variant={configuredTemplateOnWaba ? 'success' : 'destructive'}>
+                    {configuredTemplateOnWaba ? 'Configured template found' : 'Not on this WABA'}
+                  </Badge>
+                )}
+              </div>
+
+              {metaTemplatesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading templates from Meta…</p>
+              ) : metaTemplates?.templates.length ? (
+                <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                  {metaTemplates.templates.map((template) => (
+                    <li
+                      key={`${template.name}-${template.language}`}
+                      className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2"
+                    >
+                      <span className="font-mono text-xs sm:text-sm">{template.name}</span>
+                      <span className="text-xs text-muted-foreground">{template.language}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No approved templates found on this WhatsApp account. Create one in Meta WhatsApp
+                  Manager under the same business account as WABA {activeAccount.wabaId ?? 'above'}.
+                </p>
+              )}
+
+              {reengagementForm.reengagementTemplateName.trim() &&
+                metaTemplates &&
+                !configuredTemplateOnWaba && (
+                  <p className="text-sm text-destructive">
+                    &quot;{reengagementForm.reengagementTemplateName}&quot; (
+                    {reengagementForm.reengagementTemplateLanguage}) is not on this WABA. If you
+                    created it under Botan Automation or another Meta account, recreate it on WABA{' '}
+                    {metaTemplates.wabaId} or connect the matching WhatsApp account.
+                  </p>
+                )}
+            </div>
           </CardContent>
         </Card>
       )}

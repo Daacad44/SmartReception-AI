@@ -11,6 +11,12 @@ import {
   isMetaTemplateSlug,
   normalizeWhatsAppTemplateLanguage,
 } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
+import {
+  fetchMetaMessageTemplates,
+  findMetaTemplateOnWaba,
+  formatMetaTemplateValidationError,
+} from '../../infrastructure/whatsapp/whatsapp-meta-templates.service';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
 export type ResolvedConversationTemplate = {
   content: string;
@@ -78,6 +84,8 @@ export async function resolveConversationTemplateSend(params: {
     prisma.whatsAppAccount.findFirst({
       where: { id: params.whatsappAccountId, businessId: params.businessId },
       select: {
+        wabaId: true,
+        accessToken: true,
         reengagementTemplateName: true,
         reengagementTemplateLanguage: true,
         reengagementTemplateHasBodyVariable: true,
@@ -98,7 +106,7 @@ export async function resolveConversationTemplateSend(params: {
       (isMetaTemplateSlug(template.name) ? template.name.trim() : null) ??
       whatsappAccount?.reengagementTemplateName ??
       null;
-    const metaTemplateLanguage = normalizeWhatsAppTemplateLanguage(
+    let metaTemplateLanguage = normalizeWhatsAppTemplateLanguage(
       template.whatsappTemplateLanguage ??
         whatsappAccount?.reengagementTemplateLanguage ??
         'en'
@@ -122,6 +130,32 @@ export async function resolveConversationTemplateSend(params: {
           },
         ]
       : undefined;
+
+    const accessToken = resolveStoredToken(whatsappAccount?.accessToken);
+    const wabaId = whatsappAccount?.wabaId?.trim();
+    if (accessToken && wabaId) {
+      try {
+        const metaTemplates = await fetchMetaMessageTemplates(wabaId, accessToken);
+        const lookup = findMetaTemplateOnWaba(metaTemplates, metaTemplateName, metaTemplateLanguage);
+        if (!lookup.found) {
+          throw new ValidationError(
+            formatMetaTemplateValidationError({
+              templateName: metaTemplateName,
+              templateLanguage: metaTemplateLanguage,
+              wabaId,
+              lookup,
+              approvedTemplates: metaTemplates,
+            })
+          );
+        }
+        if (lookup.match && lookup.match.language !== metaTemplateLanguage) {
+          metaTemplateLanguage = lookup.match.language;
+        }
+      } catch (error) {
+        if (error instanceof ValidationError) throw error;
+        // If Meta template list is unavailable, still attempt send and surface Graph API error.
+      }
+    }
 
     return {
       content,

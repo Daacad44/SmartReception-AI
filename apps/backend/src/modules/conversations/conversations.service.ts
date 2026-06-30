@@ -12,7 +12,9 @@ import { messageTemplatesService } from '../message-templates/message-templates.
 import {
   formatSessionExpiryMessage,
   getWhatsAppSessionWindow,
+  WHATSAPP_TEMPLATE_NOT_FOUND_CODE,
 } from '../whatsapp/whatsapp-session.service';
+import { formatMetaTemplateDeliveryError } from '../../infrastructure/whatsapp/whatsapp-meta-templates.service';
 import { resolveConversationTemplateSend } from '../whatsapp/conversation-template.service';
 import { logger } from '../../core/logger';
 import { listConversationActivities } from './conversation-activity.service';
@@ -195,10 +197,20 @@ export class ConversationsService {
     });
 
     if (!delivered.success) {
-      const errorMessage =
+      const graphCode = Number(delivered.error?.code);
+      let errorMessage =
         typeof delivered.error?.message === 'string'
           ? delivered.error.message
           : 'WhatsApp failed to deliver the message';
+
+      if (graphCode === WHATSAPP_TEMPLATE_NOT_FOUND_CODE) {
+        errorMessage = formatMetaTemplateDeliveryError({
+          templateName: templateMeta?.templateNameMeta ?? templateMeta?.templateName,
+          templateLanguage: templateMeta?.templateLanguage,
+          wabaId: whatsappAccount.wabaId,
+        });
+      }
+
       throw new WhatsAppDeliveryError(errorMessage, delivered.error ?? undefined);
     }
 
