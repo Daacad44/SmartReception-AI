@@ -7,6 +7,7 @@ import { logger } from '../../core/logger';
 import { enqueueCampaignSend, removeCampaignQueueJobs } from './campaign-queue.utils';
 import { assertCampaignCreateAllowed } from './campaign-limits.service';
 import { enqueueCampaignBatches, finalizeCampaignIfComplete } from './campaign-batch.service';
+import { applyCampaignDeliveryStats, getCampaignDeliveryStats } from './campaign-stats.service';
 import { computeNextCampaignRun, type ScheduleConfig } from './campaign-scheduler.service';
 import { personalizeCampaignMessage } from './campaign-personalization.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
@@ -199,7 +200,12 @@ export class CampaignsService {
       prisma.campaign.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    const stats = await getCampaignDeliveryStats(data.map((c) => c.id));
+
+    return {
+      data: applyCampaignDeliveryStats(data, stats),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async getCalendar(businessId: string, from: string, to: string) {

@@ -2,6 +2,7 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { personalizeCampaignMessage } from './campaign-personalization.service';
+import { syncCampaignDeliveryStats } from './campaign-stats.service';
 import { logger } from '../../core/logger';
 import type { CampaignMessageType } from '@prisma/client';
 
@@ -28,6 +29,17 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
   const whatsappAccount = campaign.business.whatsappAccounts[0];
   if (!whatsappAccount) return { sent: 0, failed: data.recipientIds.length };
 
+  await prisma.campaignRecipient.updateMany({
+    where: {
+      id: { in: data.recipientIds },
+      campaignId: data.campaignId,
+      status: 'SENDING',
+      isSent: false,
+      whatsappMsgId: null,
+    },
+    data: { status: 'PENDING' },
+  });
+
   const recipients = await prisma.campaignRecipient.findMany({
     where: {
       id: { in: data.recipientIds },
@@ -43,78 +55,110 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
   let failed = 0;
 
   for (const recipient of recipients) {
-    const optedOut = await prisma.customerCampaignOptOut.findUnique({
-      where: {
-        businessId_customerId: { businessId: data.businessId, customerId: recipient.customerId },
-      },
-    });
-    if (optedOut) {
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: 'FAILED', isSent: true, failedReason: 'Customer opted out' },
-      });
-      failed++;
-      continue;
-    }
-
-    const claimed = await prisma.campaignRecipient.updateMany({
-      where: { id: recipient.id, isSent: false, status: 'PENDING', runVersion: data.runVersion },
-      data: { status: 'SENDING' },
-    });
-    if (claimed.count === 0) continue;
-
-    const content = personalizeCampaignMessage(campaign.message, {
-      businessName: campaign.business.name,
-      customer: recipient.customer,
-    });
-
-    const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
-    const messageType = mapMessageType(campaign.messageType);
-
-    const result = await whatsappService.sendOutbound({
-      phoneNumberId: whatsappAccount.phoneNumberId,
-      to: phone,
-      accessToken: resolveStoredToken(whatsappAccount.accessToken),
-      type: messageType,
-      content,
-      mediaUrl: campaign.mediaUrl ?? undefined,
-      mediaFilename: campaign.mediaFilename ?? undefined,
-    });
-
-    if (result.success) {
-      sent++;
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: {
-          status: 'SENT',
-          isSent: true,
-          whatsappMsgId: result.whatsappMsgId,
-          sentAt: new Date(),
+    try {
+      const optedOut = await prisma.customerCampaignOptOut.findUnique({
+        where: {
+          businessId_customerId: { businessId: data.businessId, customerId: recipient.customerId },
         },
       });
-    } else {
-      failed++;
-      const reason = result.error?.message || 'Send failed';
-      const isBlocked = /blocked|opt|131026|131047/i.test(reason);
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: {
-          status: 'FAILED',
-          isSent: true,
-          failedReason: reason,
-        },
-      });
-      if (isBlocked) {
-        await prisma.campaign.update({
-          where: { id: campaign.id },
-          data: { blockedCount: { increment: 1 } },
+      if (optedOut) {
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: { status: 'FAILED', isSent: true, failedReason: 'Customer opted out' },
         });
+        failed++;
+        continue;
       }
+
+      const claimed = await prisma.campaignRecipient.updateMany({
+        where: { id: recipient.id, isSent: false, status: 'PENDING', runVersion: data.runVersion },
+        data: { status: 'SENDING' },
+      });
+      if (claimed.count === 0) continue;
+
+      const content = personalizeCampaignMessage(campaign.message, {
+        businessName: campaign.business.name,
+        customer: recipient.customer,
+      });
+
+      const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
+      const messageType = mapMessageType(campaign.messageType);
+
+      const result = await whatsappService.sendOutbound({
+        phoneNumberId: whatsappAccount.phoneNumberId,
+        to: phone,
+        accessToken: resolveStoredToken(whatsappAccount.accessToken),
+        type: messageType,
+        content,
+        mediaUrl: campaign.mediaUrl ?? undefined,
+        mediaFilename: campaign.mediaFilename ?? undefined,
+      });
+
+      if (result.success) {
+        sent++;
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: {
+            status: 'SENT',
+            isSent: true,
+            whatsappMsgId: result.whatsappMsgId,
+            sentAt: new Date(),
+          },
+        });
+      } else {
+        failed++;
+        const reason = result.error?.message || 'Send failed';
+        const isBlocked = /blocked|opt|131026|131047/i.test(reason);
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: {
+            status: 'FAILED',
+            isSent: true,
+            failedReason: reason,
+          },
+        });
+        if (isBlocked) {
+          await prisma.campaign.update({
+            where: { id: campaign.id },
+            data: { blockedCount: { increment: 1 } },
+          });
+        }
+      }
+    } catch (error) {
+      failed++;
+      const reason = error instanceof Error ? error.message : 'Send failed';
+      await prisma.campaignRecipient.updateMany({
+        where: { id: recipient.id, isSent: false },
+        data: { status: 'FAILED', isSent: true, failedReason: reason },
+      });
+      logger.error('Campaign recipient send failed', { campaignId: data.campaignId, recipientId: recipient.id, error });
     }
+  }
+
+  if (sent > 0 || failed > 0) {
+    await syncCampaignDeliveryStats(data.campaignId);
+    const { broadcastBusinessEvent } = await import('../../infrastructure/realtime/broadcast.service');
+    void broadcastBusinessEvent(data.businessId, { type: 'campaign', campaignId: data.campaignId, action: 'progress' });
   }
 
   logger.debug('Campaign batch processed', { campaignId: data.campaignId, sent, failed });
   await finalizeCampaignIfComplete(data.campaignId, data.businessId);
+
+  const remaining = await prisma.campaignRecipient.count({
+    where: {
+      campaignId: data.campaignId,
+      isSent: false,
+      status: 'PENDING',
+      runVersion: data.runVersion,
+    },
+  });
+  if (remaining > 0) {
+    const { getCampaignBatchQueue } = await import('../../infrastructure/queue/queues');
+    if (!getCampaignBatchQueue()) {
+      await enqueueCampaignBatches(data.campaignId, data.businessId, data.runVersion);
+    }
+  }
+
   return { sent, failed };
 }
 
@@ -204,16 +248,20 @@ export async function finalizeCampaignIfComplete(campaignId: string, businessId:
     where: { campaignId, runVersion: campaign.runVersion },
     _count: { status: true },
   });
-  const sent = agg.find((a) => a.status === 'SENT' || a.status === 'DELIVERED' || a.status === 'READ')?._count.status ?? 0;
-  const failed = agg.find((a) => a.status === 'FAILED')?._count.status ?? 0;
+  const sent = agg
+    .filter((a) => ['SENT', 'DELIVERED', 'READ'].includes(a.status))
+    .reduce((sum, a) => sum + a._count.status, 0);
+  const failed = agg
+    .filter((a) => a.status === 'FAILED')
+    .reduce((sum, a) => sum + a._count.status, 0);
+
+  await syncCampaignDeliveryStats(campaignId);
 
   await prisma.campaign.update({
     where: { id: campaignId },
     data: {
       status: failed > 0 && sent === 0 ? 'FAILED' : oneTimeComplete ? 'COMPLETED' : 'SCHEDULED',
       isSent: oneTimeComplete,
-      sentCount: { increment: sent },
-      failedCount: { increment: failed },
       lastRunAt: new Date(),
       runsCompleted,
       nextRunAt: oneTimeComplete ? null : nextRunAt,
