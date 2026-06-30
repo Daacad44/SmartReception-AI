@@ -43,7 +43,7 @@ async function resolveRecipients(
       where: {
         businessId,
         isActive: true,
-        campaignOptOut: null,
+        campaignOptOut: { is: null },
       },
     });
   }
@@ -51,25 +51,27 @@ async function resolveRecipients(
   if (segmentId) {
     const segment = await prisma.customerSegment.findFirst({
       where: { id: segmentId, businessId },
-      include: { members: { include: { customer: true } } },
+      include: { members: { include: { customer: { include: { campaignOptOut: true } } } } },
     });
     if (!segment) throw new NotFoundError('Segment not found');
 
     if (segment.customerType) {
       return prisma.customer.findMany({
-        where: { businessId, isActive: true, customerType: segment.customerType, campaignOptOut: null },
+        where: { businessId, isActive: true, customerType: segment.customerType, campaignOptOut: { is: null } },
       });
     }
-    return segment.members.map((m) => m.customer).filter((c) => c.isActive);
+    return segment.members
+      .map((m) => m.customer)
+      .filter((c) => c.isActive && !c.campaignOptOut);
   }
 
   if (customerTypes && customerTypes.length > 0) {
     return prisma.customer.findMany({
-      where: { businessId, isActive: true, customerType: { in: customerTypes }, campaignOptOut: null },
+      where: { businessId, isActive: true, customerType: { in: customerTypes }, campaignOptOut: { is: null } },
     });
   }
 
-  return prisma.customer.findMany({ where: { businessId, isActive: true, campaignOptOut: null } });
+  return prisma.customer.findMany({ where: { businessId, isActive: true, campaignOptOut: { is: null } } });
 }
 
 export async function executeCampaignSend(campaignId: string, businessId: string): Promise<void> {
