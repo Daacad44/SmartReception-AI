@@ -1,6 +1,7 @@
 import type { PlatformFeatureStatus } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { PLATFORM_FEATURE_REGISTRY } from './feature-registry.data';
+import { isSubscriptionFeatureEntitled } from './subscription-feature-entitlements';
 import { logger } from '../../core/logger';
 
 const CACHE_TTL_MS = 30_000;
@@ -13,6 +14,10 @@ interface FeatureCacheEntry {
 
 const featureCache = new Map<string, FeatureCacheEntry>();
 
+function cacheKey(featureKey: string, businessId?: string) {
+  return `${featureKey}:${businessId ?? 'global'}`;
+}
+
 export function isExecutableStatus(status: PlatformFeatureStatus): boolean {
   return status === 'ENABLED';
 }
@@ -20,7 +25,9 @@ export function isExecutableStatus(status: PlatformFeatureStatus): boolean {
 export class FeatureRegistryService {
   invalidateCache(featureKey?: string) {
     if (featureKey) {
-      featureCache.delete(featureKey);
+      for (const key of featureCache.keys()) {
+        if (key.startsWith(`${featureKey}:`)) featureCache.delete(key);
+      }
       return;
     }
     featureCache.clear();
@@ -54,6 +61,7 @@ export class FeatureRegistryService {
           category: entry.category,
           version: entry.version ?? '1.0.0',
           module: entry.module,
+          status: entry.status ?? 'DISABLED',
           routePath: entry.routePath,
           apiPrefix: entry.apiPrefix,
           navLabel: entry.navLabel,
@@ -93,7 +101,8 @@ export class FeatureRegistryService {
   }
 
   async isFeatureEnabled(featureKey: string, businessId?: string): Promise<boolean> {
-    const cached = featureCache.get(featureKey);
+    const key = cacheKey(featureKey, businessId);
+    const cached = featureCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.enabled;
     }
@@ -108,7 +117,16 @@ export class FeatureRegistryService {
     });
 
     if (!feature) {
-      featureCache.set(featureKey, {
+      if (businessId && (await isSubscriptionFeatureEntitled(featureKey, businessId))) {
+        featureCache.set(key, {
+          expiresAt: Date.now() + CACHE_TTL_MS,
+          enabled: true,
+          status: 'ENABLED',
+        });
+        return true;
+      }
+
+      featureCache.set(key, {
         expiresAt: Date.now() + CACHE_TTL_MS,
         enabled: false,
         status: 'DISABLED',
@@ -124,8 +142,13 @@ export class FeatureRegistryService {
       if (scope) status = scope.status;
     }
 
-    const enabled = isExecutableStatus(status);
-    featureCache.set(featureKey, {
+    let enabled = isExecutableStatus(status);
+
+    if (!enabled && businessId) {
+      enabled = await isSubscriptionFeatureEntitled(featureKey, businessId);
+    }
+
+    featureCache.set(key, {
       expiresAt: Date.now() + CACHE_TTL_MS,
       enabled,
       status,
@@ -188,25 +211,38 @@ export class FeatureRegistryService {
     });
   }
 
-  async getPublicFeatureMap() {
+  async getPublicFeatureMap(businessId?: string) {
     const features = await prisma.platformFeature.findMany({
       where: { isNavItem: true },
       select: {
         featureKey: true,
         status: true,
+        scope: true,
         routePath: true,
         navLabel: true,
         category: true,
         releaseType: true,
+        businessScopes: businessId
+          ? { where: { businessId }, take: 1, select: { status: true } }
+          : false,
       },
     });
 
     const map: Record<string, { enabled: boolean; status: PlatformFeatureStatus }> = {};
     for (const f of features) {
-      map[f.featureKey] = {
-        enabled: isExecutableStatus(f.status),
-        status: f.status,
-      };
+      let status = f.status;
+      if (businessId && f.scope === 'BUSINESS_SPECIFIC') {
+        const scope = Array.isArray(f.businessScopes) ? f.businessScopes[0] : undefined;
+        if (scope) status = scope.status;
+      }
+
+      let enabled = isExecutableStatus(status);
+      if (!enabled && businessId) {
+        enabled = await isSubscriptionFeatureEntitled(f.featureKey, businessId);
+        if (enabled) status = 'ENABLED';
+      }
+
+      map[f.featureKey] = { enabled, status };
     }
     return map;
   }
