@@ -12,39 +12,32 @@ import { personalizeCampaignMessage } from './campaign-personalization.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
-async function resolveRecipients(
-  businessId: string,
-  options: {
-    segmentId?: string | null;
-    customerTypes?: CustomerType[];
-    sendToAll?: boolean;
-    targetCustomerId?: string | null;
-    customerIds?: string[];
-  }
-) {
+type RecipientOptions = {
+  segmentId?: string | null;
+  customerTypes?: CustomerType[];
+  sendToAll?: boolean;
+  targetCustomerId?: string | null;
+  customerIds?: string[];
+};
+
+async function resolveRecipientCount(businessId: string, options: RecipientOptions): Promise<number> {
   const { segmentId, customerTypes, sendToAll, targetCustomerId, customerIds } = options;
 
   if (customerIds?.length) {
-    return prisma.customer.findMany({
+    return prisma.customer.count({
       where: { businessId, isActive: true, id: { in: customerIds } },
     });
   }
 
   if (targetCustomerId) {
-    const customer = await prisma.customer.findFirst({
+    return prisma.customer.count({
       where: { id: targetCustomerId, businessId, isActive: true },
     });
-    if (!customer) throw new NotFoundError('Customer not found');
-    return [customer];
   }
 
   if (sendToAll) {
-    return prisma.customer.findMany({
-      where: {
-        businessId,
-        isActive: true,
-        campaignOptOut: { is: null },
-      },
+    return prisma.customer.count({
+      where: { businessId, isActive: true, campaignOptOut: { is: null } },
     });
   }
 
@@ -56,23 +49,76 @@ async function resolveRecipients(
     if (!segment) throw new NotFoundError('Segment not found');
 
     if (segment.customerType) {
-      return prisma.customer.findMany({
+      return prisma.customer.count({
         where: { businessId, isActive: true, customerType: segment.customerType, campaignOptOut: { is: null } },
       });
     }
-    return segment.members
-      .map((m) => m.customer)
-      .filter((c) => c.isActive && !c.campaignOptOut);
+    return segment.members.filter((m) => m.customer.isActive && !m.customer.campaignOptOut).length;
   }
 
   if (customerTypes && customerTypes.length > 0) {
-    return prisma.customer.findMany({
+    return prisma.customer.count({
       where: { businessId, isActive: true, customerType: { in: customerTypes }, campaignOptOut: { is: null } },
     });
   }
 
-  return prisma.customer.findMany({ where: { businessId, isActive: true, campaignOptOut: { is: null } } });
+  return prisma.customer.count({ where: { businessId, isActive: true, campaignOptOut: { is: null } } });
 }
+
+async function* iterateRecipientBatches(
+  businessId: string,
+  options: RecipientOptions,
+  batchSize = 500
+): AsyncGenerator<Array<{ id: string; phone: string; whatsappNumber: string | null }>> {
+  const { segmentId, customerTypes, sendToAll, targetCustomerId, customerIds } = options;
+
+  if (segmentId) {
+    const segment = await prisma.customerSegment.findFirst({
+      where: { id: segmentId, businessId },
+      include: { members: { include: { customer: { include: { campaignOptOut: true } } } } },
+    });
+    if (!segment) throw new NotFoundError('Segment not found');
+
+    if (!segment.customerType) {
+      const customers = segment.members
+        .map((m) => m.customer)
+        .filter((c) => c.isActive && !c.campaignOptOut)
+        .map((c) => ({ id: c.id, phone: c.phone, whatsappNumber: c.whatsappNumber }));
+      for (let i = 0; i < customers.length; i += batchSize) {
+        yield customers.slice(i, i + batchSize);
+      }
+      return;
+    }
+  }
+
+  const where: Prisma.CustomerWhereInput = { businessId, isActive: true, campaignOptOut: { is: null } };
+  if (customerIds?.length) {
+    where.id = { in: customerIds };
+  } else if (targetCustomerId) {
+    where.id = targetCustomerId;
+  } else if (segmentId) {
+    const segment = await prisma.customerSegment.findFirst({ where: { id: segmentId, businessId } });
+    if (segment?.customerType) where.customerType = segment.customerType;
+  } else if (customerTypes?.length) {
+    where.customerType = { in: customerTypes };
+  }
+
+  let cursor: string | undefined;
+  for (;;) {
+    const batch = await prisma.customer.findMany({
+      where,
+      select: { id: true, phone: true, whatsappNumber: true },
+      orderBy: { id: 'asc' },
+      take: batchSize,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    if (batch.length === 0) break;
+    yield batch;
+    if (batch.length < batchSize) break;
+    cursor = batch[batch.length - 1].id;
+  }
+}
+
 
 export async function executeCampaignSend(campaignId: string, businessId: string): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
@@ -282,18 +328,20 @@ export class CampaignsService {
       if (!message) message = template.content;
     }
 
-    const customers = await resolveRecipients(businessId, {
+    const recipientOptions: RecipientOptions = {
       segmentId: input.segmentId,
       customerTypes: input.customerTypes,
       sendToAll: input.sendToAll,
       targetCustomerId: input.targetCustomerId,
       customerIds: input.customerIds,
-    });
-    if (customers.length === 0) {
+    };
+
+    const recipientCount = await resolveRecipientCount(businessId, recipientOptions);
+    if (recipientCount === 0) {
       throw new ValidationError('No customers match the selected audience');
     }
 
-    await assertCampaignCreateAllowed(businessId, customers.length);
+    await assertCampaignCreateAllowed(businessId, recipientCount);
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
@@ -312,7 +360,7 @@ export class CampaignsService {
         message,
         type: input.type,
         schedule: input.schedule,
-        status,
+        status: sendNow ? 'RUNNING' : scheduledAt ? 'SCHEDULED' : 'DRAFT',
         messageType: input.messageType ?? 'TEXT',
         segmentId: input.segmentId,
         templateId: input.templateId,
@@ -331,31 +379,53 @@ export class CampaignsService {
         mediaFilename: input.mediaFilename,
         category: input.category,
         createdById: userId,
-        recipients: {
-          create: customers.map((c) => ({
-            customerId: c.id,
-            phone: c.whatsappNumber || c.phone,
-            isSent: false,
-            runVersion: 0,
-          })),
-        },
       },
-      include: { _count: { select: { recipients: true } } },
     });
 
+    void this.attachRecipientsAndDispatch({
+      campaignId: campaign.id,
+      businessId,
+      recipientOptions,
+      sendNow,
+      scheduledAt,
+    }).catch((err) => logger.error('Campaign recipient build failed', { campaignId: campaign.id, err }));
+
+    return { ...campaign, _count: { recipients: recipientCount } };
+  }
+
+  private async attachRecipientsAndDispatch(params: {
+    campaignId: string;
+    businessId: string;
+    recipientOptions: RecipientOptions;
+    sendNow: boolean;
+    scheduledAt: Date | null;
+  }) {
+    const { campaignId, businessId, recipientOptions, sendNow, scheduledAt } = params;
+
+    for await (const batch of iterateRecipientBatches(businessId, recipientOptions)) {
+      await prisma.campaignRecipient.createMany({
+        data: batch.map((c) => ({
+          campaignId,
+          customerId: c.id,
+          phone: c.whatsappNumber || c.phone,
+          isSent: false,
+          runVersion: 0,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     await prisma.auditLog.create({
-      data: { businessId, userId, action: 'CREATE', entity: 'Campaign', entityId: campaign.id },
+      data: { businessId, action: 'CREATE', entity: 'Campaign', entityId: campaignId },
     });
 
     if (sendNow) {
-      void executeCampaignSend(campaign.id, businessId).catch((err) =>
+      void executeCampaignSend(campaignId, businessId).catch((err) =>
         logger.error('Campaign send failed', err)
       );
     } else if (scheduledAt) {
-      await enqueueCampaignSend(campaign.id, businessId, scheduledAt, campaign.id);
+      await enqueueCampaignSend(campaignId, businessId, scheduledAt, campaignId);
     }
-
-    return campaign;
   }
 
   async update(businessId: string, id: string, input: UpdateCampaignInput, userId: string) {
