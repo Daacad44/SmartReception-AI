@@ -1,6 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { Prisma } from '@prisma/client';
 import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/customer-phone';
+import { resolveInboundTimestamp } from './whatsapp-session.service';
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
@@ -96,6 +97,56 @@ export class WhatsAppRepository {
       return { conversation: existing, isNew: false };
     }
 
+    const reopenStatuses = ['CLOSED', 'RESOLVED'] as const;
+    const closedConversation = await prisma.conversation.findFirst({
+      where: {
+        businessId,
+        customerId,
+        whatsappAccountId,
+        status: { in: [...reopenStatuses] },
+      },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+
+    if (closedConversation) {
+      const reopened = await prisma.conversation.update({
+        where: { id: closedConversation.id },
+        data: {
+          status: 'AI_HANDLING',
+          isAiEnabled: true,
+          resolvedAt: null,
+          resolutionMethod: null,
+          whatsappAccountId,
+        },
+      });
+      console.log('[WhatsApp] Conversation reopened after customer reply');
+      return { conversation: reopened, isNew: false };
+    }
+
+    const closedAnyAccount = await prisma.conversation.findFirst({
+      where: {
+        businessId,
+        customerId,
+        status: { in: [...reopenStatuses] },
+      },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+
+    if (closedAnyAccount) {
+      const reopened = await prisma.conversation.update({
+        where: { id: closedAnyAccount.id },
+        data: {
+          status: 'AI_HANDLING',
+          isAiEnabled: true,
+          resolvedAt: null,
+          resolutionMethod: null,
+          whatsappAccountId,
+        },
+      });
+      console.log('[WhatsApp] Conversation reopened after customer reply');
+      return { conversation: reopened, isNew: false };
+    }
+
     const staleConversation = await prisma.conversation.findFirst({
       where: {
         businessId,
@@ -143,6 +194,8 @@ export class WhatsAppRepository {
     mediaUrl?: string;
     metadata?: Record<string, unknown>;
   }) {
+    const inboundAt = resolveInboundTimestamp(data.metadata);
+
     return prisma.$transaction(async (tx) => {
       const message = await tx.message.create({
         data: {
@@ -157,17 +210,56 @@ export class WhatsAppRepository {
         },
       });
 
+      const customer = await tx.customer.findUnique({
+        where: { id: data.customerId },
+        select: { lastCustomerMessageAt: true },
+      });
+      const nextCustomerInboundAt =
+        !customer?.lastCustomerMessageAt || inboundAt > customer.lastCustomerMessageAt
+          ? inboundAt
+          : customer.lastCustomerMessageAt;
+
+      const conversation = await tx.conversation.findUnique({
+        where: { id: data.conversationId },
+        select: { lastCustomerMessageAt: true, status: true, isAiEnabled: true },
+      });
+      const nextConversationInboundAt =
+        !conversation?.lastCustomerMessageAt || inboundAt > conversation.lastCustomerMessageAt
+          ? inboundAt
+          : conversation.lastCustomerMessageAt;
+
+      const conversationUpdate: {
+        lastMessageAt: Date;
+        lastCustomerMessageAt: Date;
+        unreadCount: { increment: number };
+        status?: 'AI_HANDLING';
+        isAiEnabled?: boolean;
+        resolvedAt?: null;
+        resolutionMethod?: null;
+      } = {
+        lastMessageAt: inboundAt,
+        lastCustomerMessageAt: nextConversationInboundAt,
+        unreadCount: { increment: 1 },
+      };
+
+      if (conversation && ['CLOSED', 'RESOLVED'].includes(conversation.status)) {
+        conversationUpdate.status = 'AI_HANDLING';
+        conversationUpdate.isAiEnabled = true;
+        conversationUpdate.resolvedAt = null;
+        conversationUpdate.resolutionMethod = null;
+      }
+
       await tx.conversation.update({
         where: { id: data.conversationId },
-        data: {
-          lastMessageAt: new Date(),
-          unreadCount: { increment: 1 },
-        },
+        data: conversationUpdate,
       });
 
       await tx.customer.update({
         where: { id: data.customerId },
-        data: { lastContactAt: new Date() },
+        data: {
+          lastContactAt: inboundAt,
+          lastCustomerMessageAt: nextCustomerInboundAt,
+        },
       });
 
       console.log('[WhatsApp] Message stored');

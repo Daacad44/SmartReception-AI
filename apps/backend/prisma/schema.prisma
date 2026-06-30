@@ -827,6 +827,8 @@ model Customer {
   aiSummary     Json?
   isActive      Boolean      @default(true)
   lastContactAt DateTime?
+  /** Latest inbound WhatsApp message time (Meta customer care window anchor). */
+  lastCustomerMessageAt DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -905,6 +907,8 @@ model Conversation {
   isTyping        Boolean            @default(false)
   unreadCount     Int                @default(0)
   lastMessageAt   DateTime?
+  /** Latest inbound WhatsApp message in this thread (session window anchor). */
+  lastCustomerMessageAt DateTime?
   resolvedAt      DateTime?
   aiStartTime     DateTime?
   humanStartTime  DateTime?
