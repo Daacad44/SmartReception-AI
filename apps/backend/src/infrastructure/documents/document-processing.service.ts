@@ -127,6 +127,11 @@ export async function processDocumentById(documentId: string, businessId: string
       `Knowledge document is ready for AI search (${chunks.length} chunks)`,
       documentId
     );
+
+    const { scheduleAutoTrainingAfterProcessing } = await import(
+      '../../modules/ai-training-mgmt/auto-training.service'
+    );
+    void scheduleAutoTrainingAfterProcessing(businessId);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Document processing failed';
     logger.error(`Document processing failed for ${documentId}:`, error);

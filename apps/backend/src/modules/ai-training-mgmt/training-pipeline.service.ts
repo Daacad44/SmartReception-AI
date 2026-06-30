@@ -15,6 +15,7 @@ import { insightsService } from './insights.service';
 import { trainingValidationService } from './training-validation.service';
 import { trainingSessionLogService } from './training-session-log.service';
 import { trainingEngineService } from './training-engine.service';
+import { deploymentService } from './deployment.service';
 import { createNotification } from '../../infrastructure/notifications/notification-helper';
 import { logger } from '../../core/logger';
 
@@ -392,13 +393,21 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       { entity: 'AiTrainingVersion', entityId: version.id }
     );
 
+    await updateJobProgress(jobId, 96, 'Auto-deploying validated version');
+    await deploymentService.autoDeployValidatedVersion(businessId, version.id, {
+      businessId,
+      userId,
+      trainerId,
+      validationScore: validation.validationScore,
+    });
+
     await createNotification({
       businessId,
       userId: userId ?? undefined,
       type: 'AI_TRAINING_COMPLETE',
       title: 'AI training completed',
-      message: `Version ${versionNumber} passed validation and is ready for sandbox testing.`,
-      data: { versionId: version.id, versionNumber },
+      message: `Version ${versionNumber} passed validation and was automatically deployed to production.`,
+      data: { versionId: version.id, versionNumber, autoDeployed: true },
     });
 
     return version.id;

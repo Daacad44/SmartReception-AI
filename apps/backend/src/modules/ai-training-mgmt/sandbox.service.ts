@@ -3,6 +3,7 @@ import { answerQuestion } from '../../infrastructure/ai/gemini.service';
 import { searchVersionKnowledgeContext } from '../../infrastructure/ai/knowledge-search.service';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { recordAiTrainingAudit } from './audit.service';
+import { NO_KNOWLEDGE_REPLY } from './ai-knowledge.constants';
 
 export class SandboxService {
   async createSession(
@@ -68,7 +69,9 @@ export class SandboxService {
     const knowledgeContext = await searchVersionKnowledgeContext(session.versionId, content);
     const missingKnowledge = !knowledgeContext || knowledgeContext.length < 20;
 
-    const reply = await answerQuestion(content, knowledgeContext || 'No knowledge available.');
+    const reply = missingKnowledge
+      ? NO_KNOWLEDGE_REPLY
+      : await answerQuestion(content, knowledgeContext);
 
     const confidence = knowledgeContext ? Math.min(0.95, 0.5 + knowledgeContext.length / 2000) : 0.25;
     const hallucinationRisk = missingKnowledge ? 0.65 : Math.max(0, 1 - confidence);

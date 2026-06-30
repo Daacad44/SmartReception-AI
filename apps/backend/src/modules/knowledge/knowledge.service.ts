@@ -14,9 +14,29 @@ const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
   'application/msword': 'DOCX',
   'text/plain': 'TXT',
+  'text/csv': 'CSV',
+  'application/csv': 'CSV',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+  'application/vnd.ms-excel': 'XLSX',
+  'text/markdown': 'MARKDOWN',
+  'text/x-markdown': 'MARKDOWN',
 };
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt'];
+const ALLOWED_EXTENSIONS = [
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.txt',
+  '.csv',
+  '.xlsx',
+  '.xls',
+  '.md',
+  '.markdown',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+];
 
 export class KnowledgeService {
   async listBases(businessId: string) {
@@ -43,7 +63,9 @@ export class KnowledgeService {
 
     const ext = file.originalname.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
+      throw new ValidationError(
+        'Unsupported file type. Allowed: PDF, Word, Excel, CSV, TXT, Markdown, Images'
+      );
     }
 
     const base =
@@ -55,10 +77,7 @@ export class KnowledgeService {
       throw new NotFoundError('Knowledge base not found');
     }
 
-    const docType = MIME_TO_TYPE[file.mimetype] ?? MIME_TO_TYPE[this.mimeFromExtension(ext)];
-    if (!docType) {
-      throw new ValidationError('Unsupported file type. Allowed: PDF, DOC, DOCX, TXT');
-    }
+    const docType = MIME_TO_TYPE[file.mimetype] ?? MIME_TO_TYPE[this.mimeFromExtension(ext)] ?? 'TXT';
 
     const { key, url } = await storageService.upload(
       file.buffer,
@@ -115,6 +134,15 @@ export class KnowledgeService {
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       '.doc': 'application/msword',
       '.txt': 'text/plain',
+      '.csv': 'text/csv',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xls': 'application/vnd.ms-excel',
+      '.md': 'text/markdown',
+      '.markdown': 'text/markdown',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
     };
     return map[ext] ?? '';
   }

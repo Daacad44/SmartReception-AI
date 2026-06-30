@@ -17,6 +17,11 @@ export async function extractDocumentText(
       return result.value;
     }
     case 'TXT':
+    case 'MARKDOWN':
+      return buffer.toString('utf-8');
+    case 'CSV':
+      return buffer.toString('utf-8');
+    case 'XLSX':
       return buffer.toString('utf-8');
     default:
       return '';
