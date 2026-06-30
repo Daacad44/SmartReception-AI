@@ -668,6 +668,10 @@ model Business {
   aiTrainingSessionLogs    AiTrainingSessionLog[]
   platformFeatureScopes    PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs PlatformFeatureAuditLog[]
+  businessFinancialProfile BusinessFinancialProfile?
+  financialAuditLogs       FinancialAuditLog[]
+  financialAlerts          FinancialAlert[]
+  financialCostEvents      FinancialCostEvent[]
 
   @@index([slug])
   @@index([isActive])
@@ -745,6 +749,7 @@ model User {
   platformFeaturesModified     PlatformFeature[]           @relation("PlatformFeatureModifiedBy")
   platformFeatureVerifications PlatformFeatureVerificationRequest[] @relation("PlatformFeatureVerificationUser")
   platformFeatureAuditLogs     PlatformFeatureAuditLog[]   @relation("PlatformFeatureAuditUser")
+  financialAuditLogs           FinancialAuditLog[]         @relation("FinancialAuditOperator")
 
   @@index([email])
   @@index([isActive])
@@ -2300,6 +2305,16 @@ model BusinessSubscription {
   payments       SubscriptionPayment[]
   renewals       SubscriptionRenewal[]
   discounts      SubscriptionDiscount[]
+  billingCycle   BillingCycle               @default(MONTHLY)
+  currency       String                     @default("USD")
+  gracePeriodDays Int                       @default(0)
+  trialEndsAt    DateTime?
+  paymentGateway String?
+  taxRatePercent Decimal?                   @db.Decimal(5, 2)
+  discountPercent Decimal?                  @db.Decimal(5, 2)
+  lifetimeRevenueUsd Decimal                @default(0) @db.Decimal(12, 2)
+  mrrContributionUsd Decimal                @default(0) @db.Decimal(12, 2)
+  arrContributionUsd Decimal                @default(0) @db.Decimal(12, 2)
 
   @@index([status])
   @@index([expiresAt])
@@ -3359,4 +3374,212 @@ model PlatformFeatureAuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("platform_feature_audit_logs")
+}
+
+// ─── ENTERPRISE FINANCIAL INTELLIGENCE ───────────────────────────────────────
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum FinancialAlertType {
+  COST_EXCEEDS_REVENUE
+  AI_LIMIT_EXCEEDED
+  STORAGE_LIMIT_EXCEEDED
+  WHATSAPP_LIMIT_EXCEEDED
+  PROFIT_MARGIN_LOW
+  INFRASTRUCTURE_COST_SPIKE
+  BUSINESS_UNPROFITABLE
+}
+
+enum FinancialAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum FinancialCostProviderKey {
+  AI
+  WHATSAPP
+  EMAIL
+  STORAGE
+  INFRASTRUCTURE
+  DATABASE
+  REDIS
+  MONITORING
+  BACKUP
+}
+
+model PlatformFinancialConfig {
+  id                              String   @id @default("default")
+  currency                        String   @default("USD")
+  infrastructureMonthlyCostUsd    Decimal  @default(120) @db.Decimal(12, 2)
+  databaseMonthlyCostUsd          Decimal  @default(25) @db.Decimal(12, 2)
+  redisMonthlyCostUsd             Decimal  @default(15) @db.Decimal(12, 2)
+  monitoringMonthlyCostUsd        Decimal  @default(10) @db.Decimal(12, 2)
+  backupMonthlyCostUsd              Decimal  @default(8) @db.Decimal(12, 2)
+  whatsappAuthCostPerConversation   Decimal  @default(0.005) @db.Decimal(10, 6)
+  whatsappMarketingCostPerConversation Decimal @default(0.04) @db.Decimal(10, 6)
+  whatsappUtilityCostPerConversation Decimal @default(0.02) @db.Decimal(10, 6)
+  whatsappServiceCostPerConversation Decimal @default(0.01) @db.Decimal(10, 6)
+  emailCostPerSend                  Decimal  @default(0.001) @db.Decimal(10, 6)
+  storageCostPerGbMonth             Decimal  @default(0.023) @db.Decimal(10, 6)
+  profitMarginAlertThresholdPercent Decimal  @default(20) @db.Decimal(5, 2)
+  useWeightedInfrastructureAllocation Boolean @default(false)
+  updatedById                     String?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  @@map("platform_financial_config")
+}
+
+model BusinessFinancialProfile {
+  businessId              String   @id
+  subscriptionId          String?
+  planCode                String?
+  planName                String?
+  billingCycle            BillingCycle?
+  currency                String   @default("USD")
+  monthlyRevenueUsd       Decimal  @default(0) @db.Decimal(12, 2)
+  yearlyRevenueUsd        Decimal  @default(0) @db.Decimal(12, 2)
+  lifetimeRevenueUsd      Decimal  @default(0) @db.Decimal(12, 2)
+  mrrContributionUsd      Decimal  @default(0) @db.Decimal(12, 2)
+  arrContributionUsd      Decimal  @default(0) @db.Decimal(12, 2)
+  failedPaymentsUsd       Decimal  @default(0) @db.Decimal(12, 2)
+  refundsUsd              Decimal  @default(0) @db.Decimal(12, 2)
+  outstandingInvoicesUsd  Decimal  @default(0) @db.Decimal(12, 2)
+  aiCostUsd               Decimal  @default(0) @db.Decimal(12, 4)
+  whatsappCostUsd         Decimal  @default(0) @db.Decimal(12, 4)
+  emailCostUsd            Decimal  @default(0) @db.Decimal(12, 4)
+  storageCostUsd          Decimal  @default(0) @db.Decimal(12, 4)
+  infrastructureCostUsd   Decimal  @default(0) @db.Decimal(12, 4)
+  databaseCostUsd         Decimal  @default(0) @db.Decimal(12, 4)
+  redisCostUsd            Decimal  @default(0) @db.Decimal(12, 4)
+  monitoringCostUsd       Decimal  @default(0) @db.Decimal(12, 4)
+  backupCostUsd           Decimal  @default(0) @db.Decimal(12, 4)
+  totalOperatingCostUsd   Decimal  @default(0) @db.Decimal(12, 4)
+  grossProfitUsd          Decimal  @default(0) @db.Decimal(12, 2)
+  netProfitUsd            Decimal  @default(0) @db.Decimal(12, 2)
+  profitMarginPercent     Float    @default(0)
+  operatingMarginPercent  Float    @default(0)
+  costRecoveryPercent     Float    @default(0)
+  roiPercent              Float    @default(0)
+  customerLifetimeValueUsd Decimal @default(0) @db.Decimal(12, 2)
+  avgProfitPerCustomerUsd Decimal  @default(0) @db.Decimal(12, 4)
+  avgProfitPerConversationUsd Decimal @default(0) @db.Decimal(12, 6)
+  avgProfitPerTokenUsd    Decimal  @default(0) @db.Decimal(12, 8)
+  isProfitable            Boolean  @default(false)
+  isOperatingAtLoss       Boolean  @default(false)
+  revenueBreakdown        Json?
+  costBreakdown           Json?
+  usageBreakdown          Json?
+  calculatedAt            DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([planCode])
+  @@index([isProfitable])
+  @@index([isOperatingAtLoss])
+  @@index([calculatedAt])
+  @@map("business_financial_profiles")
+}
+
+model PlatformFinancialSnapshot {
+  id                      String   @id @default(uuid())
+  snapshotDate            DateTime @db.Date
+  totalMrrUsd             Decimal  @default(0) @db.Decimal(14, 2)
+  totalArrUsd             Decimal  @default(0) @db.Decimal(14, 2)
+  monthlyRevenueUsd       Decimal  @default(0) @db.Decimal(14, 2)
+  yearlyRevenueUsd        Decimal  @default(0) @db.Decimal(14, 2)
+  lifetimeRevenueUsd      Decimal  @default(0) @db.Decimal(14, 2)
+  totalOperatingCostUsd   Decimal  @default(0) @db.Decimal(14, 4)
+  aiCostUsd               Decimal  @default(0) @db.Decimal(14, 4)
+  whatsappCostUsd         Decimal  @default(0) @db.Decimal(14, 4)
+  emailCostUsd            Decimal  @default(0) @db.Decimal(14, 4)
+  storageCostUsd          Decimal  @default(0) @db.Decimal(14, 4)
+  infrastructureCostUsd   Decimal  @default(0) @db.Decimal(14, 4)
+  databaseCostUsd         Decimal  @default(0) @db.Decimal(14, 4)
+  redisCostUsd            Decimal  @default(0) @db.Decimal(14, 4)
+  monitoringCostUsd       Decimal  @default(0) @db.Decimal(14, 4)
+  backupCostUsd           Decimal  @default(0) @db.Decimal(14, 4)
+  grossProfitUsd          Decimal  @default(0) @db.Decimal(14, 2)
+  netProfitUsd            Decimal  @default(0) @db.Decimal(14, 2)
+  platformProfitMarginPercent Float @default(0)
+  activeBusinessCount     Int      @default(0)
+  profitableBusinessCount Int      @default(0)
+  lossBusinessCount       Int      @default(0)
+  breakdown               Json?
+  createdAt               DateTime @default(now())
+
+  @@unique([snapshotDate])
+  @@index([snapshotDate])
+  @@map("platform_financial_snapshots")
+}
+
+model FinancialAuditLog {
+  id                 String   @id @default(uuid())
+  businessId         String?
+  action             String
+  entity             String
+  previousValue      Json?
+  newValue           Json?
+  operatorId         String?
+  operatorEmail      String?
+  ipAddress          String?
+  reason             String?
+  verificationStatus String?
+  createdAt          DateTime @default(now())
+
+  business  Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  operator  User?     @relation("FinancialAuditOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("financial_audit_logs")
+}
+
+model FinancialAlert {
+  id             String                 @id @default(uuid())
+  businessId     String?
+  type           FinancialAlertType
+  severity       FinancialAlertSeverity @default(WARNING)
+  title          String
+  message        String
+  metadata       Json?
+  acknowledgedAt DateTime?
+  acknowledgedById String?
+  createdAt      DateTime               @default(now())
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([type])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("financial_alerts")
+}
+
+model FinancialCostEvent {
+  id          String                   @id @default(uuid())
+  businessId  String
+  provider    FinancialCostProviderKey
+  amountUsd   Decimal                  @db.Decimal(12, 6)
+  quantity    Decimal?                 @db.Decimal(14, 4)
+  unit        String?
+  referenceId String?
+  metadata    Json?
+  occurredAt  DateTime                 @default(now())
+  createdAt   DateTime                 @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, provider])
+  @@index([businessId, occurredAt])
+  @@index([provider, occurredAt])
+  @@map("financial_cost_events")
 }

@@ -115,6 +115,16 @@ const EmployeeCommunicationPage = lazyWithRetry(() =>
 const SubscriptionManagementPage = lazyWithRetry(() =>
   import('@/pages/SubscriptionManagementPage').then((m) => ({ default: m.SubscriptionManagementPage }))
 );
+const FinancialIntelligenceAdminPage = lazyWithRetry(() =>
+  import('@/pages/FinancialIntelligenceAdminPage').then((m) => ({
+    default: m.FinancialIntelligenceAdminPage,
+  }))
+);
+const BusinessFinancialDetailPage = lazyWithRetry(() =>
+  import('@/pages/BusinessFinancialDetailPage').then((m) => ({
+    default: m.BusinessFinancialDetailPage,
+  }))
+);
 const SubscriptionDetailsPage = lazyWithRetry(() =>
   import('@/pages/SubscriptionDetailsPage').then((m) => ({ default: m.SubscriptionDetailsPage }))
 );
@@ -447,6 +457,26 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <SubscriptionManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/financial-intelligence"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="financial-intelligence">
+                          <FinancialIntelligenceAdminPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/financial-intelligence/:businessId"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="financial-intelligence">
+                          <BusinessFinancialDetailPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />

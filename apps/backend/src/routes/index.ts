@@ -33,6 +33,10 @@ import aiTrainingCenterRoutes from '../modules/ai-training-mgmt/ai-training-cent
 import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
 import aiAnalyticsAdminRoutes from '../modules/ai-analytics/ai-analytics-admin.routes';
 import aiAnalyticsRoutes from '../modules/ai-analytics/ai-analytics.routes';
+import {
+  financialIntelligenceAdminRoutes,
+  financialIntelligenceRoutes,
+} from '../modules/financial-intelligence/financial-intelligence.routes';
 import featureManagementRoutes from '../modules/feature-management/feature-management.routes';
 import {
   subscriptionAdminRoutes,
@@ -52,6 +56,7 @@ router.use('/super-admin/feature-management', featureManagementRoutes);
 router.use('/super-admin/ai-training', aiTrainingAdminRoutes);
 router.use('/super-admin/ai-training-center', aiTrainingCenterRoutes);
 router.use('/super-admin/ai-analytics', aiAnalyticsAdminRoutes);
+router.use('/super-admin/financial-intelligence', financialIntelligenceAdminRoutes);
 router.use('/super-admin/subscriptions', subscriptionAdminRoutes);
 router.use('/subscription', subscriptionRoutes);
 
@@ -85,6 +90,7 @@ licensed.use('/business-profile', businessProfileRoutes);
 licensed.use('/governance', governanceRoutes);
 licensed.use('/ai-training', aiTrainingRoutes);
 licensed.use('/ai-analytics', aiAnalyticsRoutes);
+licensed.use('/financial-intelligence', financialIntelligenceRoutes);
 licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);
 
 router.use('/billing', billingRoutes);
