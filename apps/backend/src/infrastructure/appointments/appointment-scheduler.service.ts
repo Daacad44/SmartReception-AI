@@ -1,5 +1,5 @@
 import { getReminderQueue } from '../queue/queues';
-import type { ReminderInterval } from './appointment-dual-channel.service';
+import type { ReminderInterval } from './appointment-notification.service';
 import { logger } from '../../core/logger';
 
 const REMINDER_OFFSETS: Record<'30m' | '20m' | '10m', number> = {

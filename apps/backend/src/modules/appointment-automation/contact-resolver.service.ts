@@ -4,6 +4,10 @@ import type { AppointmentContactRecipient } from './types';
 type AppointmentWithCustomer = Appointment & { customer: Customer };
 
 export class AppointmentContactResolverService {
+  /**
+   * Resolves notification recipients from appointment contact fields first.
+   * Never prefers the active WhatsApp conversation number over appointment.primaryPhone.
+   */
   resolveRecipients(appointment: AppointmentWithCustomer, businessEmail?: string | null): AppointmentContactRecipient[] {
     const recipients: AppointmentContactRecipient[] = [];
     const seen = new Set<string>();
@@ -37,14 +41,16 @@ export class AppointmentContactResolverService {
   buildContactFields(
     appointment: Partial<Appointment>,
     customer: Customer,
-    businessEmail?: string | null
+    businessEmail?: string | null,
+    overrideEmail?: string | null,
+    overridePhone?: string | null
   ) {
     return {
-      primaryPhone: appointment.primaryPhone ?? customer.phone,
+      primaryPhone: overridePhone ?? appointment.primaryPhone ?? customer.phone,
       secondaryPhone: appointment.secondaryPhone,
       guardianPhone: appointment.guardianPhone,
-      companyPhone: appointment.companyPhone ?? customer.companyName ? customer.phone : undefined,
-      primaryEmail: appointment.primaryEmail ?? customer.email,
+      companyPhone: appointment.companyPhone,
+      primaryEmail: overrideEmail ?? appointment.primaryEmail ?? customer.email,
       secondaryEmail: appointment.secondaryEmail,
       guardianEmail: appointment.guardianEmail,
       businessEmail: appointment.businessEmail ?? businessEmail ?? undefined,

@@ -166,7 +166,10 @@ export interface ReminderJobData {
   appointmentId: string;
   businessId: string;
   customerPhone: string;
-  interval?: '30m' | '20m' | '10m' | 'missed' | 'followup-24h';
+  interval?: '30m' | '20m' | '10m' | 'missed' | 'followup-24h' | 'configurable';
+  configId?: string;
+  label?: string;
+  channels?: Array<'EMAIL' | 'WHATSAPP'>;
 }
 
 export interface EmailJobData {

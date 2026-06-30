@@ -221,7 +221,7 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentSchema = createAppointmentSchema.partial().extend({
-  status: z.enum(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'MISSED']).optional(),
+  status: z.enum(['DRAFT', 'PENDING', 'SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'MISSED', 'IN_PROGRESS', 'REJECTED', 'RESCHEDULED', 'EXPIRED', 'ARCHIVED', 'CUSTOMER_ARRIVED']).optional(),
 });
 
 export const appointmentActionSchema = z.object({

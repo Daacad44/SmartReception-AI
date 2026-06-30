@@ -124,13 +124,22 @@ async function processDocumentJob(job: Job<DocumentJobData>): Promise<void> {
 }
 
 async function processReminderJobHandler(job: Job<ReminderJobData>): Promise<void> {
-  const { appointmentId, businessId, interval = '30m' } = job.data;
+  const { appointmentId, businessId, interval = '30m', label, channels } = job.data;
   const { assertFeatureEnabled } = await import('./core/middleware/platform-feature.middleware');
   if (!(await assertFeatureEnabled('appointment-automation', businessId))) {
     logger.debug(`Skipping appointment reminder — automation feature disabled`);
     return;
   }
-  await processReminderJob(appointmentId, businessId, interval);
+  const { processReminderJob } = await import('./infrastructure/appointments/appointment-notification.service');
+  if (interval === 'configurable' && label) {
+    await processReminderJob(appointmentId, businessId, 'configurable', { label, channels });
+    return;
+  }
+  await processReminderJob(
+    appointmentId,
+    businessId,
+    interval as '30m' | '20m' | '10m' | 'missed' | 'followup-24h'
+  );
 }
 
 async function processCampaignJob(job: Job<CampaignJobData>): Promise<void> {
@@ -272,6 +281,16 @@ async function startWorkers(): Promise<void> {
   }, SUBSCRIPTION_SCAN_MS);
   void processExpiredSubscriptions().catch(() => undefined);
   void processDueReminders().catch(() => undefined);
+
+  const { retryFailedAppointmentNotifications } = await import(
+    './infrastructure/appointments/notification-retry.service'
+  );
+  const NOTIFICATION_RETRY_MS = 5 * 60 * 1000;
+  setInterval(() => {
+    void retryFailedAppointmentNotifications().catch((error) => {
+      logger.warn('Appointment notification retry scan failed', { error });
+    });
+  }, NOTIFICATION_RETRY_MS);
 }
 
 const shutdown = async (signal: string) => {

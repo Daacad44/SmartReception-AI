@@ -25,15 +25,15 @@ export const DEFAULT_WORKFLOW_STAGES = [
 ] as const;
 
 const DEFAULT_REMINDER_OFFSETS = [
-  { label: '7 Days Before', offsetMinutes: -7 * 24 * 60 },
-  { label: '3 Days Before', offsetMinutes: -3 * 24 * 60 },
   { label: '24 Hours Before', offsetMinutes: -24 * 60 },
   { label: '12 Hours Before', offsetMinutes: -12 * 60 },
   { label: '6 Hours Before', offsetMinutes: -6 * 60 },
-  { label: '2 Hours Before', offsetMinutes: -2 * 60 },
   { label: '1 Hour Before', offsetMinutes: -60 },
-  { label: '30 Minutes Before', offsetMinutes: -30 },
   { label: '15 Minutes Before', offsetMinutes: -15 },
+  { label: '7 Days Before', offsetMinutes: -7 * 24 * 60 },
+  { label: '3 Days Before', offsetMinutes: -3 * 24 * 60 },
+  { label: '2 Hours Before', offsetMinutes: -2 * 60 },
+  { label: '30 Minutes Before', offsetMinutes: -30 },
 ];
 
 function buildDefaultDefinition(name: string, description: string): WorkflowTemplateDefinition {

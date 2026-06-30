@@ -238,12 +238,20 @@ enum MessageStatus {
 }
 
 enum AppointmentStatus {
+  DRAFT
+  PENDING
   SCHEDULED
   CONFIRMED
   CANCELLED
   COMPLETED
   NO_SHOW
   MISSED
+  IN_PROGRESS
+  REJECTED
+  RESCHEDULED
+  EXPIRED
+  ARCHIVED
+  CUSTOMER_ARRIVED
 }
 
 enum AppointmentNotificationChannel {
@@ -256,6 +264,20 @@ enum AppointmentNotificationChannel {
 enum AppointmentNotificationType {
   APPOINTMENT_CREATED
   APPOINTMENT_APPROVED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_PENDING
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REJECTED
+  APPOINTMENT_IN_PROGRESS
+  APPOINTMENT_COMPLETED
+  APPOINTMENT_EXPIRED
+  APPOINTMENT_NO_SHOW
+  REMINDER_24_HOURS
+  REMINDER_12_HOURS
+  REMINDER_6_HOURS
+  REMINDER_1_HOUR
+  REMINDER_15_MINUTES
   REMINDER_30_MIN
   REMINDER_20_MIN
   REMINDER_10_MIN
@@ -266,8 +288,11 @@ enum AppointmentNotificationType {
 enum AppointmentNotificationStatus {
   PENDING
   SENT
+  DELIVERED
+  READ
   FAILED
   SKIPPED
+  BOUNCED
 }
 
 enum AppointmentWorkflowEventType {
@@ -597,6 +622,7 @@ model Business {
   appointmentTimelineEvents AppointmentTimelineEvent[]
   appointmentWorkflowExecutions AppointmentWorkflowExecution[]
   appointmentNotifications AppointmentNotification[]
+  appointmentMessageTemplates AppointmentMessageTemplate[]
   services          Service[]
   knowledgeBases    KnowledgeBase[]
   whatsappAccounts  WhatsAppAccount[]
@@ -1100,21 +1126,50 @@ model AppointmentNotification {
   customerId       String
   channel          AppointmentNotificationChannel
   notificationType AppointmentNotificationType
+  recipient        String                       @default("")
+  templateKey      String?
   scheduledAt      DateTime?
   sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  failedAt         DateTime?
   status           AppointmentNotificationStatus @default(PENDING)
   errorMessage     String?
+  externalMessageId String?
+  retryCount       Int                          @default(0)
+  maxRetries       Int                          @default(5)
   createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
 
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  @@unique([appointmentId, notificationType, channel])
+  @@unique([appointmentId, notificationType, channel, recipient])
   @@index([appointmentId])
   @@index([businessId, status])
   @@index([scheduledAt, status])
+  @@index([status, retryCount])
   @@map("appointment_notifications")
+}
+
+model AppointmentMessageTemplate {
+  id          String                        @id @default(uuid())
+  businessId  String
+  templateKey String
+  channel     AppointmentNotificationChannel?
+  name        String
+  subject     String?
+  body        String
+  isActive    Boolean                       @default(true)
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, templateKey, channel])
+  @@index([businessId, isActive])
+  @@map("appointment_message_templates")
 }
 
 // ─── APPOINTMENT AUTOMATION PLATFORM ─────────────────────────────────────────

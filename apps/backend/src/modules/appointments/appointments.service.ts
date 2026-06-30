@@ -17,12 +17,8 @@ import {
   cancelAppointmentReminderJobs,
 } from '../../infrastructure/appointments/appointment-scheduler.service';
 import {
-  sendAppointmentConfirmation,
-  sendAppointmentApproved,
-  sendAppointmentRejected,
-  sendAppointmentRescheduled,
-  sendAppointmentCancelled,
   resetAppointmentReminderFlags,
+  scheduleAllReminders,
 } from '../../infrastructure/appointments/appointment-notification.service';
 import { appointmentNotificationRepository } from '../../infrastructure/appointments/appointment-notification.repository';
 import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
@@ -144,6 +140,9 @@ export class AppointmentsService {
       });
     }
 
+    const primaryEmail = normalizeEmail(input.customerEmail || customer.email!);
+    const primaryPhone = customer.phone;
+
     const appointment = await appointmentsRepository.create(businessId, {
       customerId: input.customerId,
       serviceId: input.serviceId,
@@ -162,17 +161,11 @@ export class AppointmentsService {
       priority: input.priority,
       serviceCategory: input.serviceCategory,
       budget: input.budget,
+      primaryEmail,
+      primaryPhone,
     });
 
-    await scheduleAppointmentReminders({
-      appointmentId: appointment.id,
-      businessId,
-      customerPhone: customer.phone,
-      startTime,
-    });
-
-    void sendAppointmentConfirmation(appointment.id, businessId).catch(() => undefined);
-    void appointmentWorkflowEngineService.bootstrapAppointment(businessId, appointment.id).catch(() => undefined);
+    await appointmentWorkflowEngineService.bootstrapAppointment(businessId, appointment.id);
 
     await prisma.auditLog.create({
       data: {
@@ -249,11 +242,14 @@ export class AppointmentsService {
 
     if (input.startTime || input.endTime) {
       await cancelAppointmentReminderJobs(id);
+      const { cancelConfigurableReminders } = await import(
+        '../appointment-automation/reminder-scheduler.service'
+      );
+      await cancelConfigurableReminders(id, businessId);
       await resetAppointmentReminderFlags(id);
-      await scheduleAppointmentReminders({
+      await scheduleAllReminders({
         appointmentId: id,
         businessId,
-        customerPhone: appointment.customer.phone,
         startTime,
       });
     }
@@ -314,7 +310,7 @@ export class AppointmentsService {
         status = 'COMPLETED';
         break;
       case 'mark_missed':
-        status = 'MISSED';
+        status = 'NO_SHOW';
         updateData.missedAt = new Date();
         updateData.canRebookAfter = new Date(Date.now() + 24 * 60 * 60 * 1000);
         break;
@@ -345,7 +341,6 @@ export class AppointmentsService {
     }
 
     if (action === 'approve') {
-      void sendAppointmentApproved(id, businessId).catch(() => undefined);
       await notifyAppointment(businessId, 'Appointment approved', `${appointment.title} was approved`, id, userId);
       await prisma.notification.create({
         data: {
@@ -359,22 +354,22 @@ export class AppointmentsService {
       });
     } else if (action === 'reject') {
       await cancelAppointmentReminderJobs(id);
-      void sendAppointmentRejected(id, businessId, data?.rejectionReason).catch(() => undefined);
       await notifyAppointment(businessId, 'Appointment rejected', `${appointment.title} was rejected`, id, userId);
     } else if (action === 'reschedule') {
       await cancelAppointmentReminderJobs(id);
+      const { cancelConfigurableReminders } = await import(
+        '../appointment-automation/reminder-scheduler.service'
+      );
+      await cancelConfigurableReminders(id, businessId);
       await resetAppointmentReminderFlags(id);
-      void sendAppointmentRescheduled(id, businessId).catch(() => undefined);
-      await scheduleAppointmentReminders({
+      await scheduleAllReminders({
         appointmentId: id,
         businessId,
-        customerPhone: appointment.customer.phone,
         startTime: appointment.startTime,
       });
       await notifyAppointment(businessId, 'Appointment rescheduled', `${appointment.title} was rescheduled`, id, userId);
     } else if (action === 'cancel') {
       await cancelAppointmentReminderJobs(id);
-      void sendAppointmentCancelled(id, businessId).catch(() => undefined);
       await prisma.notification.create({
         data: {
           businessId,
@@ -409,6 +404,12 @@ export class AppointmentsService {
           appointmentId: id,
           triggerEvent: workflowEvent,
           operatorId: userId,
+          metadata:
+            action === 'reschedule'
+              ? { previousStartTime: existing.startTime.toISOString() }
+              : action === 'reject'
+                ? { reason: data?.rejectionReason }
+                : undefined,
         })
         .catch(() => undefined);
     }

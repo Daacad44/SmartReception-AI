@@ -1,153 +1,30 @@
 import { prisma } from '../database/prisma';
-import {
-  appointmentConfirmationEmail,
-  appointmentApprovedEmail,
-  appointmentMissedEmail,
-  appointmentMissedFollowUpEmail,
-  appointmentReminderEmail,
-} from '../email/templates';
 import { logger } from '../../core/logger';
 import {
-  dispatchDualChannelNotification,
-  type ReminderInterval,
-} from './appointment-dual-channel.service';
+  dispatchAppointmentNotification,
+  reminderLabelToNotificationType,
+} from './appointment-notification-engine.service';
 import {
   cancelAppointmentReminderJobs,
   scheduleMissedFollowUp,
 } from './appointment-scheduler.service';
+import {
+  cancelConfigurableReminders,
+  scheduleConfigurableReminders,
+} from '../../modules/appointment-automation/reminder-scheduler.service';
 
-export type { ReminderInterval };
-
-function formatDateTime(date: Date, timezone = 'UTC'): { date: string; time: string } {
-  return {
-    date: date.toLocaleDateString('en-GB', {
-      timeZone: timezone,
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }),
-    time: date.toLocaleTimeString('en-GB', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-  };
-}
-
-async function loadAppointment(appointmentId: string, businessId: string) {
-  return prisma.appointment.findFirst({
-    where: { id: appointmentId, businessId },
-    include: {
-      customer: true,
-      service: true,
-      business: { include: { whatsappAccounts: { where: { isActive: true }, take: 1 } } },
-    },
-  });
-}
-
-function serviceName(appointment: NonNullable<Awaited<ReturnType<typeof loadAppointment>>>) {
-  return appointment.serviceRequested || appointment.service?.name || appointment.title;
-}
-
-const REMINDER_FLAG: Record<'30m' | '20m' | '10m', string> = {
-  '30m': 'reminder30mSent',
-  '20m': 'reminder20mSent',
-  '10m': 'reminder10mSent',
-};
-
-const REMINDER_TYPE: Record<'30m' | '20m' | '10m', 'REMINDER_30_MIN' | 'REMINDER_20_MIN' | 'REMINDER_10_MIN'> = {
-  '30m': 'REMINDER_30_MIN',
-  '20m': 'REMINDER_20_MIN',
-  '10m': 'REMINDER_10_MIN',
-};
-
-const REMINDER_LABEL: Record<'30m' | '20m' | '10m', string> = {
-  '30m': '30 minutes',
-  '20m': '20 minutes',
-  '10m': '10 minutes',
-};
+export type ReminderInterval = '30m' | '20m' | '10m' | 'missed' | 'followup-24h' | 'configurable';
 
 export async function sendAppointmentConfirmation(
   appointmentId: string,
   businessId: string
 ): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
-  if (!appointment) return;
-
-  const svc = serviceName(appointment);
-  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
-  const customerName = appointment.customer.name;
-
-  const whatsappMessage = `Hello ${customerName}
-
-Your appointment has been successfully scheduled.
-
-Date:
-${date}
-
-Time:
-${time}
-
-Service:
-${svc}
-
-Thank you.`;
-
-  const { subject, html } = appointmentConfirmationEmail({
-    customerName,
-    serviceName: svc,
-    date,
-    time,
-    meetingLink: appointment.meetingLink || undefined,
-    details: appointment.additionalNotes || appointment.description || undefined,
-  });
-
-  await dispatchDualChannelNotification({
-    appointment,
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
     notificationType: 'APPOINTMENT_CREATED',
-    emailSubject: subject,
-    emailHtml: html,
-    whatsappMessage,
-  });
-
-  await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: { confirmationSentAt: new Date(), status: 'CONFIRMED' },
-  });
-}
-
-export async function sendAppointmentApproved(
-  appointmentId: string,
-  businessId: string
-): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
-  if (!appointment) return;
-
-  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
-  const customerName = appointment.customer.name;
-
-  const whatsappMessage = `Hello ${customerName}
-
-Your appointment has been approved.
-
-Please be available at the scheduled time.
-
-Date:
-${date}
-
-Time:
-${time}
-
-We look forward to serving you.`;
-
-  const { subject, html } = appointmentApprovedEmail({ customerName, date, time });
-
-  await dispatchDualChannelNotification({
-    appointment,
-    notificationType: 'APPOINTMENT_APPROVED',
-    emailSubject: subject,
-    emailHtml: html,
-    whatsappMessage,
+    templateKey: 'confirmation',
+    attachIcs: true,
   });
 
   await prisma.appointment.update({
@@ -156,51 +33,54 @@ We look forward to serving you.`;
   });
 }
 
+export async function sendAppointmentApproved(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_CONFIRMED',
+    templateKey: 'confirmed',
+    attachIcs: true,
+  });
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { confirmationSentAt: new Date(), status: 'CONFIRMED' },
+  });
+}
+
 export async function sendAppointmentReminder(
   appointmentId: string,
   businessId: string,
   interval: '30m' | '20m' | '10m'
 ): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, businessId },
+  });
   if (!appointment) return;
-  if (['CANCELLED', 'COMPLETED', 'MISSED', 'NO_SHOW'].includes(appointment.status)) return;
+  if (['CANCELLED', 'COMPLETED', 'MISSED', 'NO_SHOW', 'EXPIRED', 'ARCHIVED'].includes(appointment.status)) {
+    return;
+  }
 
-  const flagKey = REMINDER_FLAG[interval];
+  const flagKey =
+    interval === '30m' ? 'reminder30mSent' : interval === '20m' ? 'reminder20mSent' : 'reminder10mSent';
   if (appointment[flagKey as keyof typeof appointment]) return;
 
-  const svc = serviceName(appointment);
-  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
-  const remaining = REMINDER_LABEL[interval];
-  const customerName = appointment.customer.name;
+  const typeMap = {
+    '30m': 'REMINDER_30_MIN' as const,
+    '20m': 'REMINDER_20_MIN' as const,
+    '10m': 'REMINDER_10_MIN' as const,
+  };
+  const labelMap = { '30m': '30 Minutes Before', '20m': '20 Minutes Before', '10m': '10 Minutes Before' };
 
-  const whatsappMessage = `Hello ${customerName}
-
-This is a reminder that your appointment is scheduled in:
-
-${remaining}
-
-Appointment Time:
-${time}
-
-Please prepare accordingly.
-
-Thank you.`;
-
-  const { subject, html } = appointmentReminderEmail({
-    customerName,
-    serviceName: svc,
-    date,
-    time,
-    meetingLink: appointment.meetingLink || undefined,
-    reminderLabel: remaining,
-  });
-
-  await dispatchDualChannelNotification({
-    appointment,
-    notificationType: REMINDER_TYPE[interval],
-    emailSubject: subject,
-    emailHtml: html,
-    whatsappMessage,
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: typeMap[interval],
+    templateKey: 'reminder',
+    extras: { reminderLabel: labelMap[interval] },
     scheduledAt: appointment.startTime,
   });
 
@@ -212,51 +92,66 @@ Thank you.`;
   logger.info('Appointment reminder sent', { appointmentId, interval });
 }
 
+export async function sendConfigurableReminder(
+  appointmentId: string,
+  businessId: string,
+  label: string,
+  channels?: Array<'EMAIL' | 'WHATSAPP'>
+): Promise<void> {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, businessId },
+  });
+  if (!appointment) return;
+  if (['CANCELLED', 'COMPLETED', 'MISSED', 'NO_SHOW', 'EXPIRED', 'ARCHIVED'].includes(appointment.status)) {
+    return;
+  }
+
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: reminderLabelToNotificationType(label),
+    templateKey: 'reminder',
+    extras: { reminderLabel: label },
+    scheduledAt: appointment.startTime,
+    channels,
+  });
+}
+
 export async function sendMissedAppointmentNotification(
   appointmentId: string,
   businessId: string
 ): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, businessId },
+    include: { customer: true },
+  });
   if (!appointment) return;
-
-  if (!['SCHEDULED', 'CONFIRMED'].includes(appointment.status)) return;
+  if (!['SCHEDULED', 'CONFIRMED', 'PENDING'].includes(appointment.status)) return;
   if (appointment.missedNotificationSent) return;
 
-  const customerName = appointment.customer.name;
   const canRebookAfter = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   await prisma.appointment.update({
     where: { id: appointmentId },
     data: {
-      status: 'MISSED',
+      status: 'NO_SHOW',
       missedAt: new Date(),
       canRebookAfter,
       missedNotificationSent: true,
     },
   });
 
-  const whatsappMessage = `Hello ${customerName}
-
-Your appointment time has passed.
-
-If you still need assistance, please contact us or schedule a new appointment.
-
-Thank you.`;
-
-  const { subject, html } = appointmentMissedEmail({ customerName });
-
-  await dispatchDualChannelNotification({
-    appointment,
-    notificationType: 'MISSED_APPOINTMENT',
-    emailSubject: subject,
-    emailHtml: html,
-    whatsappMessage,
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_NO_SHOW',
+    templateKey: 'no_show',
   });
 
   await scheduleMissedFollowUp({
     appointmentId,
     businessId,
-    customerPhone: appointment.customer.phone,
+    customerPhone: appointment.primaryPhone ?? appointment.customer.phone,
     missedAt: new Date(),
   });
 }
@@ -265,29 +160,16 @@ export async function sendMissedAppointmentFollowUp(
   appointmentId: string,
   businessId: string
 ): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
+  const appointment = await prisma.appointment.findFirst({ where: { id: appointmentId, businessId } });
   if (!appointment) return;
-  if (appointment.status !== 'MISSED') return;
+  if (!['NO_SHOW', 'MISSED'].includes(appointment.status)) return;
   if (appointment.followUp24hSent) return;
 
-  const customerName = appointment.customer.name;
-
-  const whatsappMessage = `Hello ${customerName}
-
-We noticed that your appointment was missed.
-
-Would you like to book a new appointment?
-
-Reply to this message or contact us to reschedule.`;
-
-  const { subject, html } = appointmentMissedFollowUpEmail({ customerName });
-
-  await dispatchDualChannelNotification({
-    appointment,
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
     notificationType: 'FOLLOW_UP_24H',
-    emailSubject: subject,
-    emailHtml: html,
-    whatsappMessage,
+    templateKey: 'follow_up',
   });
 
   await prisma.appointment.update({
@@ -296,13 +178,124 @@ Reply to this message or contact us to reschedule.`;
   });
 }
 
+export async function sendAppointmentRejected(
+  appointmentId: string,
+  businessId: string,
+  reason?: string
+): Promise<void> {
+  await cancelAppointmentReminderJobs(appointmentId);
+  await cancelConfigurableReminders(appointmentId, businessId);
+
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_REJECTED',
+    templateKey: 'rejected',
+    extras: { reason: reason ?? 'Not specified' },
+  });
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { status: 'REJECTED' },
+  });
+}
+
+export async function sendAppointmentRescheduled(
+  appointmentId: string,
+  businessId: string,
+  previousStart?: Date
+): Promise<void> {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, businessId },
+    include: { business: true },
+  });
+  if (!appointment) return;
+
+  const tz = appointment.business.timezone;
+  const prev = previousStart ?? appointment.startTime;
+  const oldFmt = {
+    date: prev.toLocaleDateString('en-GB', { timeZone: tz }),
+    time: prev.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
+  };
+  const newFmt = {
+    date: appointment.startTime.toLocaleDateString('en-GB', { timeZone: tz }),
+    time: appointment.startTime.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
+  };
+
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_RESCHEDULED',
+    templateKey: 'rescheduled',
+    extras: {
+      oldDate: oldFmt.date,
+      oldTime: oldFmt.time,
+      newDate: newFmt.date,
+      newTime: newFmt.time,
+    },
+    attachIcs: true,
+  });
+}
+
+export async function sendAppointmentCancelled(
+  appointmentId: string,
+  businessId: string,
+  reason?: string
+): Promise<void> {
+  await cancelAppointmentReminderJobs(appointmentId);
+  await cancelConfigurableReminders(appointmentId, businessId);
+
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_CANCELLED',
+    templateKey: 'cancelled',
+    extras: reason ? { reason } : undefined,
+  });
+}
+
+export async function sendAppointmentCompleted(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_COMPLETED',
+    templateKey: 'completed',
+  });
+}
+
+export async function sendAppointmentInProgress(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_IN_PROGRESS',
+    templateKey: 'in_progress',
+  });
+}
+
+export async function sendAppointmentExpired(
+  appointmentId: string,
+  businessId: string
+): Promise<void> {
+  await dispatchAppointmentNotification({
+    appointmentId,
+    businessId,
+    notificationType: 'APPOINTMENT_EXPIRED',
+    templateKey: 'expired',
+  });
+}
+
 export async function processMissedAppointments(): Promise<void> {
   const cutoff = new Date();
-
   const overdue = await prisma.appointment.findMany({
     where: {
       startTime: { lt: cutoff },
-      status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      status: { in: ['SCHEDULED', 'CONFIRMED', 'PENDING'] },
       missedNotificationSent: false,
     },
     take: 50,
@@ -310,10 +303,7 @@ export async function processMissedAppointments(): Promise<void> {
 
   for (const appt of overdue) {
     await sendMissedAppointmentNotification(appt.id, appt.businessId).catch((error) => {
-      logger.error('Batch missed appointment processing failed', {
-        appointmentId: appt.id,
-        error,
-      });
+      logger.error('Batch missed appointment processing failed', { appointmentId: appt.id, error });
     });
   }
 }
@@ -321,8 +311,13 @@ export async function processMissedAppointments(): Promise<void> {
 export async function processReminderJob(
   appointmentId: string,
   businessId: string,
-  interval: ReminderInterval
+  interval: ReminderInterval | 'configurable',
+  config?: { label?: string; channels?: Array<'EMAIL' | 'WHATSAPP'> }
 ): Promise<void> {
+  if (interval === 'configurable' && config?.label) {
+    await sendConfigurableReminder(appointmentId, businessId, config.label, config.channels);
+    return;
+  }
   if (interval === 'missed') {
     await sendMissedAppointmentNotification(appointmentId, businessId);
     return;
@@ -331,108 +326,19 @@ export async function processReminderJob(
     await sendMissedAppointmentFollowUp(appointmentId, businessId);
     return;
   }
-  await sendAppointmentReminder(appointmentId, businessId, interval);
+  await sendAppointmentReminder(
+    appointmentId,
+    businessId,
+    interval as '30m' | '20m' | '10m'
+  );
 }
 
-async function sendWhatsAppToCustomer(
-  appointment: NonNullable<Awaited<ReturnType<typeof loadAppointment>>>,
-  content: string
-): Promise<boolean> {
-  const whatsappAccount = appointment.business.whatsappAccounts[0];
-  if (!whatsappAccount) return false;
-
-  const phone = appointment.customer.whatsappNumber || appointment.customer.phone;
-  const { whatsappService } = await import('../whatsapp/whatsapp.service');
-  const { resolveStoredToken } = await import('../crypto/token-crypto');
-
-  const result = await whatsappService.sendOutbound({
-    phoneNumberId: whatsappAccount.phoneNumberId,
-    to: phone,
-    accessToken: resolveStoredToken(whatsappAccount.accessToken),
-    type: 'TEXT',
-    content,
-  });
-  return result.success;
-}
-
-export async function sendAppointmentRejected(
-  appointmentId: string,
-  businessId: string,
-  reason?: string
-): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
-  if (!appointment) return;
-
-  await cancelAppointmentReminderJobs(appointmentId);
-
-  const waMessage = `Mahadsanid ${appointment.customer.name}.
-
-Waan ka xunnahay, ballantaadii lama aqbali karin${reason ? `.\n\nSababta: ${reason}` : '.'}
-
-Fadlan nala soo xiriir si aad waqti kale u ballansato.`;
-
-  await sendWhatsAppToCustomer(appointment, waMessage);
-}
-
-export async function sendAppointmentRescheduled(
-  appointmentId: string,
-  businessId: string
-): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
-  if (!appointment) return;
-
-  const svc = serviceName(appointment);
-  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
-
-  const waMessage = `Mahadsanid ${appointment.customer.name}.
-
-Ballantaadii waa la beddelay.
-
-Adeegga: ${svc}
-Taariikh: ${date}
-Saacad: ${time}
-
-Fadlan waqtiga cusub nala ilaali.`;
-
-  await sendWhatsAppToCustomer(appointment, waMessage);
-
-  if (appointment.customer.email) {
-    const { subject, html } = appointmentConfirmationEmail({
-      customerName: appointment.customer.name,
-      serviceName: svc,
-      date,
-      time,
-      meetingLink: appointment.meetingLink || undefined,
-      details: 'Your appointment has been rescheduled.',
-    });
-    const { emailService } = await import('../email/email.service');
-    await emailService.send(appointment.customer.email, subject, html);
-  }
-}
-
-export async function sendAppointmentCancelled(
-  appointmentId: string,
-  businessId: string
-): Promise<void> {
-  const appointment = await loadAppointment(appointmentId, businessId);
-  if (!appointment) return;
-
-  await cancelAppointmentReminderJobs(appointmentId);
-
-  const svc = serviceName(appointment);
-  const { date, time } = formatDateTime(appointment.startTime, appointment.business.timezone);
-
-  const waMessage = `Mahadsanid ${appointment.customer.name}.
-
-Ballantaadii waa la joojiyay.
-
-Adeegga: ${svc}
-Taariikh: ${date}
-Saacad: ${time}
-
-Fadlan nala soo xiriir haddii aad rabto inaad waqti cusub ballansato.`;
-
-  await sendWhatsAppToCustomer(appointment, waMessage);
+export async function scheduleAllReminders(params: {
+  appointmentId: string;
+  businessId: string;
+  startTime: Date;
+}) {
+  await scheduleConfigurableReminders(params);
 }
 
 export async function resetAppointmentReminderFlags(appointmentId: string): Promise<void> {
@@ -440,6 +346,9 @@ export async function resetAppointmentReminderFlags(appointmentId: string): Prom
     where: { id: appointmentId },
     data: {
       reminderSent: false,
+      reminder24hSent: false,
+      reminder1hSent: false,
+      reminder15mSent: false,
       reminder30mSent: false,
       reminder20mSent: false,
       reminder10mSent: false,

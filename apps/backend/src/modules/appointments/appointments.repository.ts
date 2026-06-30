@@ -92,6 +92,8 @@ export class AppointmentsRepository {
       priority?: string;
       serviceCategory?: string;
       budget?: number;
+      primaryEmail?: string;
+      primaryPhone?: string;
     }
   ) {
     return prisma.appointment.create({
@@ -114,7 +116,9 @@ export class AppointmentsRepository {
         priority: data.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | undefined,
         serviceCategory: data.serviceCategory,
         budget: data.budget,
-        status: 'SCHEDULED',
+        primaryEmail: data.primaryEmail,
+        primaryPhone: data.primaryPhone,
+        status: 'PENDING',
       },
       include: {
         customer: { select: { id: true, name: true, phone: true, email: true } },

@@ -8,9 +8,12 @@ import {
   sendAppointmentRejected,
   sendAppointmentRescheduled,
   sendAppointmentCancelled,
+  sendAppointmentCompleted,
+  sendAppointmentInProgress,
+  sendAppointmentExpired,
+  sendMissedAppointmentNotification,
 } from '../../infrastructure/appointments/appointment-notification.service';
 import {
-  scheduleAppointmentReminders,
   cancelAppointmentReminderJobs,
 } from '../../infrastructure/appointments/appointment-scheduler.service';
 import { appointmentWorkflowBuilderService } from './workflow-builder.service';
@@ -21,6 +24,7 @@ import { appointmentCalendarSyncService } from './calendar-sync.service';
 import { appointmentAiWorkflowService } from './ai-workflow.service';
 import { appointmentAnalyticsService } from './analytics.service';
 import { scheduleConfigurableReminders } from './reminder-scheduler.service';
+import { ensureBusinessTemplates } from '../../infrastructure/appointments/notification-retry.service';
 import type { WorkflowAction, WorkflowCondition, WorkflowEventContext } from './types';
 
 export class AppointmentWorkflowEngineService {
@@ -59,8 +63,12 @@ export class AppointmentWorkflowEngineService {
     const contacts = appointmentContactResolverService.buildContactFields(
       appointment,
       appointment.customer,
-      appointment.business.email
+      appointment.business.email,
+      appointment.primaryEmail,
+      appointment.primaryPhone
     );
+
+    await ensureBusinessTemplates(businessId);
 
     await prisma.appointment.update({
       where: { id: appointmentId },
@@ -277,17 +285,11 @@ export class AppointmentWorkflowEngineService {
       switch (action.type) {
         case 'SEND_WHATSAPP':
         case 'SEND_EMAIL':
-          return await this.sendNotifications(appointment, ctx.triggerEvent);
+          return await this.sendNotifications(appointment, ctx.triggerEvent, ctx);
         case 'SCHEDULE_REMINDER':
           await scheduleConfigurableReminders({
             appointmentId: appointment.id,
             businessId: appointment.businessId,
-            startTime: appointment.startTime,
-          });
-          await scheduleAppointmentReminders({
-            appointmentId: appointment.id,
-            businessId: appointment.businessId,
-            customerPhone: appointment.customer.phone,
             startTime: appointment.startTime,
           });
           return { scheduled: true };
@@ -393,7 +395,8 @@ export class AppointmentWorkflowEngineService {
 
   private async sendNotifications(
     appointment: NonNullable<Awaited<ReturnType<typeof this.loadAppointment>>>,
-    triggerEvent: AppointmentWorkflowEventType
+    triggerEvent: AppointmentWorkflowEventType,
+    ctx?: WorkflowEventContext
   ) {
     const recipients = appointmentContactResolverService.resolveRecipients(
       appointment,
@@ -406,15 +409,46 @@ export class AppointmentWorkflowEngineService {
         break;
       case 'APPOINTMENT_CONFIRMED':
         await sendAppointmentApproved(appointment.id, appointment.businessId);
+        await scheduleConfigurableReminders({
+          appointmentId: appointment.id,
+          businessId: appointment.businessId,
+          startTime: appointment.startTime,
+        });
         break;
       case 'APPOINTMENT_REJECTED':
-        await sendAppointmentRejected(appointment.id, appointment.businessId);
+        await sendAppointmentRejected(
+          appointment.id,
+          appointment.businessId,
+          typeof ctx?.metadata?.reason === 'string' ? ctx.metadata.reason : undefined
+        );
         break;
-      case 'APPOINTMENT_RESCHEDULED':
-        await sendAppointmentRescheduled(appointment.id, appointment.businessId);
+      case 'APPOINTMENT_RESCHEDULED': {
+        const previousStart =
+          typeof ctx?.metadata?.previousStartTime === 'string'
+            ? new Date(ctx.metadata.previousStartTime)
+            : undefined;
+        await sendAppointmentRescheduled(appointment.id, appointment.businessId, previousStart);
+        await scheduleConfigurableReminders({
+          appointmentId: appointment.id,
+          businessId: appointment.businessId,
+          startTime: appointment.startTime,
+        });
         break;
+      }
       case 'APPOINTMENT_CANCELLED':
         await sendAppointmentCancelled(appointment.id, appointment.businessId);
+        break;
+      case 'APPOINTMENT_COMPLETED':
+        await sendAppointmentCompleted(appointment.id, appointment.businessId);
+        break;
+      case 'APPOINTMENT_STARTED':
+        await sendAppointmentInProgress(appointment.id, appointment.businessId);
+        break;
+      case 'APPOINTMENT_NO_SHOW':
+        await sendMissedAppointmentNotification(appointment.id, appointment.businessId);
+        break;
+      case 'APPOINTMENT_EXPIRED':
+        await sendAppointmentExpired(appointment.id, appointment.businessId);
         break;
       default:
         break;
