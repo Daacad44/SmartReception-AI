@@ -1,4 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
+import { findCustomerIdsByPhoneDigits } from '../../core/utils/customer-phone';
 
 /** WhatsApp Cloud API customer care session window (free-form messages). */
 export const WHATSAPP_SESSION_MS = 24 * 60 * 60 * 1000;
@@ -11,21 +12,29 @@ export interface WhatsAppSessionWindow {
   remainingHours: number;
 }
 
-export async function getWhatsAppSessionWindow(
-  conversationId: string,
-  customerId?: string
-): Promise<WhatsAppSessionWindow> {
-  // Session is per customer phone on WhatsApp — use latest inbound across all
-  // conversations for this customer (handles duplicate customer/conversation records).
-  const lastInbound = await prisma.message.findFirst({
-    where: customerId
-      ? { direction: 'INBOUND', conversation: { customerId } }
-      : { conversationId, direction: 'INBOUND' },
-    orderBy: { createdAt: 'desc' },
-    select: { createdAt: true },
-  });
+type InboundAnchor = {
+  at: Date;
+  source: 'customer_field' | 'message_meta' | 'message_created';
+};
 
-  if (!lastInbound) {
+/** Resolve inbound time from Meta webhook metadata or DB timestamps. */
+export function resolveInboundTimestamp(
+  metadata: unknown,
+  createdAt: Date = new Date()
+): Date {
+  if (!metadata || typeof metadata !== 'object') return createdAt;
+  const raw = (metadata as Record<string, unknown>).whatsappTimestamp;
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) {
+    return new Date(Number(raw) * 1000);
+  }
+  if (typeof raw === 'number' && raw > 0) {
+    return new Date(raw > 1e12 ? raw : raw * 1000);
+  }
+  return createdAt;
+}
+
+export function buildWhatsAppSessionWindow(lastInboundAt: Date | null): WhatsAppSessionWindow {
+  if (!lastInboundAt) {
     return {
       isOpen: false,
       lastInboundAt: null,
@@ -35,7 +44,6 @@ export async function getWhatsAppSessionWindow(
     };
   }
 
-  const lastInboundAt = lastInbound.createdAt;
   const expiresAt = new Date(lastInboundAt.getTime() + WHATSAPP_SESSION_MS);
   const remainingMs = Math.max(0, expiresAt.getTime() - Date.now());
 
@@ -46,6 +54,100 @@ export async function getWhatsAppSessionWindow(
     remainingMs,
     remainingHours: Math.ceil(remainingMs / (60 * 60 * 1000)),
   };
+}
+
+function pickLatestAnchor(anchors: InboundAnchor[]): Date | null {
+  if (!anchors.length) return null;
+  return anchors.reduce(
+    (latest, anchor) => (anchor.at > latest ? anchor.at : latest),
+    anchors[0].at
+  );
+}
+
+async function resolveLatestInboundAnchor(
+  conversationId: string,
+  customerId?: string
+): Promise<Date | null> {
+  const anchors: InboundAnchor[] = [];
+
+  if (customerId) {
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId },
+      select: { lastCustomerMessageAt: true, businessId: true, phone: true },
+    });
+
+    if (customer?.lastCustomerMessageAt) {
+      anchors.push({ at: customer.lastCustomerMessageAt, source: 'customer_field' });
+    }
+
+    if (customer) {
+      const relatedCustomerIds = await findCustomerIdsByPhoneDigits(
+        customer.businessId,
+        customer.phone
+      );
+      const customerIds = relatedCustomerIds.length ? relatedCustomerIds : [customerId];
+
+      const relatedCustomers = await prisma.customer.findMany({
+        where: { id: { in: customerIds } },
+        select: { lastCustomerMessageAt: true },
+      });
+      for (const related of relatedCustomers) {
+        if (related.lastCustomerMessageAt) {
+          anchors.push({ at: related.lastCustomerMessageAt, source: 'customer_field' });
+        }
+      }
+
+      const lastInbound = await prisma.message.findFirst({
+        where: { direction: 'INBOUND', conversation: { customerId: { in: customerIds } } },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true, metadata: true },
+      });
+
+      if (lastInbound) {
+        const metaAt = resolveInboundTimestamp(lastInbound.metadata, lastInbound.createdAt);
+        anchors.push({
+          at: metaAt,
+          source:
+            metaAt.getTime() !== lastInbound.createdAt.getTime()
+              ? 'message_meta'
+              : 'message_created',
+        });
+      }
+    }
+  } else {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { lastCustomerMessageAt: true },
+    });
+    if (conversation?.lastCustomerMessageAt) {
+      anchors.push({ at: conversation.lastCustomerMessageAt, source: 'customer_field' });
+    }
+
+    const lastInbound = await prisma.message.findFirst({
+      where: { conversationId, direction: 'INBOUND' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true, metadata: true },
+    });
+
+    if (lastInbound) {
+      const metaAt = resolveInboundTimestamp(lastInbound.metadata, lastInbound.createdAt);
+      anchors.push({
+        at: metaAt,
+        source:
+          metaAt.getTime() !== lastInbound.createdAt.getTime() ? 'message_meta' : 'message_created',
+      });
+    }
+  }
+
+  return pickLatestAnchor(anchors);
+}
+
+export async function getWhatsAppSessionWindow(
+  conversationId: string,
+  customerId?: string
+): Promise<WhatsAppSessionWindow> {
+  const lastInboundAt = await resolveLatestInboundAnchor(conversationId, customerId);
+  return buildWhatsAppSessionWindow(lastInboundAt);
 }
 
 export function formatSessionExpiryMessage(window: WhatsAppSessionWindow): string {

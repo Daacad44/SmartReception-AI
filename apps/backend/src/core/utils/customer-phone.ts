@@ -6,7 +6,16 @@ export function phoneDigits(phone: string): string {
   return phone.replace(/\D/g, '');
 }
 
-/** Find a customer by phone regardless of formatting (+252, spaces, etc.). */
+/** True when two phones refer to the same WhatsApp subscriber (handles +252 vs local). */
+export function phonesMatchDigitized(a: string, b: string): boolean {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  if (!da || !db) return false;
+  if (da === db) return true;
+  return da.endsWith(db) || db.endsWith(da);
+}
+
+/** Find a customer by phone regardless of formatting (+252, spaces, local vs international). */
 export async function findCustomerByPhoneDigits(
   businessId: string,
   phone: string
@@ -17,13 +26,38 @@ export async function findCustomerByPhoneDigits(
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM customers
     WHERE "businessId" = ${businessId}
-      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${digits}
+      AND (
+        regexp_replace(phone, '[^0-9]', '', 'g') = ${digits}
+        OR regexp_replace(phone, '[^0-9]', '', 'g') LIKE '%' || ${digits}
+        OR ${digits} LIKE '%' || regexp_replace(phone, '[^0-9]', '', 'g')
+      )
     ORDER BY "createdAt" ASC
     LIMIT 1
   `;
 
   if (!rows[0]) return null;
   return prisma.customer.findUnique({ where: { id: rows[0].id } });
+}
+
+/** All customer IDs for a business that share the same WhatsApp phone (suffix-safe). */
+export async function findCustomerIdsByPhoneDigits(
+  businessId: string,
+  phone: string
+): Promise<string[]> {
+  const digits = phoneDigits(phone);
+  if (!digits) return [];
+
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM customers
+    WHERE "businessId" = ${businessId}
+      AND (
+        regexp_replace(phone, '[^0-9]', '', 'g') = ${digits}
+        OR regexp_replace(phone, '[^0-9]', '', 'g') LIKE '%' || ${digits}
+        OR ${digits} LIKE '%' || regexp_replace(phone, '[^0-9]', '', 'g')
+      )
+  `;
+
+  return rows.map((row) => row.id);
 }
 
 /**
