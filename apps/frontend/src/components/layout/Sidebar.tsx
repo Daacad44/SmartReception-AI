@@ -22,6 +22,7 @@ import {
   PanelLeft,
   Workflow,
   Layers,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +59,7 @@ const adminNavItems = [
   { to: '/admin/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'platform:admin' as const, featureKey: 'ai-analytics-admin' },
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
+  { to: '/admin/financial-intelligence', icon: Wallet, label: 'Financial Intelligence', permission: 'platform:admin' as const, featureKey: 'financial-intelligence' },
   { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
   { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
 ];
