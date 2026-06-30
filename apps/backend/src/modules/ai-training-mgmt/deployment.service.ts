@@ -306,6 +306,82 @@ export class DeploymentService {
 
     return deployed;
   }
+
+  async autoDeployValidatedVersion(
+    businessId: string,
+    versionId: string,
+    audit: AuditContext & { validationScore?: number }
+  ) {
+    const version = await prisma.aiTrainingVersion.findFirst({
+      where: { id: versionId, businessId, status: { in: ['SANDBOX', 'DRAFT'] } },
+    });
+    if (!version) {
+      throw new ValidationError('Version not available for auto-deployment');
+    }
+
+    const workspace = await workspaceService.getWorkspace(businessId);
+    const previousProductionId = workspace.productionVersionId;
+
+    if (previousProductionId) {
+      await prisma.aiTrainingVersion.update({
+        where: { id: previousProductionId },
+        data: { status: 'ARCHIVED' },
+      });
+    }
+
+    await prisma.aiTrainingVersion.update({
+      where: { id: versionId },
+      data: { status: 'PRODUCTION' },
+    });
+
+    await workspaceService.updateWorkspaceMetrics(businessId, {
+      productionVersionId: versionId,
+      sandboxVersionId: versionId,
+      aiReadinessScore: audit.validationScore ?? version.readinessScore ?? undefined,
+      knowledgeScore: version.knowledgeScore ?? undefined,
+      confidenceScore: version.confidenceScore ?? undefined,
+    });
+
+    invalidateKnowledgeCache(businessId);
+
+    const request = await prisma.aiDeploymentRequest.create({
+      data: {
+        businessId,
+        versionId,
+        status: 'DEPLOYED',
+        requestedByUserId: audit.userId,
+        approvedByUserId: audit.userId,
+        deployedAt: new Date(),
+        reviewedAt: new Date(),
+        knowledgeScore: version.knowledgeScore,
+        confidenceScore: version.confidenceScore,
+        readinessScore: version.readinessScore,
+        deploymentSummary: `Auto-deployed after validation score ${audit.validationScore ?? 'N/A'}`,
+      },
+    });
+
+    await recordAiTrainingAudit(
+      { ...audit, businessId, versionId },
+      'DEPLOYMENT_PUBLISHED',
+      {
+        entity: 'AiDeploymentRequest',
+        entityId: request.id,
+        oldData: { productionVersionId: previousProductionId },
+        newData: { productionVersionId: versionId, autoDeployed: true },
+      }
+    );
+
+    await createNotification({
+      businessId,
+      userId: audit.userId ?? undefined,
+      type: 'AI_TRAINING_COMPLETE',
+      title: 'AI deployed to production',
+      message: `Version ${version.versionNumber} passed validation and was automatically deployed.`,
+      data: { versionId, versionNumber: version.versionNumber },
+    });
+
+    return request;
+  }
 }
 
 export const deploymentService = new DeploymentService();

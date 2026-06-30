@@ -41,14 +41,26 @@ const AppointmentsPage = lazyWithRetry(() =>
 const AppointmentAutomationPage = lazyWithRetry(() =>
   import('@/pages/AppointmentAutomationPage').then((m) => ({ default: m.AppointmentAutomationPage }))
 );
-const AITrainingPage = lazyWithRetry(() =>
-  import('@/pages/AITrainingPage').then((m) => ({ default: m.AITrainingPage }))
+const EnterpriseAiIntelligencePage = lazyWithRetry(() =>
+  import('@/pages/EnterpriseAiIntelligencePage').then((m) => ({ default: m.EnterpriseAiIntelligencePage }))
 );
-const AnalyticsPage = lazyWithRetry(() =>
-  import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
+const BusinessIntelligencePage = lazyWithRetry(() =>
+  import('@/pages/BusinessIntelligencePage').then((m) => ({ default: m.BusinessIntelligencePage }))
 );
-const AiAnalyticsPage = lazyWithRetry(() =>
-  import('@/pages/AiAnalyticsPage').then((m) => ({ default: m.AiAnalyticsPage }))
+const EnterpriseAiIntelligenceAdminPage = lazyWithRetry(() =>
+  import('@/pages/EnterpriseAiIntelligenceAdminPage').then((m) => ({
+    default: m.EnterpriseAiIntelligenceAdminPage,
+  }))
+);
+const EnterpriseAiIntelligenceBusinessPage = lazyWithRetry(() =>
+  import('@/pages/EnterpriseAiIntelligenceBusinessPage').then((m) => ({
+    default: m.EnterpriseAiIntelligenceBusinessPage,
+  }))
+);
+const BusinessIntelligenceAdminPage = lazyWithRetry(() =>
+  import('@/pages/BusinessIntelligenceAdminPage').then((m) => ({
+    default: m.BusinessIntelligenceAdminPage,
+  }))
 );
 const TeamPage = lazyWithRetry(() =>
   import('@/pages/TeamPage').then((m) => ({ default: m.TeamPage }))
@@ -73,18 +85,6 @@ const GovernanceAdminPage = lazyWithRetry(() =>
 );
 const AiDeploymentsAdminPage = lazyWithRetry(() =>
   import('@/pages/AiDeploymentsAdminPage').then((m) => ({ default: m.AiDeploymentsAdminPage }))
-);
-const AiAnalyticsAdminPage = lazyWithRetry(() =>
-  import('@/pages/AiAnalyticsAdminPage').then((m) => ({ default: m.AiAnalyticsAdminPage }))
-);
-const AiTrainingCenterAdminPage = lazyWithRetry(() =>
-  import('@/pages/AiTrainingCenterAdminPage').then((m) => ({ default: m.AiTrainingCenterAdminPage }))
-);
-const BusinessTrainingDetailPage = lazyWithRetry(() =>
-  import('@/pages/BusinessTrainingDetailPage').then((m) => ({ default: m.BusinessTrainingDetailPage }))
-);
-const BusinessAiAnalyticsDetailPage = lazyWithRetry(() =>
-  import('@/pages/BusinessAiAnalyticsDetailPage').then((m) => ({ default: m.BusinessAiAnalyticsDetailPage }))
 );
 import { TrainerLoginPage } from '@/pages/TrainerLoginPage';
 import {
@@ -326,32 +326,26 @@ export default function App() {
                       </PermissionRoute>
                     }
                   />
+                  <Route path="/knowledge" element={<Navigate to="/enterprise-ai-intelligence" replace />} />
+                  <Route path="/ai-training" element={<Navigate to="/enterprise-ai-intelligence" replace />} />
+                  <Route path="/analytics" element={<Navigate to="/business-intelligence" replace />} />
+                  <Route path="/ai-analytics" element={<Navigate to="/business-intelligence" replace />} />
                   <Route
-                    path="/knowledge"
-                    element={<Navigate to="/ai-training" replace />}
-                  />
-                  <Route
-                    path="/ai-training"
+                    path="/enterprise-ai-intelligence"
                     element={
                       <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
-                        <AITrainingPage />
+                        <FeatureRoute featureKey="enterprise-ai-intelligence">
+                          <EnterpriseAiIntelligencePage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
                   <Route
-                    path="/analytics"
+                    path="/business-intelligence"
                     element={
                       <PermissionRoute permission={PERMISSIONS['analytics:read']}>
-                        <AnalyticsPage />
-                      </PermissionRoute>
-                    }
-                  />
-                  <Route
-                    path="/ai-analytics"
-                    element={
-                      <PermissionRoute permission={PERMISSIONS['analytics:read']}>
-                        <FeatureRoute featureKey="ai-analytics">
-                          <AiAnalyticsPage />
+                        <FeatureRoute featureKey="business-intelligence">
+                          <BusinessIntelligencePage />
                         </FeatureRoute>
                       </PermissionRoute>
                     }
@@ -404,11 +398,36 @@ export default function App() {
                       </PermissionRoute>
                     }
                   />
+                  <Route path="/admin/ai-training" element={<Navigate to="/admin/enterprise-ai-intelligence" replace />} />
+                  <Route path="/admin/ai-analytics" element={<Navigate to="/admin/business-intelligence" replace />} />
+                  <Route path="/admin/financial-intelligence" element={<Navigate to="/admin/business-intelligence" replace />} />
                   <Route
-                    path="/admin/ai-training"
+                    path="/admin/enterprise-ai-intelligence"
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
-                        <AiTrainingCenterAdminPage />
+                        <FeatureRoute featureKey="enterprise-ai-intelligence-admin">
+                          <EnterpriseAiIntelligenceAdminPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/enterprise-ai-intelligence/:businessId"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="enterprise-ai-intelligence-admin">
+                          <EnterpriseAiIntelligenceBusinessPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/business-intelligence"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="business-intelligence-admin">
+                          <BusinessIntelligenceAdminPage />
+                        </FeatureRoute>
                       </PermissionRoute>
                     }
                   />
@@ -416,15 +435,7 @@ export default function App() {
                     path="/admin/ai-training/:businessId"
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
-                        <BusinessTrainingDetailPage />
-                      </PermissionRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/ai-analytics"
-                    element={
-                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
-                        <AiAnalyticsAdminPage />
+                        <EnterpriseAiIntelligenceBusinessPage />
                       </PermissionRoute>
                     }
                   />
@@ -432,7 +443,7 @@ export default function App() {
                     path="/admin/ai-analytics/:businessId"
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
-                        <BusinessAiAnalyticsDetailPage />
+                        <Navigate to="/admin/business-intelligence" replace />
                       </PermissionRoute>
                     }
                   />

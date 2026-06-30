@@ -22,7 +22,6 @@ import {
   PanelLeft,
   Workflow,
   Layers,
-  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -43,9 +42,8 @@ const navItems = [
   { to: '/appointments/automation', icon: Workflow, label: 'Workflow Builder', permission: 'appointments:write' as const, featureKey: 'appointment-automation' },
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const, featureKey: 'campaigns' },
   { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const, featureKey: 'employee-comms' },
-  { to: '/ai-training', icon: BookOpen, label: 'AI Training', featureKey: 'ai-training' },
-  { to: '/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'analytics:read' as const, featureKey: 'ai-analytics' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics', featureKey: 'analytics' },
+  { to: '/enterprise-ai-intelligence', icon: BookOpen, label: 'Enterprise AI Intelligence', featureKey: 'enterprise-ai-intelligence' },
+  { to: '/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'analytics:read' as const, featureKey: 'business-intelligence' },
   { to: '/team', icon: UsersRound, label: 'Team', featureKey: 'team' },
   { to: '/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
   { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const, featureKey: 'audit-logs' },
@@ -55,11 +53,10 @@ const navItems = [
 
 const adminNavItems = [
   { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
-  { to: '/admin/ai-training', icon: BookOpen, label: 'AI Training Center', permission: 'platform:admin' as const, featureKey: 'ai-training-center' },
-  { to: '/admin/ai-analytics', icon: Sparkles, label: 'AI Analytics', permission: 'platform:admin' as const, featureKey: 'ai-analytics-admin' },
+  { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'Enterprise AI Intelligence', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
+  { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
-  { to: '/admin/financial-intelligence', icon: Wallet, label: 'Financial Intelligence', permission: 'platform:admin' as const, featureKey: 'financial-intelligence' },
   { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
   { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
 ];
