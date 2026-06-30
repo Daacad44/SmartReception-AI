@@ -16,6 +16,7 @@ export function usePlatformFeatures() {
   });
 
   const isFeatureEnabled = (featureKey: string): boolean => {
+    if (query.isPending && !query.data) return true;
     return query.data?.[featureKey]?.enabled ?? false;
   };
 

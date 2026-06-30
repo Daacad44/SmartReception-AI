@@ -22,6 +22,34 @@ export function isExecutableStatus(status: PlatformFeatureStatus): boolean {
   return status === 'ENABLED';
 }
 
+function getRegistryEntry(featureKey: string) {
+  return PLATFORM_FEATURE_REGISTRY.find((entry) => entry.featureKey === featureKey);
+}
+
+async function resolveFeatureAccess(
+  featureKey: string,
+  status: PlatformFeatureStatus,
+  businessId?: string
+): Promise<{ enabled: boolean; status: PlatformFeatureStatus }> {
+  let resolvedStatus = status;
+  let enabled = isExecutableStatus(resolvedStatus);
+
+  if (!enabled && businessId) {
+    enabled = await isSubscriptionFeatureEntitled(featureKey, businessId);
+    if (enabled) resolvedStatus = 'ENABLED';
+  }
+
+  return { enabled, status: resolvedStatus };
+}
+
+function cacheResolvedFeature(key: string, enabled: boolean, status: PlatformFeatureStatus) {
+  featureCache.set(key, {
+    expiresAt: Date.now() + CACHE_TTL_MS,
+    enabled,
+    status,
+  });
+}
+
 export class FeatureRegistryService {
   invalidateCache(featureKey?: string) {
     if (featureKey) {
@@ -117,20 +145,23 @@ export class FeatureRegistryService {
     });
 
     if (!feature) {
+      const registryEntry = getRegistryEntry(featureKey);
+      if (registryEntry) {
+        const resolved = await resolveFeatureAccess(
+          featureKey,
+          registryEntry.status ?? 'DISABLED',
+          businessId
+        );
+        cacheResolvedFeature(key, resolved.enabled, resolved.status);
+        return resolved.enabled;
+      }
+
       if (businessId && (await isSubscriptionFeatureEntitled(featureKey, businessId))) {
-        featureCache.set(key, {
-          expiresAt: Date.now() + CACHE_TTL_MS,
-          enabled: true,
-          status: 'ENABLED',
-        });
+        cacheResolvedFeature(key, true, 'ENABLED');
         return true;
       }
 
-      featureCache.set(key, {
-        expiresAt: Date.now() + CACHE_TTL_MS,
-        enabled: false,
-        status: 'DISABLED',
-      });
+      cacheResolvedFeature(key, false, 'DISABLED');
       return false;
     }
 
@@ -142,18 +173,9 @@ export class FeatureRegistryService {
       if (scope) status = scope.status;
     }
 
-    let enabled = isExecutableStatus(status);
-
-    if (!enabled && businessId) {
-      enabled = await isSubscriptionFeatureEntitled(featureKey, businessId);
-    }
-
-    featureCache.set(key, {
-      expiresAt: Date.now() + CACHE_TTL_MS,
-      enabled,
-      status,
-    });
-    return enabled;
+    const resolved = await resolveFeatureAccess(featureKey, status, businessId);
+    cacheResolvedFeature(key, resolved.enabled, resolved.status);
+    return resolved.enabled;
   }
 
   async getFeatureStatus(featureKey: string): Promise<PlatformFeatureStatus | null> {
@@ -212,7 +234,7 @@ export class FeatureRegistryService {
   }
 
   async getPublicFeatureMap(businessId?: string) {
-    const features = await prisma.platformFeature.findMany({
+    const dbFeatures = await prisma.platformFeature.findMany({
       where: { isNavItem: true },
       select: {
         featureKey: true,
@@ -227,23 +249,24 @@ export class FeatureRegistryService {
           : false,
       },
     });
+    const dbByKey = new Map(dbFeatures.map((feature) => [feature.featureKey, feature]));
 
     const map: Record<string, { enabled: boolean; status: PlatformFeatureStatus }> = {};
-    for (const f of features) {
-      let status = f.status;
-      if (businessId && f.scope === 'BUSINESS_SPECIFIC') {
-        const scope = Array.isArray(f.businessScopes) ? f.businessScopes[0] : undefined;
+    const navEntries = PLATFORM_FEATURE_REGISTRY.filter((entry) => entry.isNavItem);
+
+    for (const entry of navEntries) {
+      const dbFeature = dbByKey.get(entry.featureKey);
+      let status = dbFeature?.status ?? entry.status ?? 'DISABLED';
+
+      if (businessId && dbFeature?.scope === 'BUSINESS_SPECIFIC') {
+        const scope = Array.isArray(dbFeature.businessScopes) ? dbFeature.businessScopes[0] : undefined;
         if (scope) status = scope.status;
       }
 
-      let enabled = isExecutableStatus(status);
-      if (!enabled && businessId) {
-        enabled = await isSubscriptionFeatureEntitled(f.featureKey, businessId);
-        if (enabled) status = 'ENABLED';
-      }
-
-      map[f.featureKey] = { enabled, status };
+      const resolved = await resolveFeatureAccess(entry.featureKey, status, businessId);
+      map[entry.featureKey] = resolved;
     }
+
     return map;
   }
 
