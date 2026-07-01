@@ -184,6 +184,12 @@ export function validateProductionConfig(): void {
   if (INSECURE_JWT_SECRETS.has(config.jwt.secret) || INSECURE_JWT_SECRETS.has(config.jwt.refreshSecret)) {
     throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be set to strong values in production');
   }
+
+  if (!config.whatsapp.appSecret) {
+    throw new Error(
+      'WHATSAPP_APP_SECRET (or META_APP_SECRET) must be set in production to verify webhook signatures'
+    );
+  }
 }
 
 /** Log WhatsApp webhook config at startup (never logs secrets). */
@@ -198,7 +204,6 @@ export function logWhatsAppConfig(): void {
   console.log('[WhatsApp] Verify token source:', tokenSource);
   console.log('[WhatsApp] Verify token configured:', Boolean(verifyToken));
   console.log('[WhatsApp] Verify token length:', verifyToken.length);
-  console.log('[WhatsApp] Expected verify token:', verifyToken);
   console.log('[WhatsApp] App secret configured:', Boolean(config.whatsapp.appSecret));
   console.log('[WhatsApp] Access token configured:', Boolean(config.whatsapp.accessToken));
   console.log('[AI] Provider:', config.ai.provider);
