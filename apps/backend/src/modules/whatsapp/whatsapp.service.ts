@@ -117,7 +117,7 @@ export class WhatsAppModuleService {
     console.log('[WhatsApp] Webhook verification successful');
     await whatsappRepository.markAllActiveWebhooksVerified();
   }
-  verifyWebhookSignature(rawBody: Buffer, signature: string | undefined): boolean {
+  verifyWebhookSignature(rawBody: Buffer | undefined, signature: string | undefined): boolean {
     const appSecret =
       config.whatsapp.appSecret ||
       process.env.META_APP_SECRET ||
@@ -127,7 +127,7 @@ export class WhatsAppModuleService {
       logger.warn('WhatsApp app secret not configured — skipping signature verification');
       return true;
     }
-    if (!signature) return false;
+    if (!signature || !rawBody) return false;
 
     const expected = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
     const received = signature.replace('sha256=', '');

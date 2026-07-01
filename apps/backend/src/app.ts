@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { config, logWhatsAppConfig } from './config';
+import { config, logWhatsAppConfig, validateProductionConfig } from './config';
 import { errorHandler, notFoundHandler } from './core/error-handler';
 import routes from './routes';
 import { logger } from './core/logger';
@@ -22,6 +22,11 @@ const WEBHOOK_RAW_PATHS = [
 ];
 
 export function createApp(): express.Application {
+  // Runs on every entrypoint (long-running server AND serverless functions)
+  // so a missing/insecure production secret fails the deployment loudly
+  // instead of silently running with dev defaults.
+  validateProductionConfig();
+
   const app = express();
 
   app.set('trust proxy', 1);
@@ -53,15 +58,12 @@ export function createApp(): express.Application {
           config.frontendUrl,
           'https://somreception.botandev.com',
           'https://api.somreception.botandev.com',
+          ...(process.env.CORS_ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
         ];
         if (process.env.VERCEL_URL) {
           allowed.push(`https://${process.env.VERCEL_URL}`);
         }
-        if (
-          !origin ||
-          allowed.includes(origin) ||
-          origin.endsWith('.vercel.app')
-        ) {
+        if (!origin || allowed.includes(origin)) {
           callback(null, true);
         } else {
           callback(null, config.env !== 'production');

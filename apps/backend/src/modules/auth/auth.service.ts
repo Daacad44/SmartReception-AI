@@ -63,21 +63,21 @@ export class AuthService {
   }
 
   async login(input: LoginInput, ipAddress?: string) {
-    assertLoginAllowed(input.email, ipAddress);
+    await assertLoginAllowed(input.email, ipAddress);
 
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
-      recordFailedLogin(input.email, ipAddress);
+      await recordFailedLogin(input.email, ipAddress);
       throw new UnauthorizedError('Invalid credentials');
     }
 
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
-      recordFailedLogin(input.email, ipAddress);
+      await recordFailedLogin(input.email, ipAddress);
       throw new UnauthorizedError('Invalid credentials');
     }
 
-    clearLoginAttempts(input.email, ipAddress);
+    await clearLoginAttempts(input.email, ipAddress);
 
     if (!user.isEmailVerified) {
       throw new EmailNotVerifiedError();

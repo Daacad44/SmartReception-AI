@@ -15,11 +15,6 @@ export class WhatsAppController {
       const token = req.query['hub.verify_token'] as string;
       const challenge = req.query['hub.challenge'] as string;
 
-      console.log('Mode:', mode);
-      console.log('Token:', token);
-      console.log('Challenge:', challenge);
-      console.log('Expected:', process.env.WHATSAPP_VERIFY_TOKEN ?? config.whatsapp.verifyToken);
-
       logger.info('WhatsApp webhook verification attempt', {
         mode,
         tokenReceived: Boolean(token),
@@ -54,7 +49,7 @@ export class WhatsAppController {
       const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
       const signature = req.headers['x-hub-signature-256'] as string | undefined;
 
-      if (rawBody && !whatsappModuleService.verifyWebhookSignature(rawBody, signature)) {
+      if (!whatsappModuleService.verifyWebhookSignature(rawBody, signature)) {
         logger.warn('WhatsApp webhook rejected: invalid signature');
         res.status(403).json({ success: false, error: 'Invalid webhook signature' });
         return;
