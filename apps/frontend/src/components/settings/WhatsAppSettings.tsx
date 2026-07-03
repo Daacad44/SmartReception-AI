@@ -14,16 +14,19 @@ import {
   useWhatsAppWebhookHealth,
   useWhatsAppDebug,
   useWhatsAppStatus,
+  useWhatsAppOAuthConfig,
 } from '@/hooks/useApi';
 import {
   useConnectWhatsApp,
+  useConnectWhatsAppOAuth,
   useConnectWhatsAppFromEnv,
   useDisconnectWhatsApp,
   useTestWhatsAppConnection,
   useUpdateWhatsAppAccount,
 } from '@/hooks/useMutations';
+import { useFacebookEmbeddedSignup } from '@/hooks/useFacebookEmbeddedSignup';
 import { LoadingState } from '@/components/LoadingState';
-import { Copy, Trash2, Plug, Wifi, RefreshCw, Lock } from 'lucide-react';
+import { Copy, Trash2, Plug, Wifi, RefreshCw, Lock, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -66,8 +69,24 @@ export function WhatsAppSettings() {
   const { data: debugInfo, refetch: refetchDebug } = useWhatsAppDebug(debugEnabled);
   const { data: connectionStatus, refetch: refetchStatus } = useWhatsAppStatus();
   const connectWhatsApp = useConnectWhatsApp();
+  const connectWhatsAppOAuth = useConnectWhatsAppOAuth();
   const connectFromEnv = useConnectWhatsAppFromEnv();
   const disconnectWhatsApp = useDisconnectWhatsApp();
+  const { data: oauthConfig } = useWhatsAppOAuthConfig();
+  const { sdkReady, launchSignup } = useFacebookEmbeddedSignup(
+    oauthConfig?.appId,
+    oauthConfig?.apiVersion || 'v23.0'
+  );
+
+  const handleConnectWithFacebook = async () => {
+    if (!oauthConfig?.configId) return;
+    try {
+      const { code, wabaId, phoneNumberId } = await launchSignup(oauthConfig.configId);
+      await connectWhatsAppOAuth.mutateAsync({ code, wabaId, phoneNumberId });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Facebook connect failed');
+    }
+  };
   const testConnection = useTestWhatsAppConnection();
   const updateWhatsAppAccount = useUpdateWhatsAppAccount();
 
@@ -513,9 +532,40 @@ export function WhatsAppSettings() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Connect with Facebook</CardTitle>
+          <CardDescription>
+            Recommended: connect through Meta&apos;s official WhatsApp Embedded Signup flow — no
+            manual copy-pasting of tokens or IDs required.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {oauthConfig?.configured ? (
+            <Button
+              type="button"
+              onClick={handleConnectWithFacebook}
+              disabled={!sdkReady || connectWhatsAppOAuth.isPending}
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              {connectWhatsAppOAuth.isPending ? 'Connecting…' : 'Connect with Facebook'}
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Facebook connect isn&apos;t configured on this server yet. An administrator needs to
+              set <code className="text-xs">META_APP_ID</code>,{' '}
+              <code className="text-xs">META_APP_SECRET</code>, and{' '}
+              <code className="text-xs">META_WHATSAPP_CONFIG_ID</code> from Meta Developer Console
+              (App → WhatsApp → Embedded Signup). Until then, use manual connection below.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Connect Manually</CardTitle>
           <CardDescription>
             Enter your Meta Cloud API credentials. Tokens are encrypted and stored per workspace.
+            Use this as an advanced/fallback option if Facebook connect above isn&apos;t available.
           </CardDescription>
         </CardHeader>
         <CardContent>

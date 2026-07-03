@@ -460,6 +460,33 @@ export function useConnectWhatsApp() {
   });
 }
 
+export function useConnectWhatsAppOAuth() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { code: string; wabaId: string; phoneNumberId: string }) => {
+      const response = await api.post('/whatsapp/oauth/exchange', data);
+      return parseMutationResponse(response);
+    },
+    onSuccess: (result) => {
+      if (result.kind === 'approval') {
+        toast.info('Administrator approval required', {
+          description: 'Your WhatsApp connect request was submitted for review.',
+        });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-health'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-webhook-health'] });
+      toast.success('WhatsApp connected via Facebook');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
 export function useConnectWhatsAppFromEnv() {
   const queryClient = useQueryClient();
 

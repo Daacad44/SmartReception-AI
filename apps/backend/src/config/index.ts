@@ -126,6 +126,7 @@ export const config = {
     apiUrl: `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v23.0'}`,
     webhookUrl,
     displayPhone: process.env.WHATSAPP_DISPLAY_PHONE || '+25268776299',
+    embeddedSignupConfigId: process.env.META_WHATSAPP_CONFIG_ID || '',
   },
 
   r2: {

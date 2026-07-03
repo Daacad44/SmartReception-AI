@@ -918,6 +918,21 @@ export function useWhatsAppWebhookInfo() {
   });
 }
 
+export function useWhatsAppOAuthConfig() {
+  return useAuthQuery({
+    queryKey: ['whatsapp-oauth-config'],
+    queryFn: async () => {
+      const response = await api.get('/whatsapp/oauth/config');
+      return extractData<{
+        appId: string;
+        configId: string;
+        apiVersion: string;
+        configured: boolean;
+      }>(response);
+    },
+  });
+}
+
 export function useKnowledgeSearch(query: string) {
   return useAuthQuery({
     queryKey: ['knowledge-search', query],

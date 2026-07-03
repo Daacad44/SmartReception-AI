@@ -277,6 +277,12 @@ export const updateWhatsAppAccountSchema = z.object({
   reengagementTemplateHasBodyVariable: z.boolean().optional(),
 });
 
+export const whatsappOAuthExchangeSchema = z.object({
+  code: z.string().min(1).max(2000),
+  wabaId: z.string().min(1).max(100),
+  phoneNumberId: z.string().min(1).max(100),
+});
+
 export const knowledgeSearchSchema = z.object({
   q: z.string().min(1).max(500),
   limit: z.coerce.number().int().min(1).max(20).default(10),
@@ -723,6 +729,7 @@ export type ChangePlanInput = z.infer<typeof changePlanSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;
 export type UpdateWhatsAppAccountInput = z.infer<typeof updateWhatsAppAccountSchema>;
+export type WhatsAppOAuthExchangeInput = z.infer<typeof whatsappOAuthExchangeSchema>;
 export type TwoFactorVerifyInput = z.infer<typeof twoFactorVerifySchema>;
 export type TwoFactorSetupVerifyInput = z.infer<typeof twoFactorSetupVerifySchema>;
 export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
