@@ -12,6 +12,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
+WORKDIR /app/packages/shared
+RUN npm run build
 WORKDIR /app/apps/backend
 RUN npx prisma generate
 RUN npm run build
