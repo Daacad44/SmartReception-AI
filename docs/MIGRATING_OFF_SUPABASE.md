@@ -47,7 +47,28 @@ npm test                    # 51 unit tests should still pass
 
 ## Stage 2: Auth
 
-*Filled in by Stage 2 commit.*
+**No code changes required.** Verified against the current codebase.
+
+The audit (`backup-plan/answer.md` §4) confirmed the app has never used Supabase Auth:
+
+- Identity lives in the app's own `users` table (`passwordHash`, `totpSecret`, `totpBackupCodes`, `emailVerifiedAt`, etc.), not `auth.users`.
+- Access tokens are minted by `apps/backend/src/infrastructure/auth/token.service.ts` using `jsonwebtoken` against `config.jwt.secret` — 15 min expiry, payload claims `{userId, email, businessId, role}`. Refresh tokens are separately signed against `config.jwt.refreshSecret`, 7-day expiry, persisted rotating in the `refresh_tokens` table.
+- Passwords hash via `bcryptjs` in `password.service.ts`.
+- 2FA is TOTP via `speakeasy` in `totp.service.ts`; backup codes are bcrypt-hashed.
+- Email OTP verification is via Resend in `otp.service.ts`.
+- Login lockout is tracked in the app in `login-lockout.service.ts`.
+- Zero calls to `.auth.` on any Supabase client anywhere (`grep`-verified in the audit).
+
+None of this depends on Supabase infrastructure. It works unchanged against any Postgres.
+
+### Env vars carried over
+`JWT_SECRET`, `JWT_REFRESH_SECRET`, `RESEND_API_KEY` (email OTP), plus the same `DATABASE_URL` / `DIRECT_URL` from Stage 1. No new env vars.
+
+### Verification
+```bash
+cd apps/backend
+npm test   # 51 unit tests include auth (token/password/totp/subscription-license) — all pass
+```
 
 ## Stage 3: Routes
 
