@@ -137,4 +137,120 @@ cd apps/backend && npm test                     # 51/51 pass
 
 ## Stage 5: Realtime replacement
 
-*Filled in by Stage 5 commit.*
+**Supabase Realtime is fully replaced** with an Express WebSocket gateway. This
+was the only genuinely stateful piece of the migration (plan risks R1 + R2) —
+everything else was either already portable or a straightforward provider swap.
+
+### What changed
+- **New: `apps/backend/src/infrastructure/realtime/ws-gateway.service.ts`** — a
+  `WebSocketServer` attached to the same HTTP server as the Express app
+  (`noServer: true` + manual `upgrade` handling on path `/api/v1/realtime`).
+  JWT auth via `?token=` query string (browsers can't set custom headers on
+  the WS handshake). Tracks clients by `businessId` (business-wide fan-out)
+  and by `conversationId` (opt-in `subscribe`/`unsubscribe` messages from the
+  client), with a 30s ping/pong liveness sweep. Emits `conversation_update`
+  and `business_update` events — the exact same event names/payload shapes
+  `useRealtime.ts` already consumed from Supabase, so no invalidation logic
+  needed to change, only the transport.
+- **`apps/backend/src/infrastructure/realtime/broadcast.service.ts`** — the
+  three exported functions (`broadcastConversationEvent`, `broadcastBusinessEvent`,
+  `broadcastAiAnalyticsUpdate`) keep their exact signatures, so none of the
+  ~14 calling services needed changes. Internally they now **dual-emit**:
+  primary path is `wsGateway.emit*()` (synchronous, in-process, no network
+  hop); secondary path still sends to Supabase realtime *if* `SUPABASE_URL`/
+  `SUPABASE_SERVICE_ROLE_KEY` are set, so any client still running the old
+  Supabase-based code keeps working during rollout. When those env vars are
+  unset, the Supabase path silently no-ops.
+- **`apps/backend/src/server.ts`** — `wsGateway.attach(server)` after
+  `app.listen(...)`, and `wsGateway.detach()` in the graceful-shutdown path.
+- **New: `apps/frontend/src/lib/realtime-client.ts`** — a small `RealtimeClient`
+  wrapping the browser `WebSocket`: connects with the JWT access token,
+  exponential-backoff reconnect (capped 10s), re-subscribes to any
+  conversation rooms after a reconnect, and dispatches typed events to
+  registered listeners. `resolveRealtimeUrl()` derives the WS URL from
+  `VITE_API_URL` (swaps `http(s)` → `ws(s)`, appends `/realtime`) so no new
+  frontend env var is needed.
+- **`apps/frontend/src/hooks/useRealtime.ts`** — rewritten against
+  `RealtimeClient` instead of `getSupabase()`. A single shared client/socket
+  is reused across every component via a ref-count (`retainConnection`), so
+  a business-wide subscriber and several open-conversation subscribers all
+  multiplex one WebSocket per tab rather than opening one Supabase channel
+  each. `useBusinessRealtime` and `useConversationRealtime` keep their exact
+  exported signatures and invalidate the same React Query keys as before.
+- **Cleanup (frontend now fully off Supabase):** deleted
+  `apps/frontend/src/lib/supabase.ts` and `supabase-config.ts` (dead code
+  once `useRealtime.ts` stopped calling `getSupabase()` — confirmed via
+  repo-wide grep, zero remaining references). Removed the now-unused
+  `@supabase/supabase-js` dependency from `apps/frontend/package.json` (the
+  `vendor-supabase` chunk is gone from the production build). Removed
+  `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` from `.env.example` — the
+  frontend needs zero Supabase configuration now. Fixed one incidental
+  breakage: `apps/frontend/src/hooks/useApi.ts` used
+  `isSupabaseConfigured` to decide whether to poll conversations as a
+  fallback when realtime wasn't configured; since the WS gateway is always
+  attempted now (matching the `false`/no-polling behavior production already
+  had when Supabase was configured), that constant is now unconditionally
+  `false` with a comment explaining why.
+
+### What did NOT change
+- Backend still depends on `@supabase/supabase-js` — it's used by the Stage 4
+  storage read-fallback and by `broadcast.service.ts`'s transitional
+  dual-emit. Both are intentionally temporary; see cleanup below.
+- Event shapes, query-invalidation keys, and the public API of
+  `useBusinessRealtime`/`useConversationRealtime` are unchanged — this was a
+  transport swap, not a behavior change.
+
+### Known limitation (flagged, not fixed in this stage)
+`WsGateway` is **single-instance, in-memory only** — client registries
+(`byBusiness`, `byConversation`) live in one Node process's memory. Running
+more than one API replica means a client connected to replica A never
+receives an event broadcast from replica B. This matches the plan's scope
+(`planToNode.md` open question §5.3 — pooling/host decisions were flagged as
+open, not resolved) and is fine for a single long-lived Node instance, but
+**multi-replica deployments need a fan-out layer** (Redis pub/sub is the
+natural choice, since Redis is already a hard dependency for BullMQ) before
+scaling the API horizontally. Not built here — flagging per the audit's own
+instruction not to silently drop gaps.
+
+### Deployment note
+The WS gateway only runs where `apps/backend/src/server.ts` runs as a
+long-lived process (e.g. Railway/Render/Fly — the same host as the BullMQ
+worker). It is **not** attached in the Vercel serverless entrypoints
+(`api/index.js`, `api/webhook.js`), which only call `createApp()` and have no
+persistent process to hold sockets. Fully leaving Vercel serverless for the
+main API (not just the worker) is a prerequisite for realtime to work
+end-to-end post-migration — this was already implied by `planToNode.md`
+§4 step 3 ("Vercel serverless can't hold sockets... may also force a
+long-lived Node host decision") but is called out explicitly here since it's
+a hard requirement, not an optimization.
+
+### Final cleanup (do after this stage is verified live)
+Once no client is depending on the Supabase realtime fallback:
+1. Remove the `sendViaSupabase` dual-emit branch from `broadcast.service.ts`.
+2. Complete Stage 4's storage cleanup (drop Supabase storage fallback once
+   backfilled) — the two remaining backend `@supabase/supabase-js` call
+   sites (storage fallback + broadcast dual-emit) both go away together.
+3. Remove `@supabase/supabase-js` from `apps/backend/package.json` and
+   `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_ANON_KEY` from env —
+   at that point the app has zero Supabase dependencies anywhere.
+4. Drop the two Supabase-only Prisma migrations
+   (`20240616000001_storage_policies`, `20240620000001_realtime_publication`)
+   from the *self-hosted* migration history per the Stage 1 bootstrap note
+   (leave them in place for the existing Supabase-hosted database's history).
+
+### Verification
+```bash
+npx tsc --noEmit -p apps/backend/tsconfig.json   # zero errors
+cd apps/frontend && npx tsc --noEmit             # zero errors
+cd apps/backend && npm test                      # 51/51 pass
+cd apps/frontend && npm run build                # vendor-supabase chunk gone
+
+# Manual smoke (needs a running backend + frontend):
+# 1. Open the dashboard in two tabs, log in as the same business in both.
+# 2. Trigger a change that used to broadcast (e.g. send/receive a WhatsApp
+#    message, update an appointment) and confirm both tabs update without
+#    a manual refresh.
+# 3. Check the Network tab: one WS connection to /api/v1/realtime per tab,
+#    no more requests to *.supabase.co.
+```
+

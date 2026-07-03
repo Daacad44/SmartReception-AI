@@ -1,165 +1,125 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSupabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth.store';
+import { RealtimeClient, resolveRealtimeUrl } from '@/lib/realtime-client';
 
 /**
- * Business-wide realtime: conversations, appointments, customers, notifications.
- * Uses channel `business-{businessId}` — must not share this name with other hooks.
+ * Shared realtime client instance. Reused across every hook that needs
+ * realtime — a single WebSocket per browser tab, one JWT-authenticated
+ * connection multiplexing all events for the user's current business.
  */
-export function useBusinessRealtime(userId?: string | null) {
-  const businessId = useAuthStore((s) => s.currentBusinessId);
-  const queryClient = useQueryClient();
+let sharedClient: RealtimeClient | null = null;
+let connectRefCount = 0;
 
-  useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase || !businessId) return;
+function getClient(): RealtimeClient {
+  if (!sharedClient) {
+    sharedClient = new RealtimeClient({
+      url: resolveRealtimeUrl(),
+      getToken: () => useAuthStore.getState().accessToken,
+    });
+  }
+  return sharedClient;
+}
 
-    let channel = supabase.channel(`business-${businessId}`);
-
-    channel = channel
-      .on('broadcast', { event: 'conversation_update' }, (payload) => {
-        const convId = (payload.payload as { conversationId?: string })?.conversationId;
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        if (convId) {
-          queryClient.invalidateQueries({ queryKey: ['messages', convId] });
-          queryClient.invalidateQueries({ queryKey: ['conversation-activity', convId] });
-        }
-      })
-      .on('broadcast', { event: 'business_update' }, (payload) => {
-        const event = payload.payload as { type?: string };
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        if (event.type === 'appointment') {
-          queryClient.invalidateQueries({ queryKey: ['appointments'] });
-        }
-        if (event.type === 'campaign') {
-          queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-        }
-        if (event.type === 'customer') {
-          queryClient.invalidateQueries({ queryKey: ['customers'] });
-        }
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations',
-          filter: `businessId=eq.${businessId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
-          queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'appointments',
-          filter: `businessId=eq.${businessId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['appointments'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'customers',
-          filter: `businessId=eq.${businessId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['customers'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `businessId=eq.${businessId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
-      );
-
-    if (userId) {
-      channel = channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `userId=eq.${userId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
-      );
+function retainConnection(): () => void {
+  const client = getClient();
+  if (connectRefCount === 0) client.connect();
+  connectRefCount++;
+  return () => {
+    connectRefCount--;
+    if (connectRefCount === 0) {
+      client.disconnect();
     }
-
-    channel.subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [businessId, userId, queryClient]);
+  };
 }
 
 /**
- * Conversation-scoped message realtime. Uses a dedicated channel per conversation
- * so it never collides with the business-wide channel.
+ * Business-wide realtime: conversations, appointments, customers, campaigns,
+ * notifications, ai-analytics. Same invalidation surface the Supabase-backed
+ * `useRealtime` covered before the migration.
  */
-export function useConversationRealtime(conversationId: string | null) {
+export function useBusinessRealtime(userId?: string | null) {
+  const businessId = useAuthStore((s) => s.currentBusinessId);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase || !conversationId) return;
+    if (!businessId || !accessToken) return;
 
-    const invalidate = () => {
+    const release = retainConnection();
+    const client = getClient();
+
+    const offConv = client.on('conversation_update', ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+        queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+      }
+    });
+
+    const offBusiness = client.on('business_update', (payload) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      switch (payload.type) {
+        case 'appointment':
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          break;
+        case 'campaign':
+          queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+          break;
+        case 'customer':
+          queryClient.invalidateQueries({ queryKey: ['customers'] });
+          break;
+        case 'notification':
+          // already invalidated above
+          break;
+        case 'ai_analytics':
+          queryClient.invalidateQueries({ queryKey: ['ai-analytics'] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
+          break;
+      }
+    });
+
+    return () => {
+      offConv();
+      offBusiness();
+      release();
+    };
+    // userId currently unused — kept in the signature for the callers that
+    // previously passed it so the API shape stays stable.
+  }, [businessId, accessToken, userId, queryClient]);
+}
+
+/**
+ * Conversation-scoped realtime. Subscribes to the specific conversation on
+ * the shared socket so message updates arrive even when the business-wide
+ * event doesn't carry a conversationId.
+ */
+export function useConversationRealtime(conversationId: string | null) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!conversationId || !accessToken) return;
+
+    const release = retainConnection();
+    const client = getClient();
+    client.subscribeConversation(conversationId);
+
+    const off = client.on('conversation_update', (payload) => {
+      if (payload.conversationId !== conversationId) return;
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['conversations', 'summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'bundle'] });
-    };
-
-    const messageChannel = supabase
-      .channel(`messages-${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversationId=eq.${conversationId}`,
-        },
-        invalidate
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `id=eq.${conversationId}`,
-        },
-        invalidate
-      )
-      .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(messageChannel);
+      off();
+      client.unsubscribeConversation(conversationId);
+      release();
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, accessToken, queryClient]);
 }
