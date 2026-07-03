@@ -1,14 +1,34 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
+import {
+  wsGateway,
+  type BusinessEventPayload,
+  type ConversationEventPayload,
+} from './ws-gateway.service';
+
+/**
+ * Broadcast facade — the ~14 services that emit realtime events (conversations,
+ * appointments, campaigns, ai-analytics, workflow-engine, sales-flow, etc.)
+ * call these three functions. Their signatures stay stable across the
+ * Supabase-→-self-host migration.
+ *
+ * During the transition this dual-emits:
+ *   1. To the new Express WebSocket gateway (wsGateway) — the target end state.
+ *   2. To the legacy Supabase realtime channel — kept live so that any client
+ *      still on `apps/frontend/src/lib/supabase.ts` continues to receive
+ *      events until every consumer has switched to the WS client.
+ *
+ * When the Supabase env vars are unset (`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`),
+ * the Supabase path silently no-ops — the WS path handles everything on its own.
+ * Deleting the Supabase code block is the final cleanup step in Stage 5.
+ */
 
 let supabaseAdmin: SupabaseClient | null = null;
 const channelPool = new Map<string, Promise<RealtimeChannel>>();
 
 function getAdminClient(): SupabaseClient | null {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey) {
-    return null;
-  }
+  if (!config.supabase.url || !config.supabase.serviceRoleKey) return null;
   if (!supabaseAdmin) {
     supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -17,7 +37,7 @@ function getAdminClient(): SupabaseClient | null {
   return supabaseAdmin;
 }
 
-async function getBusinessChannel(businessId: string): Promise<RealtimeChannel | null> {
+async function getSupabaseChannel(businessId: string): Promise<RealtimeChannel | null> {
   const client = getAdminClient();
   if (!client) return null;
 
@@ -41,47 +61,37 @@ async function getBusinessChannel(businessId: string): Promise<RealtimeChannel |
   }
 }
 
-/** Push instant UI updates via Supabase broadcast (complements postgres_changes). */
-export async function broadcastConversationEvent(
+async function sendViaSupabase(
   businessId: string,
-  payload: { conversationId: string; type: string }
+  event: 'conversation_update' | 'business_update',
+  payload: unknown
 ): Promise<void> {
-  const channel = await getBusinessChannel(businessId);
+  const channel = await getSupabaseChannel(businessId);
   if (!channel) return;
-
   try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'conversation_update',
-      payload,
-    });
+    await channel.send({ type: 'broadcast', event, payload });
   } catch (error) {
     logger.debug('Realtime broadcast failed (non-fatal)', { error, businessId });
   }
 }
 
+export async function broadcastConversationEvent(
+  businessId: string,
+  payload: ConversationEventPayload
+): Promise<void> {
+  // Primary: in-process WS fan-out. Cheap, synchronous, no network hop.
+  wsGateway.emitConversationEvent(businessId, payload);
+  // Secondary (transitional): Supabase realtime, so any client still on the
+  // old lib/supabase.ts keeps receiving events.
+  await sendViaSupabase(businessId, 'conversation_update', payload);
+}
+
 export async function broadcastBusinessEvent(
   businessId: string,
-  payload: {
-    type: 'appointment' | 'campaign' | 'customer' | 'notification' | 'ai_analytics';
-    appointmentId?: string;
-    campaignId?: string;
-    customerId?: string;
-    action?: string;
-  }
+  payload: BusinessEventPayload
 ): Promise<void> {
-  const channel = await getBusinessChannel(businessId);
-  if (!channel) return;
-
-  try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'business_update',
-      payload,
-    });
-  } catch (error) {
-    logger.debug('Business broadcast failed (non-fatal)', { error, businessId });
-  }
+  wsGateway.emitBusinessEvent(businessId, payload);
+  await sendViaSupabase(businessId, 'business_update', payload);
 }
 
 export async function broadcastAiAnalyticsUpdate(businessId: string): Promise<void> {

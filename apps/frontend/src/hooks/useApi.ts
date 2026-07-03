@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, isInitialLoading } from '@/hooks/useAuthQuery';
 import api, { extractData } from '@/lib/api';
-import { isSupabaseConfigured } from '@/lib/supabase-config';
 import type {
   Conversation,
   Message,
@@ -300,10 +299,14 @@ export function transformFaq(raw: any): Faq {
 
 const ANALYTICS_TIMEOUT = 30_000;
 const CONVERSATIONS_TIMEOUT = 15_000;
-const FALLBACK_POLL_INTERVAL = 12_000;
 
-/** Supabase realtime invalidates queries — polling is redundant when configured. */
-const conversationPollInterval = isSupabaseConfigured ? false : FALLBACK_POLL_INTERVAL;
+/**
+ * The realtime WebSocket gateway (apps/backend/src/infrastructure/realtime/
+ * ws-gateway.service.ts) invalidates queries on push, so polling is
+ * redundant — matches prior behavior when Supabase realtime was configured
+ * (which was the production default, i.e. this was already `false`).
+ */
+const conversationPollInterval = false;
 
 export function useDashboardBundle() {
   return useAuthQuery<DashboardBundle>({

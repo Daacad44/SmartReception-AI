@@ -3,7 +3,14 @@ import { v4 as uuid } from 'uuid';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 
-const BUCKET = 'knowledge-documents';
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+const KNOWLEDGE_MIME_ALLOWLIST = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'text/plain',
+];
 
 let client: SupabaseClient | null = null;
 
@@ -23,26 +30,43 @@ export function isSupabaseStorageConfigured(): boolean {
   return Boolean(config.supabase.url && config.supabase.serviceRoleKey);
 }
 
+export interface SupabaseBucketOptions {
+  bucket: string;
+  signedUrlTtl?: number;
+  fileSizeLimit?: number;
+  allowedMimeTypes?: string[];
+}
+
 export class SupabaseStorageService {
+  private readonly bucket: string;
+  private readonly signedUrlTtl: number;
+  private readonly fileSizeLimit: number;
+  private readonly allowedMimeTypes?: string[];
+  private ensured = false;
+
+  constructor(options: SupabaseBucketOptions) {
+    this.bucket = options.bucket;
+    this.signedUrlTtl = options.signedUrlTtl ?? ONE_YEAR_SECONDS;
+    this.fileSizeLimit = options.fileSizeLimit ?? 10 * 1024 * 1024;
+    this.allowedMimeTypes = options.allowedMimeTypes;
+  }
+
   async ensureBucket(): Promise<void> {
+    if (this.ensured) return;
     const supabase = getClient();
     const { data: buckets } = await supabase.storage.listBuckets();
-    const exists = buckets?.some((b) => b.name === BUCKET);
+    const exists = buckets?.some((b) => b.name === this.bucket);
     if (!exists) {
-      const { error } = await supabase.storage.createBucket(BUCKET, {
+      const { error } = await supabase.storage.createBucket(this.bucket, {
         public: false,
-        fileSizeLimit: 10 * 1024 * 1024,
-        allowedMimeTypes: [
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/msword',
-          'text/plain',
-        ],
+        fileSizeLimit: this.fileSizeLimit,
+        allowedMimeTypes: this.allowedMimeTypes,
       });
       if (error && !error.message.includes('already exists')) {
-        logger.warn('Could not create storage bucket:', error.message);
+        logger.warn(`Could not create storage bucket ${this.bucket}:`, error.message);
       }
     }
+    this.ensured = true;
   }
 
   async upload(
@@ -55,7 +79,7 @@ export class SupabaseStorageService {
     const supabase = getClient();
     const key = `${folder}/${uuid()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-    const { error } = await supabase.storage.from(BUCKET).upload(key, file, {
+    const { error } = await supabase.storage.from(this.bucket).upload(key, file, {
       contentType: mimeType,
       upsert: false,
     });
@@ -65,19 +89,19 @@ export class SupabaseStorageService {
     }
 
     const { data: signed } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(key, 60 * 60 * 24 * 365);
+      .from(this.bucket)
+      .createSignedUrl(key, this.signedUrlTtl);
 
     return {
       key,
-      url: signed?.signedUrl ?? `supabase://${BUCKET}/${key}`,
+      url: signed?.signedUrl ?? `supabase://${this.bucket}/${key}`,
     };
   }
 
   async delete(keyOrUrl: string): Promise<void> {
     const supabase = getClient();
     const key = this.resolveKey(keyOrUrl);
-    const { error } = await supabase.storage.from(BUCKET).remove([key]);
+    const { error } = await supabase.storage.from(this.bucket).remove([key]);
     if (error) {
       throw new Error(`Storage delete failed: ${error.message}`);
     }
@@ -86,7 +110,7 @@ export class SupabaseStorageService {
   async download(keyOrUrl: string): Promise<Buffer> {
     const supabase = getClient();
     const key = this.resolveKey(keyOrUrl);
-    const { data, error } = await supabase.storage.from(BUCKET).download(key);
+    const { data, error } = await supabase.storage.from(this.bucket).download(key);
     if (error || !data) {
       throw new Error(`Storage download failed: ${error?.message ?? 'No data'}`);
     }
@@ -113,4 +137,20 @@ export class SupabaseStorageService {
   }
 }
 
-export const supabaseStorageService = new SupabaseStorageService();
+/**
+ * Default knowledge-documents Supabase service. Kept as an exported singleton
+ * for reading legacy `supabase://knowledge-documents/…` URLs during the R2
+ * cutover.
+ */
+export const supabaseStorageService = new SupabaseStorageService({
+  bucket: 'knowledge-documents',
+  signedUrlTtl: ONE_YEAR_SECONDS,
+  fileSizeLimit: 10 * 1024 * 1024,
+  allowedMimeTypes: KNOWLEDGE_MIME_ALLOWLIST,
+});
+
+export function createSupabaseStorageService(
+  options: SupabaseBucketOptions
+): SupabaseStorageService {
+  return new SupabaseStorageService(options);
+}

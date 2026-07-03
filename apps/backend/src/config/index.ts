@@ -133,7 +133,14 @@ export const config = {
     accountId: process.env.R2_ACCOUNT_ID || '',
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    // Legacy single-bucket name — kept for backward compat, treated as the
+    // knowledge-documents bucket if the more-specific env var below is unset.
     bucketName: process.env.R2_BUCKET_NAME || 'smartreception',
+    knowledgeBucket:
+      process.env.R2_KNOWLEDGE_BUCKET ||
+      process.env.R2_BUCKET_NAME ||
+      'knowledge-documents',
+    whatsappMediaBucket: process.env.R2_WHATSAPP_MEDIA_BUCKET || 'whatsapp-media',
     publicUrl: process.env.R2_PUBLIC_URL || '',
   },
 
