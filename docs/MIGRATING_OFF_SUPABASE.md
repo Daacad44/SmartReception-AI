@@ -72,7 +72,25 @@ npm test   # 51 unit tests include auth (token/password/totp/subscription-licens
 
 ## Stage 3: Routes
 
-*Filled in by Stage 3 commit.*
+**No code changes required.** Verified against the current codebase.
+
+The audit (`backup-plan/answer.md` §8) confirmed the entire frontend data + auth surface already goes through the Express API:
+
+- **Zero** `.from(` / `.rpc(` / `.storage.` / `.auth.` calls anywhere in `apps/frontend/src` — grep-verified. Every `Array.from(` hit is JS, not Supabase.
+- The axios `api` client (`apps/frontend/src/lib/api.ts`) attaches `Authorization: Bearer <accessToken>` (L71–73) and `X-Business-Id` (L75) on every request; a 401 interceptor calls `/auth/refresh` (L116+).
+- Tokens are in the Zustand `auth.store`.
+- Every data hook (`apps/frontend/src/hooks/useApi.ts`, `useMutations.ts`) hits Express routes under `/api/v1/…`.
+
+Because the frontend never called Supabase for data, there are **no routes to port**. All the routes already exist.
+
+The only Supabase-facing frontend code today is `apps/frontend/src/hooks/useRealtime.ts` + `lib/supabase.ts` + `lib/supabase-config.ts` — those get replaced in Stage 5 (realtime).
+
+### Verification
+```bash
+cd apps/frontend
+grep -rE "\.from\(|\.rpc\(|\.storage\.|\.auth\." src/ | grep -v "Array\.from\|// "
+# Expected: only the .channel() hits in hooks/useRealtime.ts
+```
 
 ## Stage 4: Storage cutover
 
