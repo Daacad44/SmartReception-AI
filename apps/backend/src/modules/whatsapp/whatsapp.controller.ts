@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { whatsappModuleService } from './whatsapp.service';
+import { whatsappOAuthService } from './whatsapp-oauth.service';
 import { logger } from '../../core/logger';
-import { connectWhatsAppSchema, updateWhatsAppAccountSchema } from '@smartreception/shared';
+import {
+  connectWhatsAppSchema,
+  updateWhatsAppAccountSchema,
+  whatsappOAuthExchangeSchema,
+} from '@smartreception/shared';
 import { routeParam } from '../../core/utils';
 import { config } from '../../config';
 import { NotFoundError, ForbiddenError } from '../../core/errors';
@@ -198,6 +203,36 @@ export class WhatsAppController {
         return;
       }
       const account = await whatsappModuleService.connectAccount(req.user!.businessId!, input);
+      res.status(201).json({ success: true, data: account });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getOAuthConfig(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.json({ success: true, data: whatsappOAuthService.getClientConfig() });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async exchangeOAuthCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = whatsappOAuthExchangeSchema.parse(req.body);
+      const signupResult = await whatsappOAuthService.completeSignup(input);
+      if (
+        await withGovernanceGuard(req, res, 'WHATSAPP_CONNECT', {
+          phoneNumberId: signupResult.phoneNumberId,
+          phoneNumber: signupResult.phoneNumber,
+          displayName: signupResult.displayName,
+          wabaId: signupResult.wabaId,
+          accessToken: signupResult.accessToken,
+        })
+      ) {
+        return;
+      }
+      const account = await whatsappModuleService.connectAccount(req.user!.businessId!, signupResult);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
       next(error);
