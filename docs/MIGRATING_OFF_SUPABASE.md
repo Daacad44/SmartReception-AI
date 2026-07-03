@@ -94,7 +94,46 @@ grep -rE "\.from\(|\.rpc\(|\.storage\.|\.auth\." src/ | grep -v "Array\.from\|//
 
 ## Stage 4: Storage cutover
 
-*Filled in by Stage 4 commit.*
+**Cloudflare R2 becomes the primary object store for both buckets** (`knowledge-documents` and `whatsapp-media`). Supabase Storage stays wired only as a *read-fallback* for legacy `supabase://…` URLs during the backfill window, so nothing that's already stored in Supabase breaks.
+
+### What changed
+- `apps/backend/src/infrastructure/storage/r2.service.ts` — `R2StorageService` now takes `{ bucket, signedUrlTtl }` in its constructor and generates real signed private-bucket URLs on upload (rather than returning bare keys). A `createR2StorageService()` factory lets us stand up more than one bucket-scoped instance.
+- `apps/backend/src/infrastructure/storage/supabase-storage.service.ts` — parametrized the same way (`{ bucket, signedUrlTtl, fileSizeLimit, allowedMimeTypes }`), plus a `createSupabaseStorageService()` factory. The `knowledge-documents` singleton is preserved for backward compatibility.
+- `apps/backend/src/infrastructure/storage/index.ts` — `UnifiedStorageService` flipped to **R2-primary**. Reads/deletes route by URL scheme: any URL that looks like a Supabase Storage URL (`supabase://…` or `/storage/v1/object/…`) goes back to Supabase for as long as Supabase remains configured; everything else goes to R2. A second unified provider, `whatsappMediaStorage`, targets the `whatsapp-media` bucket with 7-day TTL.
+- `apps/backend/src/infrastructure/whatsapp/whatsapp-media.service.ts` — dropped its private `@supabase/supabase-js` client entirely. `storeInboundMedia` now delegates to `whatsappMediaStorage`; `downloadFromMeta` is unchanged (that talks to Meta, not Supabase).
+- `.env.example` — added `R2_KNOWLEDGE_BUCKET` / `R2_WHATSAPP_MEDIA_BUCKET`; kept `R2_BUCKET_NAME` for backward compatibility (used if `R2_KNOWLEDGE_BUCKET` is unset).
+
+Nothing else touched. All four call sites of `storageService` (`knowledge`, `business-profile`, `governance`, `governance-executor`) continue to work through the same `IStorageService` interface; `incoming-message.service.ts` continues to call `whatsappMediaService` with the same signature. Type-check clean, all 51 backend tests still pass.
+
+### R2 setup checklist (before deploying this stage)
+1. Create the R2 account and generate an access key pair (Cloudflare Dashboard → R2 → Manage R2 API Tokens → "Object Read & Write").
+2. Create two private buckets: `knowledge-documents` and `whatsapp-media`.
+3. Set env vars in the target environment: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_KNOWLEDGE_BUCKET=knowledge-documents`, `R2_WHATSAPP_MEDIA_BUCKET=whatsapp-media`.
+4. Leave `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` set for now — they're the read-fallback for existing objects.
+
+### Backfill (existing objects)
+The plan (`planToNode.md` §4 step 2) calls for a bulk copy of existing objects from Supabase Storage → R2 before dropping Supabase Storage. This is an out-of-band operation, not a code change:
+
+```
+# Sketch — replace URLs/keys with the live values.
+supabase storage download --recursive --local-out ./tmp knowledge-documents
+supabase storage download --recursive --local-out ./tmp whatsapp-media
+aws --endpoint-url https://<account>.r2.cloudflarestorage.com s3 sync ./tmp/knowledge-documents s3://knowledge-documents
+aws --endpoint-url https://<account>.r2.cloudflarestorage.com s3 sync ./tmp/whatsapp-media s3://whatsapp-media
+```
+
+After the sync, existing `KnowledgeDocument.fileUrl` values that were Supabase signed URLs need to be rewritten to R2 signed URLs (a one-off script that re-uploads or re-signs; not shipped with this migration since object counts are out of scope for the audit). Until that script runs, the read-fallback keeps legacy URLs resolving.
+
+### Env cleanup (after backfill)
+Once the backfill is verified and no more `supabase://…` or `/storage/v1/object/…` URLs remain in the DB (`KnowledgeDocument.fileUrl`, `Message.mediaUrl`, `BusinessProfile.profilePdfUrl`, `GovernanceApprovalRequest.stagingStorageKey`), drop the Supabase env vars — the storage layer will only touch R2.
+
+### Verification
+```bash
+npx tsc --noEmit -p apps/backend/tsconfig.json  # zero errors
+cd apps/backend && npm test                     # 51/51 pass
+# Manual smoke: upload a knowledge doc, upload a WhatsApp media message,
+# confirm the returned URL is an R2 signed URL, not a supabase.co URL.
+```
 
 ## Stage 5: Realtime replacement
 
