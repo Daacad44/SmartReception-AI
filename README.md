@@ -4,6 +4,7 @@
 
 SmartReception AI enables businesses to automate customer support, appointment booking, lead management, and CRM through intelligent WhatsApp conversations powered by OpenAI.
 
+![CI](https://github.com/Daacad44/SmartReception-AI/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-green.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)
