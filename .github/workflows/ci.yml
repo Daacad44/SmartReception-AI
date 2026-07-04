@@ -1,47 +1,83 @@
 name: CI
 
+# Runs on every push and PR against main. (No `develop` branch currently
+# exists in this repo — add it back here if one is created later.)
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
+
+concurrency:
+  # Same group per branch/PR so a new push cancels a stale run for that ref.
+  # Never cancel an in-flight run on main, since that's also what gates the
+  # production deploy job below.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  build-and-lint:
+  # Backend: install, lint/type-check, test, build. This is the gate the
+  # deploy job below waits on.
+  ci:
+    name: Backend - lint, test & build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.x'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Install dependencies (all workspaces, from lockfile)
+        run: npm ci
 
-      - run: npm run db:generate
+      - name: Build shared package
+        # backend imports @smartreception/shared's compiled dist/, not its
+        # TS source, so this must run before backend lint/test/build.
+        run: npm run build -w @smartreception/shared
 
-      - run: npm run build
+      - name: Generate Prisma client
+        # backend/src references generated @prisma/client types throughout.
+        run: npm run db:generate -w @smartreception/backend
 
-      - run: npm run lint
+      - name: Lint / type-check backend
+        # backend's "lint" script is `tsc --noEmit` (no separate ESLint
+        # config in this repo), so it also covers type-checking.
+        run: npm run lint -w @smartreception/backend --if-present
 
+      - name: Run backend tests
+        run: npm test -w @smartreception/backend --if-present
+
+      - name: Build backend
+        run: npm run build -w @smartreception/backend
+
+  # Frontend e2e: unchanged from the prior workflow, gated on backend CI.
   e2e:
+    name: Frontend - Playwright e2e
     runs-on: ubuntu-latest
-    needs: build-and-lint
+    needs: ci
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.x'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Install dependencies (all workspaces, from lockfile)
+        run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - run: npm run build -w @smartreception/frontend
+      - name: Build frontend
+        run: npm run build -w @smartreception/frontend
 
       - name: Run Playwright tests
         working-directory: frontend
@@ -52,3 +88,31 @@ jobs:
         env:
           CI: true
           PLAYWRIGHT_BASE_URL: http://localhost:4173
+
+  # Deploy: Railway, backend only, main branch only, after CI is green.
+  deploy:
+    name: Deploy backend to Railway
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        # RAILWAY_TOKEN must be a Railway *project* token (Project Settings ->
+        # Tokens), not an account token — project tokens deploy without
+        # needing `railway link` first. --service must match the Railway
+        # service name for the backend (see docs/RAILWAY_DEPLOYMENT.md, which
+        # names it "api"); update if your service is named differently.
+        run: railway up --service api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
