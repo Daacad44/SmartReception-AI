@@ -40,7 +40,7 @@ Password: Demo1234!
 ## Vercel Deployment
 
 > **Important:** In Vercel Project Settings → General → **Root Directory**, leave it empty (repository root `.`).
-> Do **not** set it to `apps/frontend` unless you only want the static frontend without the API.
+> Do **not** set it to `frontend` unless you only want the static frontend without the API.
 
 ### Required Environment Variables
 
@@ -76,8 +76,8 @@ Set these in [Vercel Project Settings → Environment Variables](https://vercel.
 Copy the frontend env template and add your anon key (file is gitignored):
 
 ```bash
-cp apps/frontend/.env.example apps/frontend/.env.local
-# Edit apps/frontend/.env.local — set VITE_SUPABASE_ANON_KEY from Supabase Dashboard → API
+cp frontend/.env.example frontend/.env.local
+# Edit frontend/.env.local — set VITE_SUPABASE_ANON_KEY from Supabase Dashboard → API
 ```
 
 Never commit `.env.local` or root `.env` — they are listed in `.gitignore`.
@@ -90,7 +90,7 @@ vercel --prod
 # Or connect GitHub repo in Vercel Dashboard
 # Root directory: / (monorepo root)
 # Build command: npm run build:vercel
-# Output directory: apps/frontend/dist
+# Output directory: frontend/dist
 ```
 
 ### Architecture on Vercel + Supabase
@@ -101,7 +101,7 @@ Browser → Vercel (React SPA + Express API serverless)
          Supabase PostgreSQL (pooled via PgBouncer)
 ```
 
-- **Frontend**: Static files served from `apps/frontend/dist`
+- **Frontend**: Static files served from `frontend/dist`
 - **API**: Express app at `/api` serverless function, routes at `/api/v1/*`
 - **Database**: Supabase PostgreSQL with Prisma ORM
 - **Background jobs**: Require Upstash Redis (optional; API works without it)

@@ -119,7 +119,7 @@ docker exec smartreception-backend npx tsx prisma/seed.ts
 ### Frontend (Vercel)
 
 1. Connect repository to Vercel
-2. Set root directory to `apps/frontend`
+2. Set root directory to `frontend`
 3. Build command: `npm run build`
 4. Output directory: `dist`
 5. Environment variables:
@@ -129,7 +129,7 @@ docker exec smartreception-backend npx tsx prisma/seed.ts
 
 ### Backend (Railway / Render / Fly.io)
 
-1. Deploy from `apps/backend`
+1. Deploy from `backend`
 2. Set start command: `node dist/server.js`
 3. Add worker process: `node dist/worker.js`
 4. Attach PostgreSQL and Redis add-ons

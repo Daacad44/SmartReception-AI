@@ -30,16 +30,16 @@ Two of the older migrations reference Supabase-only objects and will fail agains
 
 On the existing Supabase-hosted database these are already applied and recorded in `_prisma_migrations`, so nothing changes there.
 
-For a **fresh self-hosted Postgres**, delete those two folders from `apps/backend/prisma/migrations/` before running `prisma migrate deploy` for the first time. They cover Supabase-only infrastructure that has no plain-Postgres equivalent; the storage-side replacement lives in Stage 4 and the realtime replacement lives in Stage 5.
+For a **fresh self-hosted Postgres**, delete those two folders from `backend/prisma/migrations/` before running `prisma migrate deploy` for the first time. They cover Supabase-only infrastructure that has no plain-Postgres equivalent; the storage-side replacement lives in Stage 4 and the realtime replacement lives in Stage 5.
 
 The `20240620000000_pgvector` migration (`CREATE EXTENSION IF NOT EXISTS vector`) is safe to keep on any Postgres that has the `pgvector` package installed, and safe to delete otherwise — the app currently stores embeddings as JSON and does cosine similarity in-process, so the extension is unused today (see plan risk R6).
 
 ### Env vars
-`DATABASE_URL` and `DIRECT_URL` are the only Postgres knobs the app reads (`apps/backend/src/config/index.ts`). Point both at the new host. If the target host has its own connection pooler (PgBouncer/pgcat), `DATABASE_URL` should use it and `DIRECT_URL` should bypass it — same pattern as Supabase's 6543 vs 5432 split.
+`DATABASE_URL` and `DIRECT_URL` are the only Postgres knobs the app reads (`backend/src/config/index.ts`). Point both at the new host. If the target host has its own connection pooler (PgBouncer/pgcat), `DATABASE_URL` should use it and `DIRECT_URL` should bypass it — same pattern as Supabase's 6543 vs 5432 split.
 
 ### Verification
 ```bash
-cd apps/backend
+cd backend
 npx prisma migrate deploy   # applies all migrations including the new selfhost_compat
 npx prisma db seed          # optional
 npm test                    # 51 unit tests should still pass
@@ -52,7 +52,7 @@ npm test                    # 51 unit tests should still pass
 The audit (`backup-plan/answer.md` §4) confirmed the app has never used Supabase Auth:
 
 - Identity lives in the app's own `users` table (`passwordHash`, `totpSecret`, `totpBackupCodes`, `emailVerifiedAt`, etc.), not `auth.users`.
-- Access tokens are minted by `apps/backend/src/infrastructure/auth/token.service.ts` using `jsonwebtoken` against `config.jwt.secret` — 15 min expiry, payload claims `{userId, email, businessId, role}`. Refresh tokens are separately signed against `config.jwt.refreshSecret`, 7-day expiry, persisted rotating in the `refresh_tokens` table.
+- Access tokens are minted by `backend/src/infrastructure/auth/token.service.ts` using `jsonwebtoken` against `config.jwt.secret` — 15 min expiry, payload claims `{userId, email, businessId, role}`. Refresh tokens are separately signed against `config.jwt.refreshSecret`, 7-day expiry, persisted rotating in the `refresh_tokens` table.
 - Passwords hash via `bcryptjs` in `password.service.ts`.
 - 2FA is TOTP via `speakeasy` in `totp.service.ts`; backup codes are bcrypt-hashed.
 - Email OTP verification is via Resend in `otp.service.ts`.
@@ -66,7 +66,7 @@ None of this depends on Supabase infrastructure. It works unchanged against any 
 
 ### Verification
 ```bash
-cd apps/backend
+cd backend
 npm test   # 51 unit tests include auth (token/password/totp/subscription-license) — all pass
 ```
 
@@ -76,18 +76,18 @@ npm test   # 51 unit tests include auth (token/password/totp/subscription-licens
 
 The audit (`backup-plan/answer.md` §8) confirmed the entire frontend data + auth surface already goes through the Express API:
 
-- **Zero** `.from(` / `.rpc(` / `.storage.` / `.auth.` calls anywhere in `apps/frontend/src` — grep-verified. Every `Array.from(` hit is JS, not Supabase.
-- The axios `api` client (`apps/frontend/src/lib/api.ts`) attaches `Authorization: Bearer <accessToken>` (L71–73) and `X-Business-Id` (L75) on every request; a 401 interceptor calls `/auth/refresh` (L116+).
+- **Zero** `.from(` / `.rpc(` / `.storage.` / `.auth.` calls anywhere in `frontend/src` — grep-verified. Every `Array.from(` hit is JS, not Supabase.
+- The axios `api` client (`frontend/src/lib/api.ts`) attaches `Authorization: Bearer <accessToken>` (L71–73) and `X-Business-Id` (L75) on every request; a 401 interceptor calls `/auth/refresh` (L116+).
 - Tokens are in the Zustand `auth.store`.
-- Every data hook (`apps/frontend/src/hooks/useApi.ts`, `useMutations.ts`) hits Express routes under `/api/v1/…`.
+- Every data hook (`frontend/src/hooks/useApi.ts`, `useMutations.ts`) hits Express routes under `/api/v1/…`.
 
 Because the frontend never called Supabase for data, there are **no routes to port**. All the routes already exist.
 
-The only Supabase-facing frontend code today is `apps/frontend/src/hooks/useRealtime.ts` + `lib/supabase.ts` + `lib/supabase-config.ts` — those get replaced in Stage 5 (realtime).
+The only Supabase-facing frontend code today is `frontend/src/hooks/useRealtime.ts` + `lib/supabase.ts` + `lib/supabase-config.ts` — those get replaced in Stage 5 (realtime).
 
 ### Verification
 ```bash
-cd apps/frontend
+cd frontend
 grep -rE "\.from\(|\.rpc\(|\.storage\.|\.auth\." src/ | grep -v "Array\.from\|// "
 # Expected: only the .channel() hits in hooks/useRealtime.ts
 ```
@@ -97,10 +97,10 @@ grep -rE "\.from\(|\.rpc\(|\.storage\.|\.auth\." src/ | grep -v "Array\.from\|//
 **Cloudflare R2 becomes the primary object store for both buckets** (`knowledge-documents` and `whatsapp-media`). Supabase Storage stays wired only as a *read-fallback* for legacy `supabase://…` URLs during the backfill window, so nothing that's already stored in Supabase breaks.
 
 ### What changed
-- `apps/backend/src/infrastructure/storage/r2.service.ts` — `R2StorageService` now takes `{ bucket, signedUrlTtl }` in its constructor and generates real signed private-bucket URLs on upload (rather than returning bare keys). A `createR2StorageService()` factory lets us stand up more than one bucket-scoped instance.
-- `apps/backend/src/infrastructure/storage/supabase-storage.service.ts` — parametrized the same way (`{ bucket, signedUrlTtl, fileSizeLimit, allowedMimeTypes }`), plus a `createSupabaseStorageService()` factory. The `knowledge-documents` singleton is preserved for backward compatibility.
-- `apps/backend/src/infrastructure/storage/index.ts` — `UnifiedStorageService` flipped to **R2-primary**. Reads/deletes route by URL scheme: any URL that looks like a Supabase Storage URL (`supabase://…` or `/storage/v1/object/…`) goes back to Supabase for as long as Supabase remains configured; everything else goes to R2. A second unified provider, `whatsappMediaStorage`, targets the `whatsapp-media` bucket with 7-day TTL.
-- `apps/backend/src/infrastructure/whatsapp/whatsapp-media.service.ts` — dropped its private `@supabase/supabase-js` client entirely. `storeInboundMedia` now delegates to `whatsappMediaStorage`; `downloadFromMeta` is unchanged (that talks to Meta, not Supabase).
+- `backend/src/infrastructure/storage/r2.service.ts` — `R2StorageService` now takes `{ bucket, signedUrlTtl }` in its constructor and generates real signed private-bucket URLs on upload (rather than returning bare keys). A `createR2StorageService()` factory lets us stand up more than one bucket-scoped instance.
+- `backend/src/infrastructure/storage/supabase-storage.service.ts` — parametrized the same way (`{ bucket, signedUrlTtl, fileSizeLimit, allowedMimeTypes }`), plus a `createSupabaseStorageService()` factory. The `knowledge-documents` singleton is preserved for backward compatibility.
+- `backend/src/infrastructure/storage/index.ts` — `UnifiedStorageService` flipped to **R2-primary**. Reads/deletes route by URL scheme: any URL that looks like a Supabase Storage URL (`supabase://…` or `/storage/v1/object/…`) goes back to Supabase for as long as Supabase remains configured; everything else goes to R2. A second unified provider, `whatsappMediaStorage`, targets the `whatsapp-media` bucket with 7-day TTL.
+- `backend/src/infrastructure/whatsapp/whatsapp-media.service.ts` — dropped its private `@supabase/supabase-js` client entirely. `storeInboundMedia` now delegates to `whatsappMediaStorage`; `downloadFromMeta` is unchanged (that talks to Meta, not Supabase).
 - `.env.example` — added `R2_KNOWLEDGE_BUCKET` / `R2_WHATSAPP_MEDIA_BUCKET`; kept `R2_BUCKET_NAME` for backward compatibility (used if `R2_KNOWLEDGE_BUCKET` is unset).
 
 Nothing else touched. All four call sites of `storageService` (`knowledge`, `business-profile`, `governance`, `governance-executor`) continue to work through the same `IStorageService` interface; `incoming-message.service.ts` continues to call `whatsappMediaService` with the same signature. Type-check clean, all 51 backend tests still pass.
@@ -129,8 +129,8 @@ Once the backfill is verified and no more `supabase://…` or `/storage/v1/objec
 
 ### Verification
 ```bash
-npx tsc --noEmit -p apps/backend/tsconfig.json  # zero errors
-cd apps/backend && npm test                     # 51/51 pass
+npx tsc --noEmit -p backend/tsconfig.json  # zero errors
+cd backend && npm test                     # 51/51 pass
 # Manual smoke: upload a knowledge doc, upload a WhatsApp media message,
 # confirm the returned URL is an R2 signed URL, not a supabase.co URL.
 ```
@@ -142,7 +142,7 @@ was the only genuinely stateful piece of the migration (plan risks R1 + R2) —
 everything else was either already portable or a straightforward provider swap.
 
 ### What changed
-- **New: `apps/backend/src/infrastructure/realtime/ws-gateway.service.ts`** — a
+- **New: `backend/src/infrastructure/realtime/ws-gateway.service.ts`** — a
   `WebSocketServer` attached to the same HTTP server as the Express app
   (`noServer: true` + manual `upgrade` handling on path `/api/v1/realtime`).
   JWT auth via `?token=` query string (browsers can't set custom headers on
@@ -152,7 +152,7 @@ everything else was either already portable or a straightforward provider swap.
   and `business_update` events — the exact same event names/payload shapes
   `useRealtime.ts` already consumed from Supabase, so no invalidation logic
   needed to change, only the transport.
-- **`apps/backend/src/infrastructure/realtime/broadcast.service.ts`** — the
+- **`backend/src/infrastructure/realtime/broadcast.service.ts`** — the
   three exported functions (`broadcastConversationEvent`, `broadcastBusinessEvent`,
   `broadcastAiAnalyticsUpdate`) keep their exact signatures, so none of the
   ~14 calling services needed changes. Internally they now **dual-emit**:
@@ -161,16 +161,16 @@ everything else was either already portable or a straightforward provider swap.
   `SUPABASE_SERVICE_ROLE_KEY` are set, so any client still running the old
   Supabase-based code keeps working during rollout. When those env vars are
   unset, the Supabase path silently no-ops.
-- **`apps/backend/src/server.ts`** — `wsGateway.attach(server)` after
+- **`backend/src/server.ts`** — `wsGateway.attach(server)` after
   `app.listen(...)`, and `wsGateway.detach()` in the graceful-shutdown path.
-- **New: `apps/frontend/src/lib/realtime-client.ts`** — a small `RealtimeClient`
+- **New: `frontend/src/lib/realtime-client.ts`** — a small `RealtimeClient`
   wrapping the browser `WebSocket`: connects with the JWT access token,
   exponential-backoff reconnect (capped 10s), re-subscribes to any
   conversation rooms after a reconnect, and dispatches typed events to
   registered listeners. `resolveRealtimeUrl()` derives the WS URL from
   `VITE_API_URL` (swaps `http(s)` → `ws(s)`, appends `/realtime`) so no new
   frontend env var is needed.
-- **`apps/frontend/src/hooks/useRealtime.ts`** — rewritten against
+- **`frontend/src/hooks/useRealtime.ts`** — rewritten against
   `RealtimeClient` instead of `getSupabase()`. A single shared client/socket
   is reused across every component via a ref-count (`retainConnection`), so
   a business-wide subscriber and several open-conversation subscribers all
@@ -178,14 +178,14 @@ everything else was either already portable or a straightforward provider swap.
   each. `useBusinessRealtime` and `useConversationRealtime` keep their exact
   exported signatures and invalidate the same React Query keys as before.
 - **Cleanup (frontend now fully off Supabase):** deleted
-  `apps/frontend/src/lib/supabase.ts` and `supabase-config.ts` (dead code
+  `frontend/src/lib/supabase.ts` and `supabase-config.ts` (dead code
   once `useRealtime.ts` stopped calling `getSupabase()` — confirmed via
   repo-wide grep, zero remaining references). Removed the now-unused
-  `@supabase/supabase-js` dependency from `apps/frontend/package.json` (the
+  `@supabase/supabase-js` dependency from `frontend/package.json` (the
   `vendor-supabase` chunk is gone from the production build). Removed
   `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` from `.env.example` — the
   frontend needs zero Supabase configuration now. Fixed one incidental
-  breakage: `apps/frontend/src/hooks/useApi.ts` used
+  breakage: `frontend/src/hooks/useApi.ts` used
   `isSupabaseConfigured` to decide whether to poll conversations as a
   fallback when realtime wasn't configured; since the WS gateway is always
   attempted now (matching the `false`/no-polling behavior production already
@@ -213,7 +213,7 @@ scaling the API horizontally. Not built here — flagging per the audit's own
 instruction not to silently drop gaps.
 
 ### Deployment note
-The WS gateway only runs where `apps/backend/src/server.ts` runs as a
+The WS gateway only runs where `backend/src/server.ts` runs as a
 long-lived process (e.g. Railway/Render/Fly — the same host as the BullMQ
 worker). It is **not** attached in the Vercel serverless entrypoints
 (`api/index.js`, `api/webhook.js`), which only call `createApp()` and have no
@@ -230,7 +230,7 @@ Once no client is depending on the Supabase realtime fallback:
 2. Complete Stage 4's storage cleanup (drop Supabase storage fallback once
    backfilled) — the two remaining backend `@supabase/supabase-js` call
    sites (storage fallback + broadcast dual-emit) both go away together.
-3. Remove `@supabase/supabase-js` from `apps/backend/package.json` and
+3. Remove `@supabase/supabase-js` from `backend/package.json` and
    `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_ANON_KEY` from env —
    at that point the app has zero Supabase dependencies anywhere.
 4. Drop the two Supabase-only Prisma migrations
@@ -240,10 +240,10 @@ Once no client is depending on the Supabase realtime fallback:
 
 ### Verification
 ```bash
-npx tsc --noEmit -p apps/backend/tsconfig.json   # zero errors
-cd apps/frontend && npx tsc --noEmit             # zero errors
-cd apps/backend && npm test                      # 51/51 pass
-cd apps/frontend && npm run build                # vendor-supabase chunk gone
+npx tsc --noEmit -p backend/tsconfig.json   # zero errors
+cd frontend && npx tsc --noEmit             # zero errors
+cd backend && npm test                      # 51/51 pass
+cd frontend && npm run build                # vendor-supabase chunk gone
 
 # Manual smoke (needs a running backend + frontend):
 # 1. Open the dashboard in two tabs, log in as the same business in both.

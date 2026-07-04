@@ -39,12 +39,12 @@ jobs:
       - run: npm ci
 
       - run: npx playwright install --with-deps chromium
-        working-directory: apps/frontend
+        working-directory: frontend
 
       - run: npm run build -w @smartreception/frontend
 
       - name: Run Playwright tests
-        working-directory: apps/frontend
+        working-directory: frontend
         run: |
           npm run preview &
           npx wait-on http://localhost:4173

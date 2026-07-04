@@ -11,10 +11,13 @@ build
 .env.*.local
 .env.development
 .env.production
-apps/*/.env
-apps/*/.env.*
-!apps/*/.env.example
-apps/frontend/api/_bundle/
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/api/_bundle/
 
 # Credential files
 credentials.json
@@ -29,5 +32,5 @@ playwright-report
 .turbo
 .vite
 *.tsbuildinfo
-apps/backend/prisma/migrations/**/migration_lock.toml
+backend/prisma/migrations/**/migration_lock.toml
 dump.rdb

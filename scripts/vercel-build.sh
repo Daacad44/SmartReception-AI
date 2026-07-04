@@ -15,16 +15,16 @@ echo "==> Building backend..."
 npm run build -w @smartreception/backend
 
 echo "==> Preparing API serverless bundle..."
-API_BUNDLE="apps/frontend/api/_bundle"
+API_BUNDLE="frontend/api/_bundle"
 rm -rf "$API_BUNDLE"
 mkdir -p "$API_BUNDLE"
-cp -r apps/backend/dist "$API_BUNDLE/dist"
-cp -r apps/backend/prisma "$API_BUNDLE/prisma"
+cp -r backend/dist "$API_BUNDLE/dist"
+cp -r backend/prisma "$API_BUNDLE/prisma"
 
 echo "==> Building frontend..."
 export VITE_API_URL="${VITE_API_URL:-/api/v1}"
 export VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://hlngecipthlecwqozwhe.supabase.co}"
-# VITE_SUPABASE_ANON_KEY: set in Vercel env or apps/frontend/.env.local (optional — has code fallback)
+# VITE_SUPABASE_ANON_KEY: set in Vercel env or frontend/.env.local (optional — has code fallback)
 npm run build -w @smartreception/frontend
 
 echo "==> Build complete."

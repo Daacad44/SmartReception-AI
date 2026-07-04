@@ -301,7 +301,7 @@ const ANALYTICS_TIMEOUT = 30_000;
 const CONVERSATIONS_TIMEOUT = 15_000;
 
 /**
- * The realtime WebSocket gateway (apps/backend/src/infrastructure/realtime/
+ * The realtime WebSocket gateway (backend/src/infrastructure/realtime/
  * ws-gateway.service.ts) invalidates queries on push, so polling is
  * redundant — matches prior behavior when Supabase realtime was configured
  * (which was the production default, i.e. this was already `false`).

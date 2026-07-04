@@ -4,7 +4,8 @@
   "private": true,
   "description": "AI-powered WhatsApp business automation platform",
   "workspaces": [
-    "apps/*",
+    "backend",
+    "frontend",
     "packages/*"
   ],
   "scripts": {

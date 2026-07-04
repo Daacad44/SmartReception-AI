@@ -48,7 +48,7 @@ Copy `.env.example` to `.env` and fill in real values.
 
 | Environment | Location |
 |-------------|----------|
-| Local development | `/workspace/.env` or `apps/backend/.env` |
+| Local development | `/workspace/.env` or `backend/.env` |
 | Production API | Hosting provider env (e.g. Vercel, Railway) for `api.somreception.botandev.com` |
 | Production frontend | `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 

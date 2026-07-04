@@ -8,9 +8,8 @@ SmartReception AI is a multi-tenant SaaS platform for WhatsApp business automati
 
 ```
 smartreception-ai/
-├── apps/
-│   ├── backend/          # Express.js API + BullMQ workers
-│   └── frontend/         # React + Vite dashboard
+├── backend/              # Express.js API + BullMQ workers
+├── frontend/             # React + Vite dashboard
 ├── packages/
 │   └── shared/           # Shared types, Zod schemas, constants
 ├── docs/                 # Documentation
@@ -21,7 +20,7 @@ smartreception-ai/
 ## Backend Architecture (Clean Architecture)
 
 ```
-apps/backend/src/
+backend/src/
 ├── config/               # Environment configuration
 ├── core/                 # Cross-cutting concerns
 │   ├── errors.ts         # AppError hierarchy
@@ -72,7 +71,7 @@ modules/{feature}/
 ## Frontend Architecture
 
 ```
-apps/frontend/src/
+frontend/src/
 ├── components/
 │   ├── ui/               # shadcn/ui primitives
 │   └── layout/           # Sidebar, TopBar, DashboardLayout

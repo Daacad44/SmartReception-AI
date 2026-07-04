@@ -4,12 +4,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-COPY apps/frontend/package.json ./apps/frontend/
+COPY frontend/package.json ./frontend/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN npm install --workspace=@smartreception/frontend
 
-COPY apps/frontend ./apps/frontend
+COPY frontend ./frontend
 COPY packages/shared ./packages/shared
 
 ARG VITE_API_URL=http://localhost:3001/api/v1
@@ -20,8 +20,8 @@ RUN npm run build -w @smartreception/frontend
 # Production stage
 FROM nginx:alpine
 
-COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 

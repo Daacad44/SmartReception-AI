@@ -16,7 +16,7 @@ import {
  * During the transition this dual-emits:
  *   1. To the new Express WebSocket gateway (wsGateway) — the target end state.
  *   2. To the legacy Supabase realtime channel — kept live so that any client
- *      still on `apps/frontend/src/lib/supabase.ts` continues to receive
+ *      still on `frontend/src/lib/supabase.ts` continues to receive
  *      events until every consumer has switched to the WS client.
  *
  * When the Supabase env vars are unset (`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`),

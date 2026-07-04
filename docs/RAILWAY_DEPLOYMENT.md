@@ -18,17 +18,17 @@ platform.
 
 ## Prerequisites (code-side, already done)
 
-- `apps/backend/Dockerfile` builds `packages/shared` before the backend (fixed —
+- `backend/Dockerfile` builds `packages/shared` before the backend (fixed —
   previously this was missing and a fresh build would have failed since
   `packages/shared/dist` is gitignored).
-- `apps/backend/package.json` has `start:railway` (`prisma migrate deploy && node
+- `backend/package.json` has `start:railway` (`prisma migrate deploy && node
   dist/server.js`) and `db:migrate:deploy` (`prisma migrate deploy`) scripts.
 - `railway.json` at the repo root points Railway at the Dockerfile and sets the
   default start command + health check.
 
 Verify locally before deploying (needs a Docker daemon):
 ```bash
-docker build -f apps/backend/Dockerfile -t smartreception-backend .
+docker build -f backend/Dockerfile -t smartreception-backend .
 ```
 
 ## 1. Create the Railway project
@@ -37,9 +37,9 @@ Deploy **directly from this monorepo** — no code extraction needed. Railway su
 building a subdirectory Dockerfile with the full repo as build context:
 
 1. New Railway project → "Deploy from GitHub repo" → select this repo.
-2. Railway will detect `railway.json` at the root and use `apps/backend/Dockerfile`
+2. Railway will detect `railway.json` at the root and use `backend/Dockerfile`
    automatically (Root Directory stays `/`, i.e. the repo root — do **not** set it to
-   `apps/backend`, since the Dockerfile's `COPY` steps need the monorepo root as
+   `backend`, since the Dockerfile's `COPY` steps need the monorepo root as
    build context to reach `packages/shared`).
 3. Rename this first service `api`.
 
@@ -162,11 +162,11 @@ In Vercel project settings (frontend), set:
 VITE_API_URL=https://<railway-domain>/api/v1
 ```
 Redeploy the frontend. This single variable also fixes realtime — the WebSocket
-client (`apps/frontend/src/lib/realtime-client.ts`) derives its URL from
+client (`frontend/src/lib/realtime-client.ts`) derives its URL from
 `VITE_API_URL`, swapping `http(s)` for `ws(s)` and appending `/realtime`.
 
 Also set `FRONTEND_URL` on Railway's `api` service to the Vercel production domain.
-No other CORS change is needed — `apps/backend/src/app.ts`'s CORS handler already
+No other CORS change is needed — `backend/src/app.ts`'s CORS handler already
 allows any `*.vercel.app` origin (covers preview deployments) plus `config.frontendUrl`.
 
 ## 9. Rollback plan

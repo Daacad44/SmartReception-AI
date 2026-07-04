@@ -1,6 +1,6 @@
 /**
  * Thin WebSocket client for the backend realtime gateway
- * (see apps/backend/src/infrastructure/realtime/ws-gateway.service.ts).
+ * (see backend/src/infrastructure/realtime/ws-gateway.service.ts).
  *
  * Replaces the previous Supabase realtime client. Handles:
  *   - JWT auth via `?token=` on the handshake (WS spec doesn't allow custom

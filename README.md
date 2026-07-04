@@ -64,27 +64,26 @@ npm run dev
 
 ```
 smartreception-ai/
-├── apps/
-│   ├── backend/                 # Express API + BullMQ workers
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma    # Full database schema (16 tables)
-│   │   │   └── seed.ts          # Demo data seeder
-│   │   └── src/
-│   │       ├── config/          # Environment config
-│   │       ├── core/            # Errors, logger, middleware
-│   │       ├── infrastructure/  # Prisma, Redis, R2, OpenAI, WhatsApp
-│   │       ├── modules/         # Feature modules (11 modules)
-│   │       ├── routes/          # API route aggregator
-│   │       ├── app.ts           # Express app factory
-│   │       ├── server.ts        # HTTP server
-│   │       └── worker.ts        # Background job processors
-│   └── frontend/                # React dashboard
-│       └── src/
-│           ├── components/      # UI components + layout
-│           ├── pages/           # 10 page views
-│           ├── stores/          # Zustand state
-│           ├── hooks/           # Custom React hooks
-│           └── lib/             # API client, utilities
+├── backend/                     # Express API + BullMQ workers
+│   ├── prisma/
+│   │   ├── schema.prisma        # Full database schema (16 tables)
+│   │   └── seed.ts              # Demo data seeder
+│   └── src/
+│       ├── config/              # Environment config
+│       ├── core/                # Errors, logger, middleware
+│       ├── infrastructure/      # Prisma, Redis, R2, OpenAI, WhatsApp
+│       ├── modules/             # Feature modules (11 modules)
+│       ├── routes/              # API route aggregator
+│       ├── app.ts               # Express app factory
+│       ├── server.ts            # HTTP server
+│       └── worker.ts            # Background job processors
+├── frontend/                    # React dashboard
+│   └── src/
+│       ├── components/          # UI components + layout
+│       ├── pages/               # 10 page views
+│       ├── stores/              # Zustand state
+│       ├── hooks/               # Custom React hooks
+│       └── lib/                 # API client, utilities
 ├── packages/
 │   └── shared/                  # Shared types, schemas, constants
 ├── docs/

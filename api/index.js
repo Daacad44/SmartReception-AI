@@ -3,8 +3,8 @@
  * Prisma connects lazily on first query; avoid eager $connect() to prevent
  * holding a pool slot during idle warm invocations.
  */
-const { createApp } = require('../apps/backend/dist/app');
-const { logWhatsAppConfig } = require('../apps/backend/dist/config');
+const { createApp } = require('../backend/dist/app');
+const { logWhatsAppConfig } = require('../backend/dist/config');
 
 const app = createApp();
 

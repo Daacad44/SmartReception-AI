@@ -3,18 +3,18 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-COPY apps/backend/package.json ./apps/backend/
+COPY backend/package.json ./backend/
 COPY packages/shared/package.json ./packages/shared/
 RUN npm ci --workspace=@smartreception/backend --include-workspace-root
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
-COPY apps/backend ./apps/backend
+COPY backend ./backend
 COPY packages/shared ./packages/shared
 WORKDIR /app/packages/shared
 RUN npm run build
-WORKDIR /app/apps/backend
+WORKDIR /app/backend
 RUN npx prisma generate
 RUN npm run build
 
@@ -26,9 +26,9 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 smartreception
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/backend/dist ./dist
-COPY --from=builder /app/apps/backend/package.json ./package.json
-COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/package.json ./package.json
+COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 

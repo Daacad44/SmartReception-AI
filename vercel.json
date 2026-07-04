@@ -8,16 +8,16 @@
   "ignoreCommand": "exit 1",
   "installCommand": "npm install --include=dev",
   "buildCommand": "bash scripts/vercel-build.sh",
-  "outputDirectory": "apps/frontend/dist",
+  "outputDirectory": "frontend/dist",
   "framework": null,
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "apps/backend/{dist,prisma}/**"
+      "includeFiles": "backend/{dist,prisma}/**"
     },
     "api/webhook.js": {
       "maxDuration": 30,
-      "includeFiles": "apps/backend/{dist,prisma}/**"
+      "includeFiles": "backend/{dist,prisma}/**"
     }
   },
   "rewrites": [

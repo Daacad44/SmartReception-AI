@@ -3,6 +3,6 @@
  * Isolated from api/index.js so Meta traffic does not share Prisma pool
  * slots with dashboard/auth API requests.
  */
-const { createApp } = require('../apps/backend/dist/app');
+const { createApp } = require('../backend/dist/app');
 
 module.exports = createApp();
