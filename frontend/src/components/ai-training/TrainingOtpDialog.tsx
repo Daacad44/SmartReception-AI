@@ -36,7 +36,7 @@ export function TrainingOtpDialog({
   const confirm = useMutation({
     mutationFn: async () => {
       if (!verification) throw new Error('No verification request');
-      const response = await api.post('/super-admin/ai-training-center/verify/confirm', {
+      const response = await api.post('/super-admin/enterprise-ai-intelligence/verify/confirm', {
         requestId: verification.requestId,
         code: code.trim(),
       });

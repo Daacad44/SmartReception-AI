@@ -20,7 +20,6 @@ import {
   Radio,
   PanelLeftClose,
   PanelLeft,
-  Workflow,
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -39,7 +38,6 @@ const navItems = [
   { to: '/customers', icon: Users, label: 'Customers', featureKey: 'customers' },
   { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const, featureKey: 'customer-import' },
   { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const, featureKey: 'appointments' },
-  { to: '/appointments/automation', icon: Workflow, label: 'Workflow Builder', permission: 'appointments:write' as const, featureKey: 'appointment-automation' },
   { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const, featureKey: 'campaigns' },
   { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const, featureKey: 'employee-comms' },
   { to: '/enterprise-ai-intelligence', icon: BookOpen, label: 'Enterprise AI Intelligence', featureKey: 'enterprise-ai-intelligence' },
@@ -53,7 +51,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
-  { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'Enterprise AI Intelligence', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
+  { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
   { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },

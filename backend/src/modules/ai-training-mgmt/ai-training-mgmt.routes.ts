@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PERMISSIONS } from '@smartreception/shared';
 import { authorize } from '../../core/middleware/authorize.middleware';
+import { requireSuperAdmin } from '../../core/middleware/super-admin.middleware';
 import { aiTrainingMgmtController } from './ai-training-mgmt.controller';
 
 const router = Router();
@@ -19,7 +20,7 @@ router.post('/jobs/:jobId/cancel', authorize(PERMISSIONS['knowledge:write']), ai
 router.get('/versions', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.listVersions);
 router.get('/versions/compare', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.compareVersions);
 router.get('/versions/:versionId', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.getVersion);
-router.post('/versions/:versionId/rollback', authorize(PERMISSIONS['knowledge:write']), aiTrainingMgmtController.rollbackVersion);
+router.post('/versions/:versionId/rollback', requireSuperAdmin, aiTrainingMgmtController.rollbackVersion);
 
 router.post('/sandbox/sessions', authorize(PERMISSIONS['knowledge:write']), aiTrainingMgmtController.createSandboxSession);
 router.get('/sandbox/sessions', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.listSandboxSessions);

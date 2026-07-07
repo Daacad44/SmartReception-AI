@@ -102,7 +102,7 @@ export class AiTrainingMgmtService {
         ['RETRAIN', 'INCREMENTAL_RETRAIN', 'PARTIAL_RETRAIN'].includes(j.type)
       ),
       recentJobs: jobs,
-      versions,
+      versions: versions.filter((v) => v.status === 'PRODUCTION' || v.status === 'ARCHIVED'),
       deploymentRequests,
       insights,
       analytics,
