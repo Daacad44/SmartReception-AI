@@ -77,7 +77,7 @@ export class AiTrainingMgmtController {
       const allVersions = await versionService.listVersions(req.user!.businessId!);
       const versions = req.user!.isSuperAdmin
         ? allVersions
-        : allVersions.filter((v) => v.status === 'PRODUCTION' || v.status === 'ARCHIVED');
+        : allVersions.filter((v: { status: string }) => v.status === 'PRODUCTION' || v.status === 'ARCHIVED');
       res.json({ success: true, data: versions });
     } catch (error) {
       next(error);
