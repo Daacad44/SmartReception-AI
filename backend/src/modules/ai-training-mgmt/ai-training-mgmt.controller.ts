@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { ForbiddenError } from '../../core/errors';
 import { aiTrainingMgmtService } from './ai-training-mgmt.service';
 import { trainingJobService } from './training-job.service';
 import { versionService } from './version.service';
@@ -73,7 +74,10 @@ export class AiTrainingMgmtController {
 
   listVersions = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const versions = await versionService.listVersions(req.user!.businessId!);
+      const allVersions = await versionService.listVersions(req.user!.businessId!);
+      const versions = req.user!.isSuperAdmin
+        ? allVersions
+        : allVersions.filter((v) => v.status === 'PRODUCTION' || v.status === 'ARCHIVED');
       res.json({ success: true, data: versions });
     } catch (error) {
       next(error);
@@ -118,6 +122,9 @@ export class AiTrainingMgmtController {
 
   createSandboxSession = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      if (!req.user!.isSuperAdmin) {
+        throw new ForbiddenError('Sandbox testing is only available to Super Admins');
+      }
       const session = await sandboxService.createSession(
         req.user!.businessId!,
         req.body.versionId,

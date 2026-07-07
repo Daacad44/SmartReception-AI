@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   Bot,
+  Brain,
   Building2,
+  ClipboardCheck,
   Layers,
   RefreshCw,
   Search,
@@ -124,21 +126,29 @@ export function EnterpriseAiIntelligenceAdminPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Bot className="h-6 w-6 text-accent" />
-            Enterprise AI Intelligence
+            <Brain className="h-6 w-6 text-accent" />
+            AI Training Management
           </h1>
           <p className="text-muted-foreground">
             Central management for AI training, upload, validation, deployment, and monitoring
           </p>
         </div>
-        <div className="relative w-full lg:w-72">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search businesses..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <Link to="/admin/ai-deployments">
+              <ClipboardCheck className="h-4 w-4" />
+              Pending Approvals
+            </Link>
+          </Button>
+          <div className="relative w-full lg:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search businesses..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 

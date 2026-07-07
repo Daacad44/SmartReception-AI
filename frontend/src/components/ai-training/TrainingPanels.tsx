@@ -18,14 +18,35 @@ interface DeploymentRequest {
 
 interface DeploymentPanelProps {
   readOnly?: boolean;
+  businessId?: string;
 }
 
-export function DeploymentPanel({ readOnly }: DeploymentPanelProps) {
+export function DeploymentPanel({ readOnly, businessId }: DeploymentPanelProps) {
   const queryClient = useQueryClient();
+  const isAdmin = Boolean(businessId);
 
   const { data: dashboard } = useQuery({
-    queryKey: ['ai-training', 'overview'],
+    queryKey: isAdmin
+      ? ['enterprise-ai-intelligence', 'business', businessId]
+      : ['ai-training', 'overview'],
     queryFn: async () => {
+      if (isAdmin) {
+        const response = await api.get(
+          `/super-admin/enterprise-ai-intelligence/businesses/${businessId}`
+        );
+        const detail = await extractData<{
+          sandboxVersionId?: string | null;
+          versions: Array<{ id: string; versionNumber: number; status: string }>;
+          deploymentRequests?: DeploymentRequest[];
+        }>(response);
+        const sandboxVer = detail.versions.find((v) => v.status === 'SANDBOX');
+        return {
+          sandboxVersion: sandboxVer
+            ? { id: sandboxVer.id, versionNumber: sandboxVer.versionNumber, status: sandboxVer.status }
+            : undefined,
+          deploymentRequests: detail.deploymentRequests ?? [],
+        };
+      }
       const response = await api.get('/ai-training');
       return extractData<{
         sandboxVersion?: { id: string; versionNumber: number; status: string };
@@ -44,7 +65,11 @@ export function DeploymentPanel({ readOnly }: DeploymentPanelProps) {
     },
     onSuccess: () => {
       toast.success('Deployment request submitted for Super Admin approval');
-      queryClient.invalidateQueries({ queryKey: ['ai-training'] });
+      queryClient.invalidateQueries({
+        queryKey: isAdmin
+          ? ['enterprise-ai-intelligence', 'business', businessId]
+          : ['ai-training'],
+      });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -133,21 +158,51 @@ export function DeploymentPanel({ readOnly }: DeploymentPanelProps) {
   );
 }
 
-export function AiTrainingVersionsPanel() {
+interface VersionData {
+  id: string;
+  versionNumber: number;
+  status: string;
+  knowledgeScore: number | null;
+  confidenceScore: number | null;
+  readinessScore: number | null;
+  createdAt: string;
+}
+
+interface AiTrainingVersionsPanelProps {
+  businessId?: string;
+  onRequestTrain?: () => void;
+}
+
+export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTrainingVersionsPanelProps) {
+  const isAdmin = Boolean(businessId);
+
   const { data: dashboard, refetch } = useQuery({
-    queryKey: ['ai-training', 'overview'],
+    queryKey: isAdmin
+      ? ['enterprise-ai-intelligence', 'business', businessId]
+      : ['ai-training', 'overview'],
     queryFn: async () => {
+      if (isAdmin) {
+        const response = await api.get(
+          `/super-admin/enterprise-ai-intelligence/businesses/${businessId}`
+        );
+        const detail = await extractData<{
+          versions: VersionData[];
+          knowledgeVersion?: number | null;
+          sandboxVersionId?: string | null;
+        }>(response);
+        const prodVer = detail.versions.find((v) => v.status === 'PRODUCTION');
+        const sandboxVer = detail.versions.find((v) => v.status === 'SANDBOX');
+        return {
+          versions: detail.versions,
+          workspace: {
+            productionVersion: prodVer ? { versionNumber: prodVer.versionNumber } : undefined,
+            sandboxVersion: sandboxVer ? { versionNumber: sandboxVer.versionNumber } : undefined,
+          },
+        };
+      }
       const response = await api.get('/ai-training');
       return extractData<{
-        versions: Array<{
-          id: string;
-          versionNumber: number;
-          status: string;
-          knowledgeScore: number | null;
-          confidenceScore: number | null;
-          readinessScore: number | null;
-          createdAt: string;
-        }>;
+        versions: VersionData[];
         workspace: {
           productionVersion?: { versionNumber: number };
           sandboxVersion?: { versionNumber: number };
@@ -176,10 +231,17 @@ export function AiTrainingVersionsPanel() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => startTraining.mutate()} disabled={startTraining.isPending} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${startTraining.isPending ? 'animate-spin' : ''}`} />
-          Train AI
-        </Button>
+        {isAdmin && onRequestTrain ? (
+          <Button onClick={onRequestTrain} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Train AI (OTP Required)
+          </Button>
+        ) : (
+          <Button onClick={() => startTraining.mutate()} disabled={startTraining.isPending} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${startTraining.isPending ? 'animate-spin' : ''}`} />
+            Train AI
+          </Button>
+        )}
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
