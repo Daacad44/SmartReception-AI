@@ -59,7 +59,7 @@ export function BillingPage() {
       <div>
         <h1 className="text-2xl font-bold">Billing</h1>
         <p className="text-muted-foreground">
-          View your subscription and usage. Plan changes are managed by SmartReception support.
+          View your subscription and usage. Plan changes are managed by SomReception AI support.
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export function BillingPage() {
             </p>
           </div>
           <Button variant="outline" size="sm" asChild>
-            <a href="mailto:support@botandev.com?subject=Subscription%20Inquiry">
+            <a href="mailto:support@somreception.com?subject=Subscription%20Inquiry">
               <Mail className="mr-2 h-4 w-4" />
               Contact Support
             </a>

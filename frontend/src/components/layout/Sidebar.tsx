@@ -23,6 +23,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LogoMark } from '@/components/Logo';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -109,12 +110,12 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
           collapsed ? 'justify-center px-2' : 'gap-3 px-6'
         )}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent">
-          <Bot className="h-5 w-5 text-white" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#090B14]">
+          <LogoMark size={22} />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold leading-tight">SmartReception</h1>
+            <h1 className="text-sm font-bold leading-tight">SomReception</h1>
             <p className="text-xs text-white/60">AI Platform</p>
           </div>
         )}
