@@ -43,6 +43,16 @@ export default {
         danger: 'hsl(var(--destructive))',
         navy: 'hsl(var(--navy))',
         umber: 'hsl(var(--accent))',
+        brand: {
+          bg: '#090B14',
+          secondary: '#111827',
+          card: '#161F2F',
+          gold: '#FBBF24',
+          amber: '#F59E0B',
+          text: '#FFFFFF',
+          muted: '#94A3B8',
+          success: '#22C55E',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -62,10 +72,29 @@ export default {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        marquee: {
+          to: { transform: 'translateX(-50%)' },
+        },
+        'brand-float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-14px)' },
+        },
+        'brand-glow': {
+          '0%, 100%': { opacity: '0.5', transform: 'scale(1)' },
+          '50%': { opacity: '0.85', transform: 'scale(1.08)' },
+        },
+        'brand-gridpan': {
+          to: { backgroundPosition: '44px 44px' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        marquee: 'marquee 30s linear infinite',
+        'marquee-slow': 'marquee 45s linear infinite',
+        'brand-float': 'brand-float 5s ease-in-out infinite',
+        'brand-glow': 'brand-glow 8s ease-in-out infinite',
+        'brand-gridpan': 'brand-gridpan 6s linear infinite',
       },
     },
   },

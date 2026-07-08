@@ -2,11 +2,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
-import { Bot, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Logo, LogoMark } from '@/components/Logo';
 import { useAuth } from '@/hooks/useAuth';
 
 const loginSchema = z.object({
@@ -29,13 +30,8 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="hidden flex-1 flex-col justify-between bg-navy p-12 text-white lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-            <Bot className="h-6 w-6" />
-          </div>
-          <span className="text-xl font-bold">SmartReception AI</span>
-        </div>
+      <div className="hidden flex-1 flex-col justify-between bg-[#090B14] p-12 text-white lg:flex">
+        <Logo iconSize={40} />
         <div>
           <h2 className="mb-4 text-4xl font-bold leading-tight">
             AI-Powered WhatsApp<br />Business Automation
@@ -44,17 +40,17 @@ export function LoginPage() {
             Automate customer conversations, manage appointments, and grow your business with intelligent AI assistance.
           </p>
         </div>
-        <p className="text-sm text-white/40">© 2025 SmartReception AI. All rights reserved.</p>
+        <p className="text-sm text-white/40">© 2025 SomReception AI. All rights reserved.</p>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-8">
         <Card className="w-full max-w-md border-0 shadow-xl">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-navy lg:hidden">
-              <Bot className="h-6 w-6 text-white" />
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-[#090B14] lg:hidden">
+              <LogoMark size={32} />
             </div>
             <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your SmartReception account</CardDescription>
+            <CardDescription>Sign in to your SomReception AI account</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">

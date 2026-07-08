@@ -3,11 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Bot, Mail, Lock, User, ArrowRight, Check, X, Building2, Phone } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, X, Building2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Logo } from '@/components/Logo';
 import { useAuth } from '@/hooks/useAuth';
 import api, { extractData } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -95,13 +96,8 @@ export function RegisterPage() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="hidden flex-1 flex-col justify-between bg-navy p-12 text-white lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-            <Bot className="h-6 w-6" />
-          </div>
-          <span className="text-xl font-bold">SmartReception AI</span>
-        </div>
+      <div className="hidden flex-1 flex-col justify-between bg-[#090B14] p-12 text-white lg:flex">
+        <Logo iconSize={40} />
         <div>
           <h2 className="mb-4 text-4xl font-bold leading-tight">
             Isdiiwaangeli<br />ganacsigaaga
@@ -110,14 +106,14 @@ export function RegisterPage() {
             Abuur AI Receptionist, WhatsApp automation, iyo CRM — dhammaan hal madal.
           </p>
         </div>
-        <p className="text-sm text-white/40">© 2025 SmartReception AI</p>
+        <p className="text-sm text-white/40">© 2025 SomReception AI</p>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-6 md:p-8">
         <Card className="w-full max-w-md border-0 shadow-xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Abuur Akoon</CardTitle>
-            <CardDescription>Bilow safarkaaga SmartReception AI</CardDescription>
+            <CardDescription>Bilow safarkaaga SomReception AI</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -125,7 +121,7 @@ export function RegisterPage() {
                 <Label>Magaca Ganacsiga *</Label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="pl-9" placeholder="Tusaale: SmartReception AI" {...register('businessName')} />
+                  <Input className="pl-9" placeholder="Tusaale: SomReception AI" {...register('businessName')} />
                 </div>
                 {errors.businessName && <p className="text-xs text-destructive">{errors.businessName.message}</p>}
               </div>

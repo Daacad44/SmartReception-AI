@@ -45,7 +45,7 @@ export function SubscriptionExpiredPage() {
             <CardTitle className="text-2xl">Subscription Expired</CardTitle>
             <CardDescription className="text-slate-400">
               Your subscription has expired. Please contact support or renew your subscription to
-              restore full access to SmartReception AI.
+              restore full access to SomReception AI.
             </CardDescription>
           </div>
         </CardHeader>
@@ -75,13 +75,13 @@ export function SubscriptionExpiredPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button className="flex-1" asChild>
-              <a href="mailto:support@botandev.com?subject=SmartReception%20Subscription%20Renewal">
+              <a href="mailto:support@somreception.com?subject=SomReception%20AI%20Subscription%20Renewal">
                 <Mail className="mr-2 h-4 w-4" />
                 Contact Support
               </a>
             </Button>
             <Button variant="secondary" className="flex-1" asChild>
-              <a href="mailto:support@botandev.com?subject=Subscription%20Renewal%20Request">
+              <a href="mailto:support@somreception.com?subject=Subscription%20Renewal%20Request">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Request Renewal
               </a>
