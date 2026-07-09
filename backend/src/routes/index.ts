@@ -59,7 +59,11 @@ const router = Router();
 router.use('/auth', authRoutes);
 router.use('/trainer-portal', trainerPortalRoutes);
 router.use('/webhooks', webhooksRoutes);
-router.use('/super-admin', superAdminRoutes);
+// Specific /super-admin/* mounts must be registered BEFORE the general
+// /super-admin mount. The general router applies a blanket requireSuperAdmin
+// guard, so if it matched first it would shadow the more specific routers and
+// reject their non-super-admin-accessible endpoints (e.g. the public feature
+// map used to render every user's navigation menu).
 router.use('/super-admin/feature-management', featureManagementRoutes);
 router.use('/super-admin/ai-training', aiTrainingAdminRoutes);
 router.use('/super-admin/ai-training-center', aiTrainingCenterRoutes);
@@ -68,6 +72,7 @@ router.use('/super-admin/financial-intelligence', financialIntelligenceAdminRout
 router.use('/super-admin/enterprise-ai-intelligence', enterpriseAiIntelligenceAdminRoutes);
 router.use('/super-admin/business-intelligence', businessIntelligenceAdminRoutes);
 router.use('/super-admin/subscriptions', subscriptionAdminRoutes);
+router.use('/super-admin', superAdminRoutes);
 router.use('/subscription', subscriptionRoutes);
 
 // Onboarding: auth only — users may not have businessId yet (pre- and mid-onboarding)
