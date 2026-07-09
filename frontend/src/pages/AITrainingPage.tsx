@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -82,10 +82,6 @@ interface AdminBusinessDetail {
   jobs: Array<{ id: string; type: string; status: string; progress: number; currentStep?: string | null }>;
 }
 
-interface AITrainingPageProps {
-  businessId?: string;
-}
-
 const ADMIN_STEPS = [
   { key: 'profile', label: 'Business Info', icon: Bot },
   { key: 'documents', label: 'Knowledge Library', icon: FileText },
@@ -153,7 +149,8 @@ function StepIndicator({
   );
 }
 
-export function AITrainingPage({ businessId }: AITrainingPageProps = {}) {
+export function AITrainingPage() {
+  const { businessId } = useParams<{ businessId?: string }>();
   const isAdmin = Boolean(businessId);
   const [searchParams] = useSearchParams();
   const [activationRequest, setActivationRequest] = useState<GovernanceApprovalRequest | null>(null);
