@@ -1,5 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { broadcastConversationEvent } from '../../infrastructure/realtime/broadcast.service';
 import {
   recordOutboundAttempt,
@@ -38,10 +39,39 @@ export async function sendAutomatedReply(params: SendAutomatedReplyParams): Prom
 
   recordOutboundAttempt(businessId, content);
 
+  const resolvedToken = resolveStoredToken(accessToken) ?? accessToken;
+  if (resolvedToken) {
+    const tokenValid = await whatsappRepository.validateAccessToken(phoneNumberId, resolvedToken);
+    if (!tokenValid) {
+      const graphError = {
+        code: 190,
+        message: 'WhatsApp access token expired or invalid',
+        recipient: customerPhone,
+      };
+      recordGraphApiError(businessId, graphError);
+      logger.warn('Automated WhatsApp send blocked — invalid access token', { conversationId, phoneNumberId });
+
+      await prisma.message.create({
+        data: {
+          conversationId,
+          direction: 'OUTBOUND',
+          content,
+          type: 'TEXT',
+          isAiGenerated: true,
+          status: 'FAILED',
+          metadata: { ...metadata, graphApiError: graphError } as object,
+        },
+      });
+
+      void broadcastConversationEvent(businessId, { conversationId, type: 'message' }).catch(() => {});
+      return false;
+    }
+  }
+
   const sendResult = await whatsappService.sendOutbound({
     phoneNumberId,
     to: customerPhone,
-    accessToken,
+    accessToken: resolvedToken,
     type: 'TEXT',
     content,
   });

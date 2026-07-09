@@ -62,6 +62,18 @@ function mapMessageStatus(status: string | null | undefined): Message['status'] 
 }
 
 const WHATSAPP_SESSION_ERROR_CODES = new Set([131047, 131026]);
+const WHATSAPP_AUTH_ERROR_CODES = new Set([10, 190, 102, 401]);
+
+function isWhatsAppAuthError(code?: number, message?: string): boolean {
+  if (code && WHATSAPP_AUTH_ERROR_CODES.has(code)) return true;
+  const text = (message ?? '').toLowerCase();
+  return (
+    text.includes('authentication error') ||
+    text.includes('error validating access token') ||
+    text.includes('invalid oauth') ||
+    text.includes('session has expired')
+  );
+}
 
 function parseDeliveryError(metadata: unknown): string | undefined {
   if (!metadata || typeof metadata !== 'object') return undefined;
@@ -70,6 +82,9 @@ function parseDeliveryError(metadata: unknown): string | undefined {
   const graphError = meta.graphApiError as { code?: number | string; message?: string } | undefined;
   if (graphError?.code && WHATSAPP_SESSION_ERROR_CODES.has(Number(graphError.code))) {
     return graphError.message ?? 'WhatsApp session expired (24-hour window)';
+  }
+  if (isWhatsAppAuthError(Number(graphError?.code), graphError?.message)) {
+    return 'WhatsApp access token expired or invalid. Reconnect WhatsApp in Settings → WhatsApp.';
   }
 
   const deliveryErrors = meta.deliveryErrors as
@@ -82,6 +97,9 @@ function parseDeliveryError(metadata: unknown): string | undefined {
       first.message ??
       'WhatsApp session expired (24-hour window)'
     );
+  }
+  if (isWhatsAppAuthError(first?.code, first?.message ?? first?.error_data?.details)) {
+    return 'WhatsApp access token expired or invalid. Reconnect WhatsApp in Settings → WhatsApp.';
   }
 
   if (graphError?.message) return graphError.message;

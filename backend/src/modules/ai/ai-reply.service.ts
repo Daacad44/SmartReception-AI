@@ -16,6 +16,7 @@ import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenan
 import type { LeadData } from '../../infrastructure/ai/ai.types';
 import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 import { shouldAiReply } from '../conversations/conversation-handoff.service';
+import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -154,10 +155,12 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
   recordOutboundAttempt(businessId, replyContent);
   console.log('[WhatsApp] Sending reply');
 
+  const resolvedToken = resolveStoredToken(accessToken) ?? accessToken;
+
   const sendResult = await whatsappService.sendOutbound({
     phoneNumberId,
     to: customerPhone,
-    accessToken,
+    accessToken: resolvedToken,
     type: 'TEXT',
     content: replyContent,
   });
