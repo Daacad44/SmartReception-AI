@@ -30,7 +30,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useConversations, useMessages, useConversationTemplates } from '@/hooks/useApi';
+import { useConversations, useMessages, useConversationTemplates, useWhatsAppHealth } from '@/hooks/useApi';
 import { useSendMessage, useTakeoverConversation, useTransferToAi, useMarkConversationRead } from '@/hooks/useMutations';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConversationRealtime } from '@/hooks/useRealtime';
@@ -84,6 +84,8 @@ export function ConversationsPage() {
     status: statusFilter,
     search: debouncedSearch || undefined,
   });
+  const { data: whatsappHealth } = useWhatsAppHealth({ live: true });
+  const whatsappTokenInvalid = whatsappHealth?.tokenStatus === 'invalid';
   const { data: messagesData, isLoading: messagesLoading, isError: messagesError, isFetching: messagesFetching, refetch: refetchMessages } = useMessages(selectedId);
   const { data: templates, isLoading: templatesLoading } = useConversationTemplates();
   const messages = messagesData?.messages;
@@ -148,7 +150,24 @@ export function ConversationsPage() {
   }, [filtered, selectedId, handleSelect]);
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] -m-4 md:-m-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-7rem)] -m-4 md:-m-6 flex-col overflow-hidden">
+      {whatsappTokenInvalid && (
+        <div className="mb-3 flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-medium text-destructive">WhatsApp token expired or invalid</p>
+              <p className="text-sm text-muted-foreground">
+                AI replies cannot reach customers until you reconnect WhatsApp in Settings.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="destructive" onClick={() => navigate('/settings?tab=whatsapp')}>
+            Reconnect WhatsApp
+          </Button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Left pane - conversation list */}
       <div
         className={cn(
@@ -573,6 +592,7 @@ export function ConversationsPage() {
             Contact details will appear here
           </div>
         )}
+      </div>
       </div>
     </div>
   );
