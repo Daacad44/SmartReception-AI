@@ -104,13 +104,16 @@ setCatchHandler(async ({ request }) => {
 // ---------------------------------------------------------------------------
 // Update lifecycle
 // ---------------------------------------------------------------------------
+// registerType is 'prompt': a new SW installs and *waits*. We only activate it
+// when the user accepts the "Update available" prompt, which posts SKIP_WAITING.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-self.skipWaiting();
+// Take control of open pages as soon as this SW activates (so offline works
+// on the very first load without a manual refresh).
 clientsClaim();
 
 // ---------------------------------------------------------------------------
