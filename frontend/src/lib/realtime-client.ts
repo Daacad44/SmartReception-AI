@@ -34,17 +34,35 @@ export interface RealtimeClientOptions {
 }
 
 export class RealtimeClient {
+  /**
+   * Give up after this many consecutive failed reconnect attempts. When the
+   * handshake keeps failing (endpoint unreachable, or a JWT that the gateway
+   * rejects — e.g. a platform session with no `businessId` claim), retrying
+   * forever only floods the console with "WebSocket connection failed". A
+   * healthy connection resets the counter on `open`, so this only trips on a
+   * persistent failure. Realtime is a progressive enhancement — React Query
+   * still refetches on its own when it's off.
+   */
+  private static readonly MAX_RECONNECT_TRIES = 8;
+
   private socket: WebSocket | null = null;
   private listeners = new Set<Listener>();
   private subscribed = new Set<string>();
   private reconnectTries = 0;
   private reconnectTimer: number | null = null;
   private closedIntentionally = false;
+  private gaveUp = false;
 
   constructor(private readonly options: RealtimeClientOptions) {}
 
   connect(): void {
     this.closedIntentionally = false;
+    // An explicit connect() (e.g. after re-auth or a fresh mount) restarts the
+    // reconnect budget so a previously exhausted client can recover.
+    if (this.gaveUp) {
+      this.gaveUp = false;
+      this.reconnectTries = 0;
+    }
     const token = this.options.getToken();
     if (!token) return; // will retry when connect() is called after login
     const url = `${this.options.url}?token=${encodeURIComponent(token)}`;
@@ -124,7 +142,15 @@ export class RealtimeClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer !== null) return;
+    if (this.reconnectTimer !== null || this.gaveUp) return;
+    if (this.reconnectTries >= RealtimeClient.MAX_RECONNECT_TRIES) {
+      this.gaveUp = true;
+      console.warn(
+        `Realtime: giving up after ${this.reconnectTries} failed connection attempts. ` +
+          'Live updates are disabled for this session; data still refreshes on navigation.'
+      );
+      return;
+    }
     const delay = Math.min(1000 * 2 ** this.reconnectTries, 10_000);
     this.reconnectTries++;
     this.reconnectTimer = window.setTimeout(() => {

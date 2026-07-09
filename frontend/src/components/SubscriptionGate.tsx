@@ -18,13 +18,14 @@ export interface LicenseStatus {
   remainingTime: number | null;
 }
 
-export function useSubscriptionLicense() {
+export function useSubscriptionLicense(enabled = true) {
   return useQuery({
     queryKey: ['subscription', 'license'],
     queryFn: async () => {
       const res = await api.get('/billing/license');
       return extractData<LicenseStatus>(res);
     },
+    enabled,
     staleTime: 30_000,
     retry: 1,
   });
@@ -35,9 +36,13 @@ const BLOCKED_STATUSES = new Set(['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING'
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { hasPermission } = usePermissions();
-  const { data, isLoading, isError } = useSubscriptionLicense();
+  const isPlatformAdmin = hasPermission('platform:admin');
+  // Platform admins bypass the license gate entirely, so don't even fire the
+  // business-scoped /billing/license request for them — it only returns a
+  // 401/403 (no business license context) and clutters the console.
+  const { data, isLoading, isError } = useSubscriptionLicense(!isPlatformAdmin);
 
-  if (hasPermission('platform:admin')) {
+  if (isPlatformAdmin) {
     return <>{children}</>;
   }
 
