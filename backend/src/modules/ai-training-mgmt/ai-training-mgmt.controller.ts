@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { AiTrainingJobType, GovernanceActionType } from '@prisma/client';
 import { ForbiddenError } from '../../core/errors';
+import { governanceService, buildGovernanceContext } from '../governance/governance.service';
 import { aiTrainingMgmtService } from './ai-training-mgmt.service';
 import { trainingJobService } from './training-job.service';
 import { versionService } from './version.service';
@@ -8,6 +10,20 @@ import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { parseDeviceLabel } from './audit.service';
+
+function jobTypeToGovernanceAction(type: AiTrainingJobType): GovernanceActionType {
+  switch (type) {
+    case 'RETRAIN':
+    case 'PARTIAL_RETRAIN':
+    case 'INCREMENTAL_RETRAIN':
+      return 'AI_RETRAIN';
+    case 'EMBED_DOCUMENTS':
+    case 'REINDEX':
+      return 'AI_REBUILD_EMBEDDINGS';
+    default:
+      return 'AI_TRAIN';
+  }
+}
 
 function auditFromReq(req: Request) {
   return {
@@ -31,10 +47,33 @@ export class AiTrainingMgmtController {
 
   startTraining = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { type = 'FULL_TRAIN', trainingNotes, documentIds } = req.body;
+      const { type = 'FULL_TRAIN', trainingNotes, documentIds } = req.body as {
+        type?: AiTrainingJobType;
+        trainingNotes?: string;
+        documentIds?: string[];
+      };
+
+      // Spec Steps 1–6: a business may never start training immediately. Route
+      // through governance, which requires Super Admin approval + a redeemed
+      // activation code. Super Admins (the authorizing party) proceed directly.
+      const guard = await governanceService.guardAction(buildGovernanceContext(req), {
+        actionType: jobTypeToGovernanceAction(type ?? 'FULL_TRAIN'),
+        payload: { type: type ?? 'FULL_TRAIN', trainingNotes, documentIds },
+      });
+      if (!guard.proceed) {
+        res.status(202).json({
+          success: true,
+          approvalRequired: true,
+          message:
+            'For security reasons, AI Training requires administrator authorization. Please request a verification code from the platform administrator.',
+          data: guard.request,
+        });
+        return;
+      }
+
       const result = await trainingJobService.createJob({
         businessId: req.user!.businessId!,
-        type,
+        type: type ?? 'FULL_TRAIN',
         userId: req.user!.userId,
         trainingNotes,
         documentIds,

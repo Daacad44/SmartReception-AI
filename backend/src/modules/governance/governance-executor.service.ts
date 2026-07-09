@@ -6,7 +6,11 @@ import { storageService } from '../../infrastructure/storage';
 import { decryptToken, encryptToken, isEncryptedToken } from '../../infrastructure/crypto/token-crypto';
 import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
-import type { GovernanceApprovalRequest, GovernanceActionType } from '@prisma/client';
+import type {
+  GovernanceApprovalRequest,
+  GovernanceActionType,
+  AiTrainingJobType,
+} from '@prisma/client';
 import type { CreateFaqInput } from '@smartreception/shared';
 import { NotFoundError } from '../../core/errors';
 
@@ -129,6 +133,28 @@ export async function executeGovernanceAction(
       invalidateKnowledgeCache(businessId);
       invalidateBusinessTenantCache(businessId);
       return { affected: result.count };
+    }
+    case 'AI_TRAIN':
+    case 'AI_RETRAIN':
+    case 'AI_REBUILD_EMBEDDINGS': {
+      // Authorization redeemed — now queue the versioned training pipeline
+      // (train → sandbox → deployment). The job type is taken from the staged
+      // payload, falling back to a sensible default per action.
+      const { trainingJobService } = await import('../ai-training-mgmt/training-job.service');
+      const fallback: Record<string, AiTrainingJobType> = {
+        AI_TRAIN: 'FULL_TRAIN',
+        AI_RETRAIN: 'RETRAIN',
+        AI_REBUILD_EMBEDDINGS: 'EMBED_DOCUMENTS',
+      };
+      const jobType = (payload.type as AiTrainingJobType) ?? fallback[request.actionType];
+      const result = await trainingJobService.createJob({
+        businessId,
+        type: jobType,
+        userId,
+        trainingNotes: payload.trainingNotes as string | undefined,
+        documentIds: payload.documentIds as string[] | undefined,
+      });
+      return { jobId: result.job.id, existing: result.existing, type: jobType };
     }
     case 'WHATSAPP_CONNECT':
       return whatsappModuleService.connectAccount(businessId, {
