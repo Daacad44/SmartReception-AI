@@ -37,7 +37,7 @@ export function StatsSection() {
             key={label}
             className="group relative overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-gold/35 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
           >
-            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-brand-gold/10 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
+            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-brand-gold/10 [mask-image:radial-gradient(closest-side,#000,transparent)] [-webkit-mask-image:radial-gradient(closest-side,#000,transparent)] transition-opacity duration-300 group-hover:opacity-100" />
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gold/[0.12] transition-transform duration-300 group-hover:scale-110">
               <Icon className="h-[22px] w-[22px] text-brand-gold" />
             </div>

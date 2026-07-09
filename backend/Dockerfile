@@ -40,4 +40,6 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD ["node", "dist/server.js"]
+# Apply any pending database migrations, then start the API. The worker service
+# overrides this command, so migrations run once (from the backend container).
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

@@ -15,6 +15,8 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
 import { TwoFactorLoginPage } from '@/pages/TwoFactorLoginPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
+import { ApplicationPendingPage } from '@/pages/ApplicationPendingPage';
+import { ActivatePage } from '@/pages/ActivatePage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
@@ -25,6 +27,7 @@ import { FeatureRoute } from '@/components/FeatureRoute';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { PwaInstallProvider, PwaGlobals } from '@/pwa';
 
 const ConversationsPage = lazyWithRetry(() =>
   import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
@@ -103,6 +106,9 @@ const TrainerSandboxPage = lazyWithRetry(() =>
 const BusinessManagementPage = lazyWithRetry(() =>
   import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
 );
+const BusinessApplicationsPage = lazyWithRetry(() =>
+  import('@/pages/BusinessApplicationsPage').then((m) => ({ default: m.BusinessApplicationsPage }))
+);
 const UserManagementPage = lazyWithRetry(() =>
   import('@/pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
 );
@@ -169,6 +175,7 @@ export default function App() {
       <HydrationGate>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
+            <PwaInstallProvider>
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<RootRedirect />} />
@@ -192,6 +199,8 @@ export default function App() {
                 <Route path="/verify-2fa" element={<TwoFactorLoginPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
+                <Route path="/application-pending" element={<ApplicationPendingPage />} />
+                <Route path="/activate" element={<ActivatePage />} />
                 <Route
                   path="/onboarding"
                   element={
@@ -452,6 +461,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/admin/applications"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <BusinessApplicationsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
                     path="/admin/users"
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
@@ -527,6 +544,8 @@ export default function App() {
                 <Route path="*" element={<RootRedirect />} />
               </Routes>
             </BrowserRouter>
+            <PwaGlobals />
+            </PwaInstallProvider>
             <Toaster position="top-right" richColors />
           </TooltipProvider>
         </QueryClientProvider>

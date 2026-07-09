@@ -13,8 +13,41 @@ import { routeParam } from '../../core/utils';
 import { z } from 'zod';
 
 import { aiAnalyticsService } from '../ai-analytics/ai-analytics.service';
+import { authService } from '../auth/auth.service';
+
+const applicationStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
+const rejectApplicationSchema = z.object({ reason: z.string().max(500).optional() });
 
 export class SuperAdminController {
+  async listApplications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = applicationStatusSchema.catch('PENDING').parse(req.query.status);
+      const data = await authService.listApplications(status);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async approveApplication(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await authService.approveApplication(routeParam(req.params.id), req.user!.userId);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async rejectApplication(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { reason } = rejectApplicationSchema.parse(req.body ?? {});
+      const data = await authService.rejectApplication(routeParam(req.params.id), reason);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async stats(_req: Request, res: Response, next: NextFunction) {
     try {
       const data = await superAdminService.getPlatformStats();

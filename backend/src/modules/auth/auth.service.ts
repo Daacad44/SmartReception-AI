@@ -9,8 +9,18 @@ import {
   NotFoundError,
   EmailNotVerifiedError,
   ValidationError,
+  ApplicationPendingError,
+  ApplicationAwaitingCodeError,
+  ApplicationRejectedError,
 } from '../../core/errors';
 import { RegisterInput, LoginInput } from '@smartreception/shared';
+
+// Activation codes (sent after Super Admin approval) live longer than the
+// 10-minute email OTP so a business has time to act after being approved.
+const APPROVAL_CODE_EXPIRY_MINUTES = 30;
+function approvalCodeExpiry(): Date {
+  return new Date(Date.now() + APPROVAL_CODE_EXPIRY_MINUTES * 60 * 1000);
+}
 import { prisma } from '../../infrastructure/database/prisma';
 import {
   assertLoginAllowed,
@@ -34,8 +44,9 @@ export class AuthService {
     }
 
     const passwordHash = await passwordService.hash(input.password);
-    const otpCode = otpService.generateCode();
 
+    // New businesses are held for Super Admin approval — no auto-activation and
+    // no business is created until the applicant enters the approval code.
     const user = await authRepository.createUser({
       email: input.email,
       passwordHash,
@@ -43,17 +54,18 @@ export class AuthService {
       lastName: input.lastName,
       phone: input.phone,
       pendingBusinessName: input.businessName,
-      emailOtpHash: otpService.hashCode(otpCode),
-      emailOtpExpires: otpService.getExpiry(),
-      emailOtpAttempts: 0,
+      approvalStatus: 'PENDING',
     });
 
-    await emailService.sendOtpEmail(user.email, otpCode, user.firstName, 'verification');
+    await emailService
+      .sendApplicationReceivedEmail(user.email, user.firstName, input.businessName)
+      .catch(() => undefined);
 
     return {
-      message: 'Registration successful. Please verify your email to continue.',
+      message:
+        'Application submitted. A Super Admin will review your business shortly and email you an activation code.',
       email: user.email,
-      requiresVerification: true,
+      requiresApproval: true,
     };
   }
 
@@ -78,6 +90,21 @@ export class AuthService {
     }
 
     clearLoginAttempts(input.email, ipAddress);
+
+    // Business application / approval gate.
+    if (user.approvalStatus === 'PENDING') {
+      throw new ApplicationPendingError();
+    }
+    if (user.approvalStatus === 'REJECTED') {
+      throw new ApplicationRejectedError(
+        user.rejectionReason
+          ? `Your application was declined: ${user.rejectionReason}`
+          : undefined
+      );
+    }
+    if (user.approvalStatus === 'APPROVED') {
+      throw new ApplicationAwaitingCodeError();
+    }
 
     if (!user.isEmailVerified) {
       throw new EmailNotVerifiedError();
@@ -286,19 +313,31 @@ export class AuthService {
 
     await authRepository.updateUser(user.id, {
       isEmailVerified: true,
+      approvalStatus: 'ACTIVE',
       emailOtpHash: null,
       emailOtpExpires: null,
       emailOtpAttempts: 0,
     });
 
+    return this.completeActivation(user.id, 'Email verified successfully.');
+  }
+
+  /**
+   * Creates the applicant's business (if they don't have one yet), sends the
+   * welcome email and issues a token pair. Shared by email-OTP verification and
+   * the Super Admin approval-code activation flow.
+   */
+  private async completeActivation(userId: string, message: string) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new NotFoundError('User not found');
+
     let memberships = await authRepository.getUserBusinesses(user.id);
 
     if (memberships.length === 0) {
-      const freshUser = await authRepository.findUserById(user.id);
       const businessName =
-        freshUser?.pendingBusinessName?.trim() ||
-        [freshUser?.firstName, freshUser?.lastName].filter(Boolean).join(' ').trim() ||
-        freshUser?.email.split('@')[0] ||
+        user.pendingBusinessName?.trim() ||
+        [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+        user.email.split('@')[0] ||
         'Ganacsigayga';
 
       let slug = slugify(businessName) || `business-${user.id.slice(0, 8)}`;
@@ -309,22 +348,21 @@ export class AuthService {
         await authRepository.createBusinessWithOwner(user.id, {
           name: businessName,
           slug,
-          phone: freshUser?.phone ?? undefined,
+          phone: user.phone ?? undefined,
           onboardingStep: 0,
         });
         await authRepository.updateUser(user.id, { pendingBusinessName: null });
-        memberships = await authRepository.getUserBusinesses(user.id);
       } catch {
-        memberships = await authRepository.getUserBusinesses(user.id);
+        /* business may already exist from a concurrent request */
       }
+      memberships = await authRepository.getUserBusinesses(user.id);
     }
 
     const businessName = memberships[0]?.business.name ?? 'ganacsigaaga';
 
-    await emailService.sendWelcomeEmail(user.email, {
-      firstName: user.firstName,
-      businessName,
-    });
+    await emailService
+      .sendWelcomeEmail(user.email, { firstName: user.firstName, businessName })
+      .catch(() => undefined);
 
     const tokens = await tokenService.createTokenPair(
       user.id,
@@ -337,7 +375,7 @@ export class AuthService {
       memberships.length === 0 || !memberships[0]?.business.onboardingCompletedAt;
 
     return {
-      message: 'Email verified successfully.',
+      message,
       requiresOnboarding: needsOnboarding,
       user: {
         id: user.id,
@@ -355,6 +393,156 @@ export class AuthService {
       })),
       ...tokens,
     };
+  }
+
+  /**
+   * Applicant enters the activation code emailed after Super Admin approval.
+   * Activates the account, creates the business and logs them in.
+   */
+  async verifyApprovalCode(email: string, code: string) {
+    const user = await authRepository.findUserByEmail(email);
+    if (!user) {
+      throw new NotFoundError('Invalid activation code');
+    }
+
+    if (user.approvalStatus === 'ACTIVE') {
+      return this.completeActivation(user.id, 'Account already activated.');
+    }
+
+    if (user.approvalStatus === 'PENDING') {
+      throw new ApplicationPendingError();
+    }
+
+    if (user.approvalStatus === 'REJECTED') {
+      throw new ApplicationRejectedError(
+        user.rejectionReason
+          ? `Your application was declined: ${user.rejectionReason}`
+          : undefined
+      );
+    }
+
+    if ((user.approvalCodeAttempts ?? 0) >= otpService.maxAttempts) {
+      throw new ValidationError('Too many failed attempts. Request a new activation code.');
+    }
+
+    if (
+      otpService.isExpired(user.approvalCodeExpires) ||
+      !otpService.verifyCode(code, user.approvalCodeHash)
+    ) {
+      await authRepository.updateUser(user.id, {
+        approvalCodeAttempts: (user.approvalCodeAttempts ?? 0) + 1,
+      });
+      throw new ValidationError('Invalid or expired activation code');
+    }
+
+    await authRepository.updateUser(user.id, {
+      approvalStatus: 'ACTIVE',
+      isEmailVerified: true,
+      approvalCodeHash: null,
+      approvalCodeExpires: null,
+      approvalCodeAttempts: 0,
+    });
+
+    return this.completeActivation(user.id, 'Account activated successfully.');
+  }
+
+  /**
+   * Resends a fresh activation code — used when the previous one expired.
+   * Only valid for approved applications awaiting activation.
+   */
+  async resendApprovalCode(email: string) {
+    const user = await authRepository.findUserByEmail(email);
+    const genericMessage = {
+      message: 'If your application has been approved, a new activation code has been sent.',
+    };
+    if (!user || user.approvalStatus !== 'APPROVED') {
+      return genericMessage;
+    }
+
+    const code = otpService.generateCode();
+    await authRepository.updateUser(user.id, {
+      approvalCodeHash: otpService.hashCode(code),
+      approvalCodeExpires: approvalCodeExpiry(),
+      approvalCodeAttempts: 0,
+    });
+
+    await emailService
+      .sendApprovalCodeEmail(user.email, code, user.firstName, {
+        businessName: user.pendingBusinessName ?? undefined,
+        expiryMinutes: APPROVAL_CODE_EXPIRY_MINUTES,
+      })
+      .catch(() => undefined);
+
+    return genericMessage;
+  }
+
+  // ── Super Admin approval actions ──────────────────────────────────────────
+
+  async listApplications(status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING') {
+    const users = await authRepository.findUsersByApprovalStatus(status);
+    return users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      phone: u.phone,
+      businessName: u.pendingBusinessName,
+      approvalStatus: u.approvalStatus,
+      approvalCodeExpires: u.approvalCodeExpires,
+      rejectionReason: u.rejectionReason,
+      appliedAt: u.createdAt,
+      approvedAt: u.approvedAt,
+    }));
+  }
+
+  async approveApplication(userId: string, adminId: string) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new NotFoundError('Applicant not found');
+    if (user.approvalStatus === 'ACTIVE') {
+      throw new ValidationError('This account is already active.');
+    }
+
+    const code = otpService.generateCode();
+    await authRepository.updateUser(user.id, {
+      approvalStatus: 'APPROVED',
+      approvalCodeHash: otpService.hashCode(code),
+      approvalCodeExpires: approvalCodeExpiry(),
+      approvalCodeAttempts: 0,
+      approvedAt: new Date(),
+      approvedById: adminId,
+      rejectionReason: null,
+    });
+
+    await emailService
+      .sendApprovalCodeEmail(user.email, code, user.firstName, {
+        businessName: user.pendingBusinessName ?? undefined,
+        expiryMinutes: APPROVAL_CODE_EXPIRY_MINUTES,
+      })
+      .catch(() => undefined);
+
+    return { message: 'Application approved. Activation code sent to the applicant.' };
+  }
+
+  async rejectApplication(userId: string, reason?: string) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new NotFoundError('Applicant not found');
+    if (user.approvalStatus === 'ACTIVE') {
+      throw new ValidationError('Cannot reject an already active account.');
+    }
+
+    await authRepository.updateUser(user.id, {
+      approvalStatus: 'REJECTED',
+      rejectionReason: reason ?? null,
+      approvalCodeHash: null,
+      approvalCodeExpires: null,
+      approvalCodeAttempts: 0,
+    });
+
+    await emailService
+      .sendApplicationRejectedEmail(user.email, user.firstName, reason)
+      .catch(() => undefined);
+
+    return { message: 'Application rejected.' };
   }
 
   async refresh(refreshToken: string) {

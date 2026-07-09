@@ -683,6 +683,13 @@ model Business {
 
 // ─── USERS & TEAM ────────────────────────────────────────────────────────────
 
+enum UserApprovalStatus {
+  PENDING   // business application submitted, awaiting Super Admin review
+  APPROVED  // approved by Super Admin, activation code emailed, awaiting code entry
+  ACTIVE    // activation code verified — full access
+  REJECTED  // application declined by Super Admin
+}
+
 model User {
   id                String    @id @default(uuid())
   email             String    @unique
@@ -710,6 +717,15 @@ model User {
   totpBackupCodes   String?
   welcomeSeenAt     DateTime?
   pendingBusinessName String?
+  // Business application / Super Admin approval workflow.
+  // Existing users default to ACTIVE; new registrations are set to PENDING.
+  approvalStatus       UserApprovalStatus @default(ACTIVE)
+  approvalCodeHash     String?
+  approvalCodeExpires  DateTime?
+  approvalCodeAttempts Int       @default(0)
+  approvedAt           DateTime?
+  approvedById         String?
+  rejectionReason      String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

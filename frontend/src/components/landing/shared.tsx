@@ -108,5 +108,20 @@ export function OutlineLink({ to, className, children }: { to: string; className
 }
 
 export function GlowOrb({ className }: { className?: string }) {
-  return <div className={cn('pointer-events-none absolute rounded-full blur-3xl', className)} />;
+  // A soft radial glow WITHOUT `filter: blur()`. Large, animated blur layers
+  // (blur-3xl on 400–600px orbs) trigger GPU texture corruption / rainbow
+  // tearing on some mobile GPUs (Android Adreno/Mali). A radial-gradient mask
+  // over the solid tint reproduces the look on the cheap raster path and keeps
+  // scale/opacity animations compositor-only.
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute rounded-full',
+        '[mask-image:radial-gradient(closest-side,#000,transparent)]',
+        '[-webkit-mask-image:radial-gradient(closest-side,#000,transparent)]',
+        className
+      )}
+    />
+  );
 }

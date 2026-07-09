@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo, LogoMark } from '@/components/Logo';
+import { InstallButton } from '@/pwa';
 import { useAuth } from '@/hooks/useAuth';
 
 const loginSchema = z.object({
@@ -90,6 +91,9 @@ export function LoginPage() {
                 Create account
               </Link>
             </p>
+            <div className="mt-4 flex justify-center">
+              <InstallButton variant="ghost" label="Install the app" />
+            </div>
           </CardContent>
         </Card>
       </div>

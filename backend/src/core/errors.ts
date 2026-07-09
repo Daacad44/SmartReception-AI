@@ -58,6 +58,30 @@ export class SubscriptionExpiredError extends AppError {
   }
 }
 
+export class ApplicationPendingError extends AppError {
+  constructor(
+    message = 'Your business application is under review. You will be notified once it is approved.'
+  ) {
+    super(403, message, 'APPLICATION_PENDING');
+  }
+}
+
+export class ApplicationAwaitingCodeError extends AppError {
+  constructor(
+    message = 'Your application was approved. Enter the activation code sent to your email to continue.'
+  ) {
+    super(403, message, 'APPLICATION_AWAITING_CODE');
+  }
+}
+
+export class ApplicationRejectedError extends AppError {
+  constructor(
+    message = 'Your business application was declined. Please contact SmartReception support.'
+  ) {
+    super(403, message, 'APPLICATION_REJECTED');
+  }
+}
+
 export class WhatsAppDeliveryError extends AppError {
   constructor(
     message: string,
