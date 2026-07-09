@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Rocket, RefreshCw } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
@@ -5,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import type { GovernanceApprovalRequest } from '@/lib/governance';
+import { ActivationCodeDialog } from '@/components/governance/ActivationCodeDialog';
 
 interface DeploymentRequest {
   id: string;
@@ -175,6 +178,8 @@ interface AiTrainingVersionsPanelProps {
 
 export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTrainingVersionsPanelProps) {
   const isAdmin = Boolean(businessId);
+  const [activationRequest, setActivationRequest] = useState<GovernanceApprovalRequest | null>(null);
+  const [activationOpen, setActivationOpen] = useState(false);
 
   const { data: dashboard, refetch } = useQuery({
     queryKey: isAdmin
@@ -217,9 +222,23 @@ export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTraini
         type: 'FULL_TRAIN',
         trainingNotes: 'Manual training initiated from dashboard',
       });
-      return extractData(response);
+      return response.data as { approvalRequired?: boolean; data: unknown };
     },
-    onSuccess: () => {
+    onSuccess: (body) => {
+      // Training is gated: the backend returns approvalRequired until a Super
+      // Admin approves and the business redeems an activation code.
+      if (body.approvalRequired) {
+        const request = body.data as GovernanceApprovalRequest;
+        toast.info('Administrator authorization required', {
+          description: 'Your training request was submitted for Super Admin review.',
+        });
+        if (request?.status === 'APPROVED') {
+          setActivationRequest(request);
+          setActivationOpen(true);
+        }
+        refetch();
+        return;
+      }
       toast.success('Training job queued');
       refetch();
     },
@@ -295,6 +314,15 @@ export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTraini
           )}
         </CardContent>
       </Card>
+      <ActivationCodeDialog
+        open={activationOpen}
+        onOpenChange={setActivationOpen}
+        request={activationRequest}
+        onActivated={() => {
+          toast.success('AI training started');
+          refetch();
+        }}
+      />
     </div>
   );
 }

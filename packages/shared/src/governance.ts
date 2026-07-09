@@ -12,9 +12,23 @@ export const GOVERNANCE_ACTION_TYPES = {
   AI_REINDEX: 'AI_REINDEX',
   AI_RESET_MEMORY: 'AI_RESET_MEMORY',
   AI_DELETE_EMBEDDINGS: 'AI_DELETE_EMBEDDINGS',
+  // Versioned training pipeline (train → sandbox → deployment). These ALWAYS
+  // require Super Admin approval regardless of plan — a business may never
+  // start AI training immediately.
+  AI_TRAIN: 'AI_TRAIN',
+  AI_RETRAIN: 'AI_RETRAIN',
+  AI_REBUILD_EMBEDDINGS: 'AI_REBUILD_EMBEDDINGS',
   WHATSAPP_CONNECT: 'WHATSAPP_CONNECT',
   WHATSAPP_DISCONNECT: 'WHATSAPP_DISCONNECT',
 } as const;
+
+// AI actions that require Super Admin approval for EVERY business regardless of
+// plan capability (spec: "Businesses must NEVER immediately start AI Training").
+export const ALWAYS_APPROVAL_ACTION_TYPES = [
+  'AI_TRAIN',
+  'AI_RETRAIN',
+  'AI_REBUILD_EMBEDDINGS',
+] as const;
 
 export type GovernanceActionType =
   (typeof GOVERNANCE_ACTION_TYPES)[keyof typeof GOVERNANCE_ACTION_TYPES];

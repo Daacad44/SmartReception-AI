@@ -13,6 +13,7 @@ import {
 import type { Prisma, GovernanceActionType as PrismaGovernanceActionType } from '@prisma/client';
 import {
   GOVERNANCE_ACTIVATION_TTL_MS,
+  ALWAYS_APPROVAL_ACTION_TYPES,
 } from '@smartreception/shared';
 import type { GovernanceActionType } from '@smartreception/shared';
 import { getGovernanceCapabilities } from './plan-capabilities.service';
@@ -37,9 +38,16 @@ const ACTION_LABELS: Record<string, string> = {
   AI_REINDEX: 'Re-index AI knowledge',
   AI_RESET_MEMORY: 'Reset AI memory',
   AI_DELETE_EMBEDDINGS: 'Delete AI embeddings',
+  AI_TRAIN: 'Train AI',
+  AI_RETRAIN: 'Retrain AI',
+  AI_REBUILD_EMBEDDINGS: 'Rebuild AI embeddings',
   WHATSAPP_CONNECT: 'Connect WhatsApp',
   WHATSAPP_DISCONNECT: 'Disconnect WhatsApp',
 };
+
+// Actions that ALWAYS require Super Admin approval, regardless of the business's
+// plan capability (spec: AI training may never start immediately).
+const ALWAYS_APPROVAL: ReadonlySet<string> = new Set(ALWAYS_APPROVAL_ACTION_TYPES);
 
 function generateActivationCode(): string {
   return crypto.randomInt(100000, 999999).toString();
@@ -117,6 +125,13 @@ export class GovernanceService {
   ): Promise<{ proceed: true } | { proceed: false; request: ReturnType<typeof serializeRequest> }> {
     if (ctx.isSuperAdmin) {
       return { proceed: true };
+    }
+
+    // Training actions are always gated behind approval — never immediately
+    // executed and never hard-blocked by a read-only plan.
+    if (ALWAYS_APPROVAL.has(input.actionType)) {
+      const request = await this.createRequest(ctx, input);
+      return { proceed: false, request };
     }
 
     const caps = await getGovernanceCapabilities(ctx.businessId);
