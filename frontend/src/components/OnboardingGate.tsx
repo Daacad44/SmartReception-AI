@@ -16,19 +16,27 @@ interface OnboardingStatus {
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const authReady = useAuthReady();
   const location = useLocation();
 
   const { data: status, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: async () => extractData<OnboardingStatus>(await api.get('/onboarding/status')),
-    enabled: authReady && isAuthenticated && Boolean(accessToken),
+    // Platform super-admins aren't scoped to a single business onboarding flow,
+    // so skip the check for them instead of firing a request that only adds
+    // console noise and never gates their access.
+    enabled: authReady && isAuthenticated && Boolean(accessToken) && !isSuperAdmin,
     staleTime: 30_000,
     retry: (failureCount, err) => isNetworkOrTimeoutError(err) && failureCount < 2,
   });
 
   if (!isAuthenticated || !accessToken) {
     return <Navigate to="/login" replace state={{ redirect: location.pathname }} />;
+  }
+
+  if (isSuperAdmin) {
+    return <>{children}</>;
   }
 
   if (isLoading || (isFetching && !status)) {
