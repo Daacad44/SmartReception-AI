@@ -93,7 +93,8 @@ interface VerifyOtpResponse {
 interface RegisterResponse {
   message: string;
   email: string;
-  requiresVerification: boolean;
+  requiresApproval?: boolean;
+  requiresVerification?: boolean;
 }
 
 interface ProfileResponse {
@@ -148,9 +149,15 @@ export function useAuth() {
     },
     onError: (error, variables) => {
       const message = getErrorMessage(error);
+      const code = getErrorCode(error);
+      const email = encodeURIComponent(variables.email);
       toast.error(message);
-      if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
-        navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        navigate(`/verify-otp?email=${email}`);
+      } else if (code === 'APPLICATION_AWAITING_CODE') {
+        navigate(`/activate?email=${email}`);
+      } else if (code === 'APPLICATION_PENDING') {
+        navigate(`/application-pending?email=${email}`);
       }
     },
   });
@@ -182,8 +189,36 @@ export function useAuth() {
       return extractData<RegisterResponse>(response);
     },
     onSuccess: (data) => {
-      toast.success('Account created! Check your email for the verification code.');
-      navigate(`/check-email?email=${encodeURIComponent(data.email)}`);
+      toast.success('Application submitted for review.');
+      navigate(`/application-pending?email=${encodeURIComponent(data.email)}`);
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const verifyApprovalMutation = useMutation({
+    mutationFn: async ({ email, code }: { email: string; code: string }) => {
+      const response = await api.post('/auth/verify-approval', { email, code });
+      return extractData<LoginResponse>(response);
+    },
+    onSuccess: (data) => {
+      completeAuthLogin(data, login);
+      toast.success('Account activated. Welcome to SomReception AI!');
+      navigate(data.requiresOnboarding ? '/onboarding' : '/dashboard');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const resendApprovalMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await api.post('/auth/resend-approval', { email });
+      return extractData<{ message: string }>(response);
+    },
+    onSuccess: () => {
+      toast.success('A new activation code has been sent.');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -275,6 +310,10 @@ export function useAuth() {
     register: registerMutation.mutate,
     verifyOtp: verifyOtpMutation.mutate,
     resendOtp: resendOtpMutation.mutate,
+    verifyApproval: verifyApprovalMutation.mutate,
+    isVerifyingApproval: verifyApprovalMutation.isPending,
+    resendApproval: resendApprovalMutation.mutate,
+    isResendingApproval: resendApprovalMutation.isPending,
     forgotPassword: forgotPasswordMutation.mutate,
     resetPassword: resetPasswordMutation.mutate,
     logout,

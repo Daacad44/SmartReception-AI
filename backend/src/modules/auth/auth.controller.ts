@@ -66,6 +66,29 @@ export class AuthController {
     }
   }
 
+  async verifyApprovalCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, code } = verifyOtpSchema.parse(req.body);
+      const result = await authService.verifyApprovalCode(email, code);
+      if ('accessToken' in result && result.accessToken && result.refreshToken) {
+        setAuthCookies(res, result.accessToken, result.refreshToken);
+      }
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendApprovalCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = resendOtpSchema.parse(req.body);
+      const result = await authService.resendApprovalCode(email);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async checkEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { email } = checkEmailSchema.parse({ email: req.query.email });

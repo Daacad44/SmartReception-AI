@@ -24,6 +24,17 @@ router.post('/businesses/:id/impersonate', (req, res, next) =>
   superAdminController.impersonateBusiness(req, res, next)
 );
 
+// Business application approval workflow
+router.get('/applications', (req, res, next) =>
+  superAdminController.listApplications(req, res, next)
+);
+router.post('/applications/:id/approve', (req, res, next) =>
+  superAdminController.approveApplication(req, res, next)
+);
+router.post('/applications/:id/reject', (req, res, next) =>
+  superAdminController.rejectApplication(req, res, next)
+);
+
 router.get('/users', (req, res, next) => superAdminController.users(req, res, next));
 router.post('/users', (req, res, next) => superAdminController.createUser(req, res, next));
 router.patch('/users/:id', (req, res, next) => superAdminController.updateUser(req, res, next));

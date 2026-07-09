@@ -15,6 +15,8 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyOtpPage } from '@/pages/VerifyOtpPage';
 import { TwoFactorLoginPage } from '@/pages/TwoFactorLoginPage';
 import { CheckEmailPage } from '@/pages/CheckEmailPage';
+import { ApplicationPendingPage } from '@/pages/ApplicationPendingPage';
+import { ActivatePage } from '@/pages/ActivatePage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
@@ -103,6 +105,9 @@ const TrainerSandboxPage = lazyWithRetry(() =>
 );
 const BusinessManagementPage = lazyWithRetry(() =>
   import('@/pages/BusinessManagementPage').then((m) => ({ default: m.BusinessManagementPage }))
+);
+const BusinessApplicationsPage = lazyWithRetry(() =>
+  import('@/pages/BusinessApplicationsPage').then((m) => ({ default: m.BusinessApplicationsPage }))
 );
 const UserManagementPage = lazyWithRetry(() =>
   import('@/pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
@@ -194,6 +199,8 @@ export default function App() {
                 <Route path="/verify-2fa" element={<TwoFactorLoginPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
+                <Route path="/application-pending" element={<ApplicationPendingPage />} />
+                <Route path="/activate" element={<ActivatePage />} />
                 <Route
                   path="/onboarding"
                   element={
@@ -450,6 +457,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <BusinessManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/applications"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <BusinessApplicationsPage />
                       </PermissionRoute>
                     }
                   />
