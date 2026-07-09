@@ -1,6 +1,7 @@
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 import { prisma } from '../database/prisma';
+import { resolveStoredToken } from '../crypto/token-crypto';
 import type { SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 import type { WhatsAppWebhookMessage } from './whatsapp.types';
 import { parseWebhookBody } from './whatsapp-webhook.parser';
@@ -10,6 +11,37 @@ export type { WhatsAppWebhookMessage, SendOutboundParams, SendOutboundResult } f
 export { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
 
 const MAX_RETRIES = 3;
+const WHATSAPP_AUTH_ERROR_CODES = new Set([10, 190, 102, 401]);
+
+export function isWhatsAppAuthGraphError(error?: {
+  code?: number | string;
+  message?: string;
+}): boolean {
+  if (!error) return false;
+  const code = Number(error.code);
+  if (WHATSAPP_AUTH_ERROR_CODES.has(code)) return true;
+  const message = (error.message ?? '').toLowerCase();
+  return (
+    message.includes('authentication error') ||
+    message.includes('error validating access token') ||
+    message.includes('invalid oauth') ||
+    message.includes('session has expired')
+  );
+}
+
+async function markWhatsAppTokenInvalid(phoneNumberId: string, error: Record<string, unknown>) {
+  try {
+    await prisma.whatsAppAccount.updateMany({
+      where: { phoneNumberId, isActive: true },
+      data: {
+        lastGraphApiError: error as object,
+        lastSyncAt: new Date(),
+      },
+    });
+  } catch (markError) {
+    logger.warn('Failed to mark WhatsApp token invalid', { phoneNumberId, markError });
+  }
+}
 
 async function fetchWithRetry(
   url: string,
@@ -38,7 +70,9 @@ async function fetchWithRetry(
 
 export class WhatsAppService {
   private getToken(accessToken?: string): string | null {
-    return accessToken?.trim() || null;
+    const resolved = resolveStoredToken(accessToken) ?? accessToken?.trim();
+    if (resolved) return resolved;
+    return config.whatsapp.accessToken?.trim() || null;
   }
 
   async sendOutbound(params: SendOutboundParams): Promise<SendOutboundResult> {
@@ -202,6 +236,9 @@ export class WhatsAppService {
         const graphError = { code: errorCode, message: errorMessage, recipient: to };
         console.error('[WhatsApp] Message failed:', graphError);
         logger.error('WhatsApp send failed:', graphError);
+        if (isWhatsAppAuthGraphError(graphError)) {
+          void markWhatsAppTokenInvalid(params.phoneNumberId, graphError);
+        }
         return { success: false, whatsappMsgId: null, error: graphError };
       }
 

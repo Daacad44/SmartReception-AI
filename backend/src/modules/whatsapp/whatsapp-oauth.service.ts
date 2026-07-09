@@ -61,6 +61,31 @@ export class WhatsAppOAuthService {
     return data.access_token;
   }
 
+  /** Exchange a short-lived token for a ~60-day long-lived business token. */
+  private async exchangeForLongLivedToken(shortLivedToken: string): Promise<string> {
+    const params = new URLSearchParams({
+      grant_type: 'fb_exchange_token',
+      client_id: config.whatsapp.appId,
+      client_secret: config.whatsapp.appSecret,
+      fb_exchange_token: shortLivedToken,
+    });
+
+    const response = await fetch(`${config.whatsapp.apiUrl}/oauth/access_token?${params.toString()}`);
+    const data = (await response.json().catch(() => null)) as
+      | { access_token?: string; error?: { message?: string } }
+      | null;
+
+    if (!response.ok || !data?.access_token) {
+      logger.warn('WhatsApp long-lived token exchange failed — using short-lived token', {
+        status: response.status,
+        error: data?.error?.message,
+      });
+      return shortLivedToken;
+    }
+
+    return data.access_token;
+  }
+
   /**
    * Subscribes this app to the business's WABA so inbound webhook events
    * (messages, statuses) start flowing for numbers connected via Embedded
@@ -122,7 +147,8 @@ export class WhatsAppOAuthService {
       );
     }
 
-    const accessToken = await this.exchangeCodeForToken(params.code);
+    const shortLivedToken = await this.exchangeCodeForToken(params.code);
+    const accessToken = await this.exchangeForLongLivedToken(shortLivedToken);
 
     await this.subscribeAppToWaba(params.wabaId, accessToken);
     await this.registerPhoneNumber(params.phoneNumberId, accessToken);
