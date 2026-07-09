@@ -16,6 +16,7 @@ import { getAiHealth } from '../../infrastructure/ai/ai-health.service';
 import { getPipelineState } from './whatsapp-pipeline-state';
 import { handleIncomingMessage } from './incoming-message.service';
 import { ensureAiConfiguration } from '../ai/ai-config.service';
+import { whatsappOAuthService } from './whatsapp-oauth.service';
 import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { startPipelineTrace } from './message-pipeline.logger';
 import { whatsappTenantResolver } from './whatsapp-tenant-resolver.service';
@@ -676,7 +677,19 @@ export class WhatsAppModuleService {
       throw new ConflictError('This phone number is already connected to another business');
     }
 
-    const encryptedToken = encryptToken(input.accessToken);
+    let accessToken = input.accessToken.trim();
+    if (whatsappOAuthService.isConfigured()) {
+      accessToken = await whatsappOAuthService.exchangeForLongLivedToken(accessToken);
+    }
+
+    const tokenValid = await whatsappRepository.validateAccessToken(input.phoneNumberId, accessToken);
+    if (!tokenValid) {
+      throw new ValidationError(
+        'WhatsApp access token is invalid or expired. Generate a new token from Meta Business Manager and try again.'
+      );
+    }
+
+    const encryptedToken = encryptToken(accessToken);
 
     const account = await prisma.whatsAppAccount.upsert({
       where: { phoneNumberId: input.phoneNumberId },

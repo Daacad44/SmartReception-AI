@@ -39,6 +39,7 @@ import {
   handlePostFeedbackHumanOffer,
 } from '../conversations/conversation-feedback.service';
 import { logConversationActivity } from '../conversations/conversation-activity.service';
+import { resolveOutboundWhatsAppToken } from '../whatsapp/whatsapp-token.service';
 
 export interface HandleIncomingMessageParams {
   businessId: string;
@@ -223,6 +224,46 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
 
   if (canReplyWithAi) {
+    const tokenCheck = await resolveOutboundWhatsAppToken({ phoneNumberId, accessToken });
+    if (!tokenCheck.ok) {
+      logger.warn('AI auto-reply blocked — WhatsApp token invalid', {
+        businessId,
+        conversationId: conversation.id,
+        error: tokenCheck.error,
+      });
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          direction: 'OUTBOUND',
+          content:
+            'WhatsApp access token-ka wuu dhacay ama ma ansaxna. Fadlan Settings → WhatsApp ku noqo oo dib u xiriir account-kaaga Meta.',
+          type: 'TEXT',
+          isAiGenerated: true,
+          status: 'FAILED',
+          metadata: { type: 'token_error_notice', language: 'so', graphApiError: tokenCheck.error },
+        },
+      });
+      void prisma.business.update({
+        where: { id: businessId },
+        data: { whatsappStatus: 'NOT_CONNECTED' },
+      });
+      logPipelineStep(pipelineKey, 'reply_failed');
+      persistPipelineTiming(message.id, { ...timings, totalMs: Date.now() - startedAt });
+      void runDeferredInboundTasks({
+        businessId,
+        conversationId: conversation.id,
+        messageId: message.id,
+        customerName: customer.name,
+        phoneNumberId,
+        whatsappMsgId: msg.id,
+        accessToken,
+        extracted,
+        pipelineKey,
+        startedAt,
+      });
+      return;
+    }
+
     logPipelineStep(pipelineKey, 'reply_started');
     const replyStartedAt = Date.now();
     await runSomaliSalesAgent({
@@ -233,7 +274,7 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
       customerMessage: aiText,
       phoneNumberId,
       customerPhone: msg.from,
-      accessToken,
+      accessToken: tokenCheck.token,
       preferEnglish: requestsEnglish(aiText),
       pipelineKey,
     });

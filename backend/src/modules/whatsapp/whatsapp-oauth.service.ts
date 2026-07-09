@@ -61,8 +61,10 @@ export class WhatsAppOAuthService {
     return data.access_token;
   }
 
-  /** Exchange a short-lived token for a ~60-day long-lived business token. */
-  private async exchangeForLongLivedToken(shortLivedToken: string): Promise<string> {
+  /**
+   * Exchanges the Embedded Signup `code` for a long-lived access token.
+   */
+  async exchangeForLongLivedToken(shortLivedToken: string): Promise<string> {
     const params = new URLSearchParams({
       grant_type: 'fb_exchange_token',
       client_id: config.whatsapp.appId,
