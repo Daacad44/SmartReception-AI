@@ -25,6 +25,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { WhatsAppSettings } from '@/components/settings/WhatsAppSettings';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { usePermissions } from '@/hooks/usePermissions';
+import { PwaSettingsCard } from '@/pwa';
 
 const businessSchema = z.object({
   name: z.string().min(1),
@@ -306,7 +307,8 @@ export function SettingsPage() {
           </TabsContent>
         )}
 
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="notifications" className="mt-6 space-y-4">
+          <PwaSettingsCard />
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>

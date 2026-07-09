@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { InstallButton } from '@/pwa';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -51,6 +52,11 @@ export function LandingHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
+          <InstallButton
+            variant="ghost"
+            label="Install App"
+            className="rounded-[11px] border border-white/14 px-[18px] py-[9px] text-sm font-semibold text-slate-200 hover:bg-white/[0.06] hover:text-white"
+          />
           <Link
             to="/login"
             className="rounded-[11px] border border-white/14 px-[18px] py-[9px] text-sm font-semibold text-slate-200 no-underline transition-colors hover:bg-white/[0.06] hover:text-white hover:no-underline"

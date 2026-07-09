@@ -21,6 +21,7 @@ import { useNotifications, useMarkNotificationRead } from '@/hooks/useApi';
 import type { Notification } from '@/lib/entities';
 import { useTheme } from '@/components/ThemeProvider';
 import { getInitials, formatRelativeTime } from '@/lib/utils';
+import { InstallButton } from '@/pwa';
 
 const QUICK_LINKS = [
   { label: 'Conversations', path: '/conversations' },
@@ -137,6 +138,8 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
       </Popover>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <InstallButton className="hidden lg:inline-flex" />
+
         <Button
           variant="ghost"
           size="icon"

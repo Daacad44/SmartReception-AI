@@ -25,6 +25,7 @@ import { FeatureRoute } from '@/components/FeatureRoute';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { PwaInstallProvider, PwaGlobals } from '@/pwa';
 
 const ConversationsPage = lazyWithRetry(() =>
   import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
@@ -169,6 +170,7 @@ export default function App() {
       <HydrationGate>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
+            <PwaInstallProvider>
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<RootRedirect />} />
@@ -527,6 +529,8 @@ export default function App() {
                 <Route path="*" element={<RootRedirect />} />
               </Routes>
             </BrowserRouter>
+            <PwaGlobals />
+            </PwaInstallProvider>
             <Toaster position="top-right" richColors />
           </TooltipProvider>
         </QueryClientProvider>
