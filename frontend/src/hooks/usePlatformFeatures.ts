@@ -16,8 +16,11 @@ export function usePlatformFeatures() {
   });
 
   const isFeatureEnabled = (featureKey: string): boolean => {
-    if (query.isPending && !query.data) return true;
-    return query.data?.[featureKey]?.enabled ?? false;
+    // Fail open while the feature map has not successfully loaded (still
+    // loading OR the request errored). Route access is still enforced on the
+    // backend, so a transient/failed fetch must not hide the entire navigation.
+    if (!query.data) return true;
+    return query.data[featureKey]?.enabled ?? false;
   };
 
   return {
