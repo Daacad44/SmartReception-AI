@@ -60,6 +60,11 @@ const AdminAITrainingDetail = lazyWithRetry(() =>
     default: m.AdminAITrainingDetail,
   }))
 );
+const BusinessAiWorkspacePage = lazyWithRetry(() =>
+  import('@/pages/BusinessAiWorkspacePage').then((m) => ({
+    default: m.BusinessAiWorkspacePage,
+  }))
+);
 const BusinessIntelligenceAdminPage = lazyWithRetry(() =>
   import('@/pages/BusinessIntelligenceAdminPage').then((m) => ({
     default: m.BusinessIntelligenceAdminPage,
@@ -436,6 +441,16 @@ export default function App() {
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <FeatureRoute featureKey="business-intelligence-admin">
                           <BusinessIntelligenceAdminPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/ai-training/business/:businessId"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="enterprise-ai-intelligence-admin">
+                          <BusinessAiWorkspacePage />
                         </FeatureRoute>
                       </PermissionRoute>
                     }

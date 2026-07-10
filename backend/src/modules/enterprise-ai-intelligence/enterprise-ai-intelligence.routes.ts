@@ -6,6 +6,8 @@ import { requireSuperAdmin } from '../../core/middleware/super-admin.middleware'
 import { enterpriseAiIntelligenceService } from './enterprise-ai-intelligence.service';
 import { trainingVerificationService } from '../ai-training-mgmt/training-verification.service';
 import { trainingEngineService } from '../ai-training-mgmt/training-engine.service';
+import { aiTrainingAnalyticsService } from '../ai-training-mgmt/analytics.service';
+import { aiTrainingMgmtService } from '../ai-training-mgmt/ai-training-mgmt.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import type { AiTrainingJobType, AiTrainingOperation } from '@prisma/client';
 
@@ -83,6 +85,36 @@ adminRouter.get('/businesses/:businessId', async (req: Request, res: Response, n
     next(error);
   }
 });
+
+adminRouter.get(
+  '/businesses/:businessId/analytics',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Scoped to a single business — the analytics service filters every query
+      // by businessId, keeping each tenant's AI workspace fully isolated.
+      const data = await aiTrainingAnalyticsService.getAnalytics(String(req.params.businessId));
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+adminRouter.get(
+  '/businesses/:businessId/audit-logs',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Number(req.query.limit) || 100;
+      const data = await aiTrainingMgmtService.getAuditLogs(
+        String(req.params.businessId),
+        limit
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 adminRouter.get('/monitoring', async (req: Request, res: Response, next: NextFunction) => {
   try {
