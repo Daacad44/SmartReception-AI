@@ -220,7 +220,7 @@ export function EnterpriseAiIntelligenceAdminPage() {
                           </div>
                           <div>
                             <Link
-                              to={`/admin/enterprise-ai-intelligence/${business.businessId}`}
+                              to={`/admin/ai-training/business/${business.businessId}`}
                               className="font-semibold hover:underline"
                             >
                               {business.name}
@@ -249,6 +249,11 @@ export function EnterpriseAiIntelligenceAdminPage() {
                       <div className="flex items-center gap-1 text-muted-foreground"><Bot className="h-3 w-3" />{business.currentAiProvider}</div>
                       <div className="flex items-center gap-1 text-muted-foreground"><Zap className="h-3 w-3" />{business.embeddingStatus}</div>
                     </div>
+                    <Button size="sm" variant="secondary" className="w-full" asChild>
+                      <Link to={`/admin/ai-training/business/${business.businessId}`}>
+                        <Brain className="mr-1 h-3 w-3" />Open AI Workspace
+                      </Link>
+                    </Button>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1" onClick={() => startOperation('TRAIN_ONE', [business.businessId])}>
                         <RefreshCw className="mr-1 h-3 w-3" />Train
