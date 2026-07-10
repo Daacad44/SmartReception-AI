@@ -7,7 +7,8 @@ const router = Router();
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 100,   // kii hore 20
+  message: 'Too many requests, please try again later'
 });
 
 router.post('/register', authLimiter, (req, res, next) => authController.register(req, res, next));
