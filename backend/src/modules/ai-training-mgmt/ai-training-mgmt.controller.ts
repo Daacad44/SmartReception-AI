@@ -8,6 +8,7 @@ import { versionService } from './version.service';
 import { sandboxService } from './sandbox.service';
 import { deploymentService } from './deployment.service';
 import { knowledgeGapService } from './knowledge-gap.service';
+import { aiValidationService } from './ai-validation.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { parseDeviceLabel } from './audit.service';
@@ -252,6 +253,43 @@ export class AiTrainingMgmtController {
         req.user!.userId
       );
       res.json({ success: true, data: gap });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getKnowledgeCoverage = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await aiValidationService.getKnowledgeCoverage(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getBusinessValidation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await aiValidationService.getBusinessValidation(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getMemoryInspector = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await aiValidationService.getMemoryInspector(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getValidationReport = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = (req.query.sessionId as string | undefined) ?? undefined;
+      const data = await aiValidationService.getValidationReport(req.user!.businessId!, sessionId);
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
