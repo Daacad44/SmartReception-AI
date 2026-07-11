@@ -9,67 +9,62 @@ import { processBusinessProfilePdf } from '../../infrastructure/ai/business-prof
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
 import { syncBusinessIdentity } from '../../infrastructure/ai/business-identity-sync.service';
 import { storageService } from '../../infrastructure/storage';
+import { logger } from '../../core/logger';
 import type { Prisma } from '@prisma/client';
+import type { UpdateBusinessProfileInput } from '@smartreception/shared';
 
-export type UpdateBusinessProfileInput = {
-  businessName?: string;
-  logoUrl?: string;
-  businessCategory?: string;
-  industryLabel?: string;
-  companyOverview?: string;
-  aboutUs?: string;
-  mission?: string;
-  vision?: string;
-  coreValues?: string[];
-  businessDescription?: string;
-  founder?: string;
-  website?: string;
-  email?: string;
-  phone?: string;
-  whatsapp?: string;
-  address?: string;
-  country?: string;
-  city?: string;
-  workingHours?: string;
-  googleMapsUrl?: string;
-  socialMedia?: Record<string, string>;
-  yearsInBusiness?: number;
-  certifications?: string[];
-  awards?: string[];
-  brandTone?: string;
-  languages?: string[];
-  callToAction?: string;
-  whyChooseUs?: string;
-  companyIntroduction?: string;
-  companySummary?: string;
-  shortIntroduction?: string;
-  longIntroduction?: string;
-};
+export type { UpdateBusinessProfileInput };
 
 export class BusinessProfileService {
   async get(businessId: string) {
     return ensureBusinessProfile(businessId);
   }
 
+  /**
+   * Persist Business Profile edits.
+   *
+   * The frontend PATCHes the entire form back, so unset fields arrive as `null`.
+   * Prisma treats `undefined` as "skip" and `null` as "clear the column", which
+   * is exactly the semantics we want — only fields the user actually touched (or
+   * cleared) are written. We drop `undefined` keys so unrelated columns are never
+   * rewritten, then refresh every AI cache so the change is live immediately.
+   */
   async update(businessId: string, input: UpdateBusinessProfileInput) {
     await ensureBusinessProfile(businessId);
-    const data: Prisma.BusinessProfileUpdateInput = {
-      ...input,
-      coreValues: input.coreValues,
-      socialMedia: input.socialMedia,
-      certifications: input.certifications,
-      awards: input.awards,
-      languages: input.languages,
-    };
+
+    const data: Prisma.BusinessProfileUpdateInput = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value !== undefined) {
+        (data as Record<string, unknown>)[key] = value;
+      }
+    }
 
     const profile = await prisma.businessProfile.update({
       where: { businessId },
       data,
     });
 
+    await this.refreshAiContext(businessId);
+    return profile;
+  }
+
+  /**
+   * Business Profile IS the AI's memory. After any change we invalidate the
+   * profile, tenant and knowledge caches (Redis + in-process) and re-sync the
+   * business identity so prompts, welcome messages and the appointment engine
+   * pick up the new data on the very next message — no manual refresh.
+   */
+  private async refreshAiContext(businessId: string) {
     invalidateBusinessProfileCache(businessId);
     invalidateBusinessTenantCache(businessId);
-    return profile;
+    try {
+      await syncBusinessIdentity(businessId);
+    } catch (error) {
+      logger.warn('Business identity sync after profile update failed', {
+        businessId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async uploadPdf(businessId: string, buffer: Buffer, filename: string) {

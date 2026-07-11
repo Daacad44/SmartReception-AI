@@ -9,7 +9,13 @@ export interface EnterprisePromptInput {
   preferEnglish: boolean;
   route: 'knowledge_base' | 'business_profile';
   profileContext?: string;
+  appointmentContext?: string;
   groundedConfidence: number;
+}
+
+function appointmentBlock(appointmentContext?: string): string {
+  if (!appointmentContext?.trim()) return '';
+  return `\n\nAPPOINTMENT AVAILABILITY (authoritative — use these real times only):\n${appointmentContext}`;
 }
 
 function languageRule(preferEnglish: boolean): string {
@@ -46,7 +52,7 @@ Grounded confidence: ${(input.groundedConfidence * 100).toFixed(0)}%
 Respond in JSON: {"content":"","intent":"","actions":[{"type":"none"}],"confidence":0.0,"language":"so|en","citations":[]}`;
 
   const userPrompt = `RETRIEVED KNOWLEDGE (${input.compressed.citations.length} chunks):
-${knowledgeText}
+${knowledgeText}${appointmentBlock(input.appointmentContext)}
 
 ${input.compressed.memoryText}
 
@@ -73,11 +79,12 @@ export function buildEnterpriseProfilePrompt(input: EnterprisePromptInput): {
 } {
   const systemPrompt = `You are the company identity assistant for ${input.businessName}.
 ${languageRule(input.preferEnglish)}
-Answer ONLY company identity questions from the business profile below. Do not invent facts.
-Respond in JSON: {"content":"","intent":"company_intro|contact|general","actions":[{"type":"none"}],"confidence":0.0,"language":"so|en"}`;
+Answer company identity, contact, working-hours and appointment-availability questions using ONLY the data below. Do not invent facts, hours, or appointment times.
+When asked about hours or availability, state the working hours and offer the real available slots listed. Never make up times.
+Respond in JSON: {"content":"","intent":"company_intro|contact|booking|general","actions":[{"type":"none"}],"confidence":0.0,"language":"so|en"}`;
 
   const userPrompt = `BUSINESS PROFILE:
-${input.profileContext || '(Not configured)'}
+${input.profileContext || '(Not configured)'}${appointmentBlock(input.appointmentContext)}
 
 ${input.compressed.memoryText}
 

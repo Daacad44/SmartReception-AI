@@ -3,6 +3,7 @@ import { logger } from '../../../core/logger';
 import { prisma } from '../../database/prisma';
 import { loadBusinessAIPrompt } from '../business-ai-context.service';
 import { getBusinessProfileContext } from '../business-profile-prompt.service';
+import { buildAppointmentAvailabilityContext } from '../../appointments/appointment-availability.service';
 import { getCachedBusinessProfile } from '../business-tenant-cache.service';
 import { isSmartReceptionBusiness } from '../smartreception-tenant';
 import { CONTACT_FOOTER_SO } from '../somali-menu';
@@ -75,6 +76,19 @@ export async function executeRagPipeline(
     baselineCharEstimate: retrieval.baselineCharEstimate,
   });
 
+  // Appointment/hours questions need the real working hours + open slots so the
+  // AI offers genuine times from PostgreSQL, never invented ones.
+  const needsAvailability =
+    retrieval.intent === 'booking' ||
+    retrieval.intent === 'contact' ||
+    /\b(open|hour|hours|appointment|book|booking|schedule|available|availability|today|closed)\b/i.test(
+      customerMessage
+    ) ||
+    /(saacad|furan|xiran|xidhan|ballan|maanta|maalin)/i.test(customerMessage);
+  const appointmentContext = needsAvailability
+    ? await buildAppointmentAvailabilityContext(businessId)
+    : undefined;
+
   let built;
   if (route === 'business_profile') {
     const profileContext = await getBusinessProfileContext(businessId);
@@ -86,6 +100,7 @@ export async function executeRagPipeline(
       preferEnglish,
       route,
       profileContext,
+      appointmentContext,
       groundedConfidence: retrieval.groundedConfidence,
     });
   } else {
@@ -142,6 +157,7 @@ export async function executeRagPipeline(
       customerMessage,
       preferEnglish,
       route: 'knowledge_base',
+      appointmentContext,
       groundedConfidence: retrieval.groundedConfidence,
     });
   }
