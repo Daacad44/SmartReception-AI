@@ -20,6 +20,12 @@ import { isValidEmail, INVALID_EMAIL_MESSAGE } from '../appointments/email-valid
 import { scheduleAppointmentReminders } from '../appointments/appointment-scheduler.service';
 import { sendAppointmentConfirmation } from '../appointments/appointment-notification.service';
 import { parseAppointmentStart } from '../../core/utils/appointment-datetime';
+import {
+  ensureAppointmentSettings,
+  validateBookingTime,
+  getDayAvailability,
+} from '../appointments/appointment-availability.service';
+import { formatDateInTz } from '../appointments/timezone.util';
 import { resolveCustomerForAppointment } from '../../core/utils/customer-phone';
 import { appointmentsRepository } from '../../modules/appointments/appointments.repository';
 import { notifyAppointment } from '../notifications/notification-helper';
@@ -440,8 +446,24 @@ async function createAppointmentFromFlow(
       return { success: false, error: 'Customer not found' };
     }
 
+    const settings = await ensureAppointmentSettings(ctx.businessId);
     const start = parseAppointmentStart(dateStr, timeStr);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const end = new Date(start.getTime() + settings.slotDurationMinutes * 60 * 1000);
+
+    // Enforce real availability: no past / closed-day / holiday / out-of-hours /
+    // double-booked times. On failure, offer the customer real open slots.
+    try {
+      await validateBookingTime(ctx.businessId, start, end);
+    } catch (validationErr) {
+      const reason = validationErr instanceof Error ? validationErr.message : 'That time is unavailable';
+      const dateStrLocal = formatDateInTz(start, settings.timezone);
+      const day = await getDayAvailability(ctx.businessId, dateStrLocal);
+      const options = day.slots.slice(0, 6).map((s) => s.label).join(', ');
+      const suggestion = options
+        ? ` Available times on ${dateStrLocal}: ${options}.`
+        : ' Please choose another day.';
+      return { success: false, error: `${reason}.${suggestion}` };
+    }
 
     const service = await prisma.service.findFirst({
       where: {

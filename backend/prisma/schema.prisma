@@ -581,100 +581,102 @@ model BusinessTypeDefinition {
 // ─── BUSINESS (TENANT) ───────────────────────────────────────────────────────
 
 model Business {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String   @unique
-  description String?
-  industry    Industry @default(OTHER)
-  phone       String?
-  email       String?
-  website     String?
-  address     String?
-  country     String?
-  city        String?
-  whatsappNumber String?
-  timezone    String   @default("UTC")
-  logoUrl     String?
-  isActive    Boolean  @default(true)
-  onboardingStep Int   @default(0)
+  id                    String                @id @default(uuid())
+  name                  String
+  slug                  String                @unique
+  description           String?
+  industry              Industry              @default(OTHER)
+  phone                 String?
+  email                 String?
+  website               String?
+  address               String?
+  country               String?
+  city                  String?
+  whatsappNumber        String?
+  timezone              String                @default("UTC")
+  logoUrl               String?
+  isActive              Boolean               @default(true)
+  onboardingStep        Int                   @default(0)
   onboardingCompletedAt DateTime?
-  onboardingData Json?
-  employeeRange String?
-  customerVolume String?
-  mainGoal    String?
-  businessType String?
-  businessCategory String?
-  whatsappStatus WhatsAppStatus @default(NOT_CONNECTED)
-  licenseStatus  BusinessLicenseStatus @default(PENDING)
-  isLicenseLocked Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  onboardingData        Json?
+  employeeRange         String?
+  customerVolume        String?
+  mainGoal              String?
+  businessType          String?
+  businessCategory      String?
+  whatsappStatus        WhatsAppStatus        @default(NOT_CONNECTED)
+  licenseStatus         BusinessLicenseStatus @default(PENDING)
+  isLicenseLocked       Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
   // Relations
-  members           BusinessMember[]
-  customers         Customer[]
-  customerTags      CustomerTag[]
-  conversations     Conversation[]
-  conversationActivities ConversationActivity[]
-  conversationFeedback ConversationFeedback[]
-  appointments      Appointment[]
-  appointmentWorkflows AppointmentWorkflow[]
-  appointmentReminderConfigs AppointmentReminderConfig[]
+  members                       BusinessMember[]
+  customers                     Customer[]
+  customerTags                  CustomerTag[]
+  conversations                 Conversation[]
+  conversationActivities        ConversationActivity[]
+  conversationFeedback          ConversationFeedback[]
+  appointments                  Appointment[]
+  appointmentWorkflows          AppointmentWorkflow[]
+  appointmentReminderConfigs    AppointmentReminderConfig[]
   appointmentAutomationSettings AppointmentAutomationSettings?
-  appointmentAnalyticsSnapshot AppointmentAnalyticsSnapshot?
-  appointmentTimelineEvents AppointmentTimelineEvent[]
+  appointmentAnalyticsSnapshot  AppointmentAnalyticsSnapshot?
+  appointmentTimelineEvents     AppointmentTimelineEvent[]
   appointmentWorkflowExecutions AppointmentWorkflowExecution[]
-  appointmentNotifications AppointmentNotification[]
-  appointmentMessageTemplates AppointmentMessageTemplate[]
-  services          Service[]
-  knowledgeBases    KnowledgeBase[]
-  whatsappAccounts  WhatsAppAccount[]
-  notifications     Notification[]
-  auditLogs         AuditLog[]
-  subscription      Subscription?
-  businessSubscription BusinessSubscription?
-  subscriptionHistory SubscriptionHistory[]
-  subscriptionNotifications SubscriptionNotification[]
-  subscriptionActivityLogs SubscriptionActivityLog[]
-  subscriptionPayments SubscriptionPayment[]
-  subscriptionTransactions SubscriptionTransaction[]
-  invoices          Invoice[]
-  aiConfiguration   AIConfiguration?
-  teamInvitations   TeamInvitation[]
-  customerSegments  CustomerSegment[]
-  campaigns         Campaign[]
-  messageTemplates  MessageTemplate[]
-  customerImportJobs CustomerImportJob[]
-  campaignJourneys  CampaignJourney[]
-  campaignOptOuts   CustomerCampaignOptOut[]
-  businessProfile   BusinessProfile?
-  employees         Employee[]
-  employeeGroups    EmployeeGroup[]
-  employeeBroadcasts EmployeeBroadcast[]
-  employeeTemplates EmployeeTemplate[]
-  employeeConversations EmployeeConversation[]
-  employeeImportJobs EmployeeImportJob[]
-  governanceApprovalRequests GovernanceApprovalRequest[]
-  aiTrainingWorkspace      AiTrainingWorkspace?
-  aiTrainingVersions       AiTrainingVersion[]
-  aiTrainingJobs           AiTrainingJob[]
-  aiDeploymentRequests     AiDeploymentRequest[]
-  aiSandboxSessions        AiSandboxSession[]
-  aiTrainingInsights       AiTrainingInsight[]
-  aiTrainerAssignments     AiTrainerBusiness[]
-  knowledgeChunks          KnowledgeChunk[]
-  aiUsageEvents            AiUsageEvent[]
-  aiDailyRollups           AiDailyRollup[]
-  aiConversationMetrics    AiConversationMetric[]
-  aiCustomerMetrics        AiCustomerMetric[]
-  aiBusinessSnapshot       AiBusinessSnapshot?
-  aiTrainingSessionLogs    AiTrainingSessionLog[]
-  platformFeatureScopes    PlatformFeatureBusinessScope[]
-  platformFeatureAuditLogs PlatformFeatureAuditLog[]
-  businessFinancialProfile BusinessFinancialProfile?
-  financialAuditLogs       FinancialAuditLog[]
-  financialAlerts          FinancialAlert[]
-  financialCostEvents      FinancialCostEvent[]
+  appointmentNotifications      AppointmentNotification[]
+  appointmentMessageTemplates   AppointmentMessageTemplate[]
+  services                      Service[]
+  knowledgeBases                KnowledgeBase[]
+  whatsappAccounts              WhatsAppAccount[]
+  notifications                 Notification[]
+  auditLogs                     AuditLog[]
+  subscription                  Subscription?
+  businessSubscription          BusinessSubscription?
+  subscriptionHistory           SubscriptionHistory[]
+  subscriptionNotifications     SubscriptionNotification[]
+  subscriptionActivityLogs      SubscriptionActivityLog[]
+  subscriptionPayments          SubscriptionPayment[]
+  subscriptionTransactions      SubscriptionTransaction[]
+  invoices                      Invoice[]
+  aiConfiguration               AIConfiguration?
+  teamInvitations               TeamInvitation[]
+  customerSegments              CustomerSegment[]
+  campaigns                     Campaign[]
+  messageTemplates              MessageTemplate[]
+  customerImportJobs            CustomerImportJob[]
+  campaignJourneys              CampaignJourney[]
+  campaignOptOuts               CustomerCampaignOptOut[]
+  businessProfile               BusinessProfile?
+  appointmentSettings           AppointmentSettings?
+  businessExceptions            BusinessException[]
+  employees                     Employee[]
+  employeeGroups                EmployeeGroup[]
+  employeeBroadcasts            EmployeeBroadcast[]
+  employeeTemplates             EmployeeTemplate[]
+  employeeConversations         EmployeeConversation[]
+  employeeImportJobs            EmployeeImportJob[]
+  governanceApprovalRequests    GovernanceApprovalRequest[]
+  aiTrainingWorkspace           AiTrainingWorkspace?
+  aiTrainingVersions            AiTrainingVersion[]
+  aiTrainingJobs                AiTrainingJob[]
+  aiDeploymentRequests          AiDeploymentRequest[]
+  aiSandboxSessions             AiSandboxSession[]
+  aiTrainingInsights            AiTrainingInsight[]
+  aiTrainerAssignments          AiTrainerBusiness[]
+  knowledgeChunks               KnowledgeChunk[]
+  aiUsageEvents                 AiUsageEvent[]
+  aiDailyRollups                AiDailyRollup[]
+  aiConversationMetrics         AiConversationMetric[]
+  aiCustomerMetrics             AiCustomerMetric[]
+  aiBusinessSnapshot            AiBusinessSnapshot?
+  aiTrainingSessionLogs         AiTrainingSessionLog[]
+  platformFeatureScopes         PlatformFeatureBusinessScope[]
+  platformFeatureAuditLogs      PlatformFeatureAuditLog[]
+  businessFinancialProfile      BusinessFinancialProfile?
+  financialAuditLogs            FinancialAuditLog[]
+  financialAlerts               FinancialAlert[]
+  financialCostEvents           FinancialCostEvent[]
 
   @@index([slug])
   @@index([isActive])
@@ -684,91 +686,91 @@ model Business {
 // ─── USERS & TEAM ────────────────────────────────────────────────────────────
 
 enum UserApprovalStatus {
-  PENDING   // business application submitted, awaiting Super Admin review
-  APPROVED  // approved by Super Admin, activation code emailed, awaiting code entry
-  ACTIVE    // activation code verified — full access
-  REJECTED  // application declined by Super Admin
+  PENDING // business application submitted, awaiting Super Admin review
+  APPROVED // approved by Super Admin, activation code emailed, awaiting code entry
+  ACTIVE // activation code verified — full access
+  REJECTED // application declined by Super Admin
 }
 
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  avatarUrl         String?
-  phone             String?
-  isEmailVerified   Boolean   @default(false)
-  emailVerifyToken  String?
-  emailVerifyExpires DateTime?
-  emailOtpHash      String?
-  emailOtpExpires   DateTime?
-  emailOtpAttempts  Int       @default(0)
-  resetPasswordToken String?
+  id                   String             @id @default(uuid())
+  email                String             @unique
+  passwordHash         String
+  firstName            String
+  lastName             String
+  avatarUrl            String?
+  phone                String?
+  isEmailVerified      Boolean            @default(false)
+  emailVerifyToken     String?
+  emailVerifyExpires   DateTime?
+  emailOtpHash         String?
+  emailOtpExpires      DateTime?
+  emailOtpAttempts     Int                @default(0)
+  resetPasswordToken   String?
   resetPasswordExpires DateTime?
-  resetOtpHash      String?
-  resetOtpExpires   DateTime?
-  resetOtpAttempts  Int       @default(0)
-  lastLoginAt       DateTime?
-  isActive          Boolean   @default(true)
-  isSuperAdmin      Boolean   @default(false)
-  totpSecret        String?
-  totpEnabled       Boolean   @default(false)
-  totpBackupCodes   String?
-  welcomeSeenAt     DateTime?
-  pendingBusinessName String?
+  resetOtpHash         String?
+  resetOtpExpires      DateTime?
+  resetOtpAttempts     Int                @default(0)
+  lastLoginAt          DateTime?
+  isActive             Boolean            @default(true)
+  isSuperAdmin         Boolean            @default(false)
+  totpSecret           String?
+  totpEnabled          Boolean            @default(false)
+  totpBackupCodes      String?
+  welcomeSeenAt        DateTime?
+  pendingBusinessName  String?
   // Business application / Super Admin approval workflow.
   // Existing users default to ACTIVE; new registrations are set to PENDING.
   approvalStatus       UserApprovalStatus @default(ACTIVE)
   approvalCodeHash     String?
   approvalCodeExpires  DateTime?
-  approvalCodeAttempts Int       @default(0)
+  approvalCodeAttempts Int                @default(0)
   approvedAt           DateTime?
   approvedById         String?
   rejectionReason      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   // Relations
-  businessMemberships BusinessMember[]
-  refreshTokens       RefreshToken[]
-  sentMessages        Message[]          @relation("SentByUser")
-  assignedConversations Conversation[]   @relation("AssignedAgent")
-  conversationActivities ConversationActivity[] @relation("ConversationActivityActor")
-  assignedAppointments Appointment[]     @relation("AssignedStaff")
-  appointmentNotes    AppointmentInternalNote[] @relation("AppointmentNoteAuthor")
-  createdAppointments Appointment[]           @relation("AppointmentCreator")
-  createdCampaigns    Campaign[]              @relation("CampaignCreator")
-  createdEmployeeBroadcasts EmployeeBroadcast[] @relation("EmployeeBroadcastCreator")
-  employees           Employee[]
-  createdImportJobs   CustomerImportJob[]     @relation("ImportJobCreator")
-  createdEmployeeImportJobs EmployeeImportJob[] @relation("EmployeeImportJobCreator")
-  ownedEmployeeGroups EmployeeGroup[]         @relation("EmployeeGroupOwner")
-  auditLogs           AuditLog[]
-  notifications       Notification[]
-  assignedSubscriptions BusinessSubscription[] @relation("SubscriptionAssignedBy")
-  subscriptionHistoryEntries SubscriptionHistory[] @relation("SubscriptionHistoryPerformedBy")
-  subscriptionActivityEntries SubscriptionActivityLog[] @relation("SubscriptionActivityPerformedBy")
-  recordedSubscriptionPayments SubscriptionPayment[] @relation("SubscriptionPaymentRecordedBy")
-  subscriptionRenewals SubscriptionRenewal[] @relation("SubscriptionRenewalBy")
-  appliedSubscriptionDiscounts SubscriptionDiscount[] @relation("SubscriptionDiscountAppliedBy")
-  governanceRequestsSubmitted GovernanceApprovalRequest[] @relation("GovernanceRequester")
-  governanceRequestsApproved GovernanceApprovalRequest[] @relation("GovernanceApprover")
-  governanceRequestsRejected GovernanceApprovalRequest[] @relation("GovernanceRejecter")
-  aiVersionsTrained            AiTrainingVersion[]         @relation("AiVersionTrainedByUser")
-  aiTrainingJobsCreated        AiTrainingJob[]             @relation("AiJobCreatedByUser")
-  aiDeploymentRequests         AiDeploymentRequest[]       @relation("AiDeploymentRequester")
-  aiDeploymentApprovals        AiDeploymentRequest[]       @relation("AiDeploymentApprover")
-  aiDeploymentRejections       AiDeploymentRequest[]       @relation("AiDeploymentRejecter")
-  aiSandboxSessions            AiSandboxSession[]          @relation("AiSandboxUser")
-  aiTrainingAuditLogs          AiTrainingAuditLog[]        @relation("AiTrainingAuditUser")
-  aiTrainingVerifications      AiTrainingVerificationRequest[] @relation("AiTrainingVerificationUser")
-  aiTrainingSessionsOperated   AiTrainingSessionLog[]      @relation("AiTrainingSessionOperator")
-  platformFeaturesCreated      PlatformFeature[]           @relation("PlatformFeatureCreatedBy")
-  platformFeaturesModified     PlatformFeature[]           @relation("PlatformFeatureModifiedBy")
+  businessMemberships          BusinessMember[]
+  refreshTokens                RefreshToken[]
+  sentMessages                 Message[]                            @relation("SentByUser")
+  assignedConversations        Conversation[]                       @relation("AssignedAgent")
+  conversationActivities       ConversationActivity[]               @relation("ConversationActivityActor")
+  assignedAppointments         Appointment[]                        @relation("AssignedStaff")
+  appointmentNotes             AppointmentInternalNote[]            @relation("AppointmentNoteAuthor")
+  createdAppointments          Appointment[]                        @relation("AppointmentCreator")
+  createdCampaigns             Campaign[]                           @relation("CampaignCreator")
+  createdEmployeeBroadcasts    EmployeeBroadcast[]                  @relation("EmployeeBroadcastCreator")
+  employees                    Employee[]
+  createdImportJobs            CustomerImportJob[]                  @relation("ImportJobCreator")
+  createdEmployeeImportJobs    EmployeeImportJob[]                  @relation("EmployeeImportJobCreator")
+  ownedEmployeeGroups          EmployeeGroup[]                      @relation("EmployeeGroupOwner")
+  auditLogs                    AuditLog[]
+  notifications                Notification[]
+  assignedSubscriptions        BusinessSubscription[]               @relation("SubscriptionAssignedBy")
+  subscriptionHistoryEntries   SubscriptionHistory[]                @relation("SubscriptionHistoryPerformedBy")
+  subscriptionActivityEntries  SubscriptionActivityLog[]            @relation("SubscriptionActivityPerformedBy")
+  recordedSubscriptionPayments SubscriptionPayment[]                @relation("SubscriptionPaymentRecordedBy")
+  subscriptionRenewals         SubscriptionRenewal[]                @relation("SubscriptionRenewalBy")
+  appliedSubscriptionDiscounts SubscriptionDiscount[]               @relation("SubscriptionDiscountAppliedBy")
+  governanceRequestsSubmitted  GovernanceApprovalRequest[]          @relation("GovernanceRequester")
+  governanceRequestsApproved   GovernanceApprovalRequest[]          @relation("GovernanceApprover")
+  governanceRequestsRejected   GovernanceApprovalRequest[]          @relation("GovernanceRejecter")
+  aiVersionsTrained            AiTrainingVersion[]                  @relation("AiVersionTrainedByUser")
+  aiTrainingJobsCreated        AiTrainingJob[]                      @relation("AiJobCreatedByUser")
+  aiDeploymentRequests         AiDeploymentRequest[]                @relation("AiDeploymentRequester")
+  aiDeploymentApprovals        AiDeploymentRequest[]                @relation("AiDeploymentApprover")
+  aiDeploymentRejections       AiDeploymentRequest[]                @relation("AiDeploymentRejecter")
+  aiSandboxSessions            AiSandboxSession[]                   @relation("AiSandboxUser")
+  aiTrainingAuditLogs          AiTrainingAuditLog[]                 @relation("AiTrainingAuditUser")
+  aiTrainingVerifications      AiTrainingVerificationRequest[]      @relation("AiTrainingVerificationUser")
+  aiTrainingSessionsOperated   AiTrainingSessionLog[]               @relation("AiTrainingSessionOperator")
+  platformFeaturesCreated      PlatformFeature[]                    @relation("PlatformFeatureCreatedBy")
+  platformFeaturesModified     PlatformFeature[]                    @relation("PlatformFeatureModifiedBy")
   platformFeatureVerifications PlatformFeatureVerificationRequest[] @relation("PlatformFeatureVerificationUser")
-  platformFeatureAuditLogs     PlatformFeatureAuditLog[]   @relation("PlatformFeatureAuditUser")
-  financialAuditLogs           FinancialAuditLog[]         @relation("FinancialAuditOperator")
+  platformFeatureAuditLogs     PlatformFeatureAuditLog[]            @relation("PlatformFeatureAuditUser")
+  financialAuditLogs           FinancialAuditLog[]                  @relation("FinancialAuditOperator")
 
   @@index([email])
   @@index([isActive])
@@ -795,14 +797,14 @@ model BusinessMember {
 }
 
 model TeamInvitation {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   businessId String
   email      String
-  role       UserRole @default(AGENT)
-  token      String   @unique
+  role       UserRole  @default(AGENT)
+  token      String    @unique
   expiresAt  DateTime
   acceptedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -813,11 +815,11 @@ model TeamInvitation {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   revokedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -831,42 +833,44 @@ model RefreshToken {
 // ─── CUSTOMERS (CRM) ─────────────────────────────────────────────────────────
 
 model Customer {
-  id            String       @id @default(uuid())
-  businessId    String
-  name          String
-  phone         String
-  email         String?
-  whatsappId    String?
-  whatsappNumber String?
-  companyName   String?
-  address       String?
-  city          String?
-  country       String?
-  notes         String?
-  source        String?
-  customerType  CustomerType @default(REGULAR)
-  leadStatus    LeadStatus   @default(NEW)
-  leadScore     Int          @default(0)
-  customerValue Decimal?     @db.Decimal(12, 2)
-  aiSummary     Json?
-  isActive      Boolean      @default(true)
-  lastContactAt DateTime?
-  /** Latest inbound WhatsApp message time (Meta customer care window anchor). */
+  id                    String       @id @default(uuid())
+  businessId            String
+  name                  String
+  phone                 String
+  email                 String?
+  whatsappId            String?
+  whatsappNumber        String?
+  companyName           String?
+  address               String?
+  city                  String?
+  country               String?
+  notes                 String?
+  source                String?
+  customerType          CustomerType @default(REGULAR)
+  leadStatus            LeadStatus   @default(NEW)
+  leadScore             Int          @default(0)
+  customerValue         Decimal?     @db.Decimal(12, 2)
+  aiSummary             Json?
+  isActive              Boolean      @default(true)
+  lastContactAt         DateTime?
+  /**
+   * Latest inbound WhatsApp message time (Meta customer care window anchor).
+   */
   lastCustomerMessageAt DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
-  business      Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  tags          CustomerTagAssignment[]
-  conversations Conversation[]
-  appointments  Appointment[]
+  business                 Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  tags                     CustomerTagAssignment[]
+  conversations            Conversation[]
+  appointments             Appointment[]
   appointmentNotifications AppointmentNotification[]
-  customerNotes CustomerNote[]
-  segmentMembers CustomerSegmentMember[]
-  campaignRecipients CampaignRecipient[]
-  targetedCampaigns Campaign[] @relation("CampaignTargetCustomer")
-  journeyEnrollments CampaignJourneyEnrollment[]
-  campaignOptOut     CustomerCampaignOptOut?
+  customerNotes            CustomerNote[]
+  segmentMembers           CustomerSegmentMember[]
+  campaignRecipients       CampaignRecipient[]
+  targetedCampaigns        Campaign[]                  @relation("CampaignTargetCustomer")
+  journeyEnrollments       CampaignJourneyEnrollment[]
+  campaignOptOut           CustomerCampaignOptOut?
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -920,37 +924,39 @@ model CustomerNote {
 // ─── CONVERSATIONS & MESSAGES ────────────────────────────────────────────────
 
 model Conversation {
-  id              String             @id @default(uuid())
-  businessId      String
-  customerId      String
-  whatsappAccountId String?
-  status          ConversationStatus @default(AI_HANDLING)
-  assignedToId    String?
-  assignedTeam    ConversationTeam?
-  isAiEnabled     Boolean            @default(true)
-  isTyping        Boolean            @default(false)
-  unreadCount     Int                @default(0)
-  lastMessageAt   DateTime?
-  /** Latest inbound WhatsApp message in this thread (session window anchor). */
+  id                    String             @id @default(uuid())
+  businessId            String
+  customerId            String
+  whatsappAccountId     String?
+  status                ConversationStatus @default(AI_HANDLING)
+  assignedToId          String?
+  assignedTeam          ConversationTeam?
+  isAiEnabled           Boolean            @default(true)
+  isTyping              Boolean            @default(false)
+  unreadCount           Int                @default(0)
+  lastMessageAt         DateTime?
+  /**
+   * Latest inbound WhatsApp message in this thread (session window anchor).
+   */
   lastCustomerMessageAt DateTime?
-  resolvedAt      DateTime?
-  aiStartTime     DateTime?
-  humanStartTime  DateTime?
-  transferTime    DateTime?
-  aiConfidenceScore Float?
-  resolutionMethod ResolutionMethod?
-  awaitingFeedback Boolean           @default(false)
-  feedbackPromptedAt DateTime?
-  memorySummary    String?
-  memorySummaryAt  DateTime?
-  memoryMessageCount Int             @default(0)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  resolvedAt            DateTime?
+  aiStartTime           DateTime?
+  humanStartTime        DateTime?
+  transferTime          DateTime?
+  aiConfidenceScore     Float?
+  resolutionMethod      ResolutionMethod?
+  awaitingFeedback      Boolean            @default(false)
+  feedbackPromptedAt    DateTime?
+  memorySummary         String?
+  memorySummaryAt       DateTime?
+  memoryMessageCount    Int                @default(0)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id])
-  assignedTo      User?            @relation("AssignedAgent", fields: [assignedToId], references: [id])
+  business        Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer        Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  whatsappAccount WhatsAppAccount?       @relation(fields: [whatsappAccountId], references: [id])
+  assignedTo      User?                  @relation("AssignedAgent", fields: [assignedToId], references: [id])
   messages        Message[]
   activities      ConversationActivity[]
   feedback        ConversationFeedback[]
@@ -1108,16 +1114,16 @@ model Appointment {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
-  business      Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer      Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  service       Service?                  @relation(fields: [serviceId], references: [id])
-  assignedTo    User?                     @relation("AssignedStaff", fields: [assignedToId], references: [id])
-  createdBy     User?                     @relation("AppointmentCreator", fields: [createdById], references: [id])
-  workflow      AppointmentWorkflow?      @relation(fields: [workflowId], references: [id])
-  workflowStage AppointmentWorkflowStage? @relation(fields: [workflowStageId], references: [id])
-  internalNotes AppointmentInternalNote[]
-  notifications AppointmentNotification[]
-  timelineEvents AppointmentTimelineEvent[]
+  business           Business                       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer           Customer                       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service            Service?                       @relation(fields: [serviceId], references: [id])
+  assignedTo         User?                          @relation("AssignedStaff", fields: [assignedToId], references: [id])
+  createdBy          User?                          @relation("AppointmentCreator", fields: [createdById], references: [id])
+  workflow           AppointmentWorkflow?           @relation(fields: [workflowId], references: [id])
+  workflowStage      AppointmentWorkflowStage?      @relation(fields: [workflowStageId], references: [id])
+  internalNotes      AppointmentInternalNote[]
+  notifications      AppointmentNotification[]
+  timelineEvents     AppointmentTimelineEvent[]
   workflowExecutions AppointmentWorkflowExecution[]
 
   @@index([businessId])
@@ -1148,26 +1154,26 @@ model AppointmentInternalNote {
 }
 
 model AppointmentNotification {
-  id               String                       @id @default(uuid())
-  appointmentId    String
-  businessId       String
-  customerId       String
-  channel          AppointmentNotificationChannel
-  notificationType AppointmentNotificationType
-  recipient        String                       @default("")
-  templateKey      String?
-  scheduledAt      DateTime?
-  sentAt           DateTime?
-  deliveredAt      DateTime?
-  readAt           DateTime?
-  failedAt         DateTime?
-  status           AppointmentNotificationStatus @default(PENDING)
-  errorMessage     String?
+  id                String                         @id @default(uuid())
+  appointmentId     String
+  businessId        String
+  customerId        String
+  channel           AppointmentNotificationChannel
+  notificationType  AppointmentNotificationType
+  recipient         String                         @default("")
+  templateKey       String?
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+  status            AppointmentNotificationStatus  @default(PENDING)
+  errorMessage      String?
   externalMessageId String?
-  retryCount       Int                          @default(0)
-  maxRetries       Int                          @default(5)
-  createdAt        DateTime                     @default(now())
-  updatedAt        DateTime                     @updatedAt
+  retryCount        Int                            @default(0)
+  maxRetries        Int                            @default(5)
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
 
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -1182,16 +1188,16 @@ model AppointmentNotification {
 }
 
 model AppointmentMessageTemplate {
-  id          String                        @id @default(uuid())
+  id          String                          @id @default(uuid())
   businessId  String
   templateKey String
   channel     AppointmentNotificationChannel?
   name        String
   subject     String?
   body        String
-  isActive    Boolean                       @default(true)
-  createdAt   DateTime                      @default(now())
-  updatedAt   DateTime                      @updatedAt
+  isActive    Boolean                         @default(true)
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -1214,12 +1220,12 @@ model AppointmentWorkflow {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  business     Business                      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  stages       AppointmentWorkflowStage[]
-  transitions  AppointmentWorkflowTransition[]
-  rules        AppointmentWorkflowRule[]
-  appointments Appointment[]
-  executions   AppointmentWorkflowExecution[]
+  business        Business                        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stages          AppointmentWorkflowStage[]
+  transitions     AppointmentWorkflowTransition[]
+  rules           AppointmentWorkflowRule[]
+  appointments    Appointment[]
+  executions      AppointmentWorkflowExecution[]
   reminderConfigs AppointmentReminderConfig[]
 
   @@index([businessId])
@@ -1244,10 +1250,10 @@ model AppointmentWorkflowStage {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  workflow         AppointmentWorkflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  appointments     Appointment[]
-  transitionsFrom  AppointmentWorkflowTransition[] @relation("TransitionFrom")
-  transitionsTo    AppointmentWorkflowTransition[] @relation("TransitionTo")
+  workflow        AppointmentWorkflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  transitionsFrom AppointmentWorkflowTransition[] @relation("TransitionFrom")
+  transitionsTo   AppointmentWorkflowTransition[] @relation("TransitionTo")
 
   @@unique([workflowId, key])
   @@index([businessId])
@@ -1256,16 +1262,16 @@ model AppointmentWorkflowStage {
 }
 
 model AppointmentWorkflowTransition {
-  id           String   @id @default(uuid())
+  id           String                       @id @default(uuid())
   workflowId   String
   businessId   String
   fromStageId  String
   toStageId    String
   triggerEvent AppointmentWorkflowEventType
   conditions   Json?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isActive     Boolean                      @default(true)
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
 
   workflow  AppointmentWorkflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   fromStage AppointmentWorkflowStage @relation("TransitionFrom", fields: [fromStageId], references: [id], onDelete: Cascade)
@@ -1440,15 +1446,15 @@ model AppointmentAnalyticsSnapshot {
 // ─── CUSTOMER SEGMENTS & CAMPAIGNS ───────────────────────────────────────────
 
 model CustomerSegment {
-  id          String   @id @default(uuid())
-  businessId  String
-  name        String
-  description String?
-  color       String   @default("#D97706")
+  id           String        @id @default(uuid())
+  businessId   String
+  name         String
+  description  String?
+  color        String        @default("#D97706")
   customerType CustomerType?
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isSystem     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   business  Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
   members   CustomerSegmentMember[]
@@ -1561,18 +1567,18 @@ model CampaignRecipient {
 }
 
 model MessageTemplate {
-  id          String       @id @default(uuid())
-  businessId  String
-  name        String
-  content     String
-  type        CampaignType @default(MARKETING)
-  category    String?
-  isSystem    Boolean      @default(false)
-  variables   String[]     @default([])
+  id                       String       @id @default(uuid())
+  businessId               String
+  name                     String
+  content                  String
+  type                     CampaignType @default(MARKETING)
+  category                 String?
+  isSystem                 Boolean      @default(false)
+  variables                String[]     @default([])
   whatsappTemplateName     String?
   whatsappTemplateLanguage String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
 
   business  Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
   campaigns Campaign[]
@@ -1605,16 +1611,16 @@ model CampaignJourney {
 }
 
 model CampaignJourneyStep {
-  id           String   @id @default(uuid())
+  id           String              @id @default(uuid())
   journeyId    String
   orderIndex   Int
-  delayMinutes Int      @default(0)
+  delayMinutes Int                 @default(0)
   message      String
   messageType  CampaignMessageType @default(TEXT)
   mediaUrl     String?
   templateId   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   journey CampaignJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
 
@@ -1647,7 +1653,7 @@ model CampaignJourneyEnrollment {
 
 model CustomerCampaignOptOut {
   businessId String
-  customerId String @unique
+  customerId String   @unique
   optedOutAt DateTime @default(now())
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -1716,7 +1722,7 @@ model KnowledgeDocument {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  knowledgeBase KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   chunks        KnowledgeChunk[]
 
   @@index([knowledgeBaseId])
@@ -1728,27 +1734,27 @@ model KnowledgeDocument {
 // ─── WHATSAPP ────────────────────────────────────────────────────────────────
 
 model WhatsAppAccount {
-  id                String   @id @default(uuid())
-  businessId        String
-  phoneNumberId     String   @unique
-  phoneNumber       String
-  displayName       String?
-  wabaId            String?
-  accessToken       String?
-  webhookVerified   Boolean  @default(false)
-  phoneNumberStatus String?  @default("unknown")
-  webhookStatus     String?  @default("pending")
-  lastWebhookReceivedAt DateTime?
-  lastSyncAt        DateTime?
-  lastGraphApiResponse Json?
-  lastGraphApiError    Json?
-  lastOutgoingAt       DateTime?
-  reengagementTemplateName     String?
-  reengagementTemplateLanguage String?  @default("en")
-  reengagementTemplateHasBodyVariable Boolean @default(false)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                                  String    @id @default(uuid())
+  businessId                          String
+  phoneNumberId                       String    @unique
+  phoneNumber                         String
+  displayName                         String?
+  wabaId                              String?
+  accessToken                         String?
+  webhookVerified                     Boolean   @default(false)
+  phoneNumberStatus                   String?   @default("unknown")
+  webhookStatus                       String?   @default("pending")
+  lastWebhookReceivedAt               DateTime?
+  lastSyncAt                          DateTime?
+  lastGraphApiResponse                Json?
+  lastGraphApiError                   Json?
+  lastOutgoingAt                      DateTime?
+  reengagementTemplateName            String?
+  reengagementTemplateLanguage        String?   @default("en")
+  reengagementTemplateHasBodyVariable Boolean   @default(false)
+  isActive                            Boolean   @default(true)
+  createdAt                           DateTime  @default(now())
+  updatedAt                           DateTime  @updatedAt
 
   business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   conversations Conversation[]
@@ -1785,6 +1791,7 @@ model BusinessProfile {
   businessId          String                          @unique
   businessName        String?
   logoUrl             String?
+  coverImageUrl       String?
   businessCategory    String?
   industryLabel       String?
   companyOverview     String?
@@ -1793,14 +1800,19 @@ model BusinessProfile {
   vision              String?
   coreValues          Json?
   businessDescription String?
+  targetAudience      String?
   founder             String?
   website             String?
   email               String?
+  supportEmail        String?
   phone               String?
   whatsapp            String?
   address             String?
   country             String?
   city                String?
+  timezone            String?
+  latitude            Float?
+  longitude           Float?
   workingHours        String?
   googleMapsUrl       String?
   socialMedia         Json?
@@ -1829,22 +1841,84 @@ model BusinessProfile {
   @@map("business_profiles")
 }
 
+// ─── SCHEDULING: WORKING HOURS, APPOINTMENT SETTINGS & EXCEPTIONS ─────────────
+
+enum BusinessExceptionType {
+  NATIONAL_HOLIDAY
+  RELIGIOUS_HOLIDAY
+  EMERGENCY_CLOSURE
+  MAINTENANCE
+  VACATION
+  SPECIAL_HOURS
+  HALF_DAY
+  TEMPORARY_CLOSURE
+}
+
+/// One row per business. Single source of truth for the appointment engine:
+/// weekly working hours (structured), slot config, buffers and blocked dates.
+model AppointmentSettings {
+  id                  String   @id @default(uuid())
+  businessId          String   @unique
+  timezone            String   @default("Africa/Mogadishu")
+  slotDurationMinutes Int      @default(30)
+  bufferBeforeMinutes Int      @default(0)
+  bufferAfterMinutes  Int      @default(0)
+  minNoticeMinutes    Int      @default(60)
+  maxAdvanceDays      Int      @default(60)
+  maxDailyBookings    Int?
+  allowSameDay        Boolean  @default(true)
+  /// { monday: { isOpen, openTime, closeTime, breakStart, breakEnd }, ... }
+  weeklyHours         Json
+  /// ["2026-01-01", ...] fully blocked calendar dates
+  blockedDates        Json?
+  /// [{ date, start, end }] recurring/one-off unavailable ranges
+  unavailableSlots    Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_settings")
+}
+
+/// Date-range overrides for working hours: holidays, closures, special hours.
+model BusinessException {
+  id         String                @id @default(uuid())
+  businessId String
+  title      String
+  type       BusinessExceptionType
+  startDate  DateTime              @db.Date
+  endDate    DateTime?             @db.Date
+  isClosed   Boolean               @default(true)
+  openTime   String?
+  closeTime  String?
+  note       String?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, startDate])
+  @@map("business_exceptions")
+}
+
 // ─── AI CONFIGURATION ────────────────────────────────────────────────────────
 
 model AIConfiguration {
-  id                    String   @id @default(uuid())
-  businessId            String   @unique
-  systemPrompt          String?
-  temperature           Float    @default(0.7)
-  maxTokens             Int      @default(500)
-  enableAutoReply       Boolean  @default(true)
-  enableBooking         Boolean  @default(true)
-  enableLeadQualification Boolean @default(true)
-  languages             String[] @default(["en"])
-  greetingMessage       String?
-  fallbackMessage       String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  businessId              String   @unique
+  systemPrompt            String?
+  temperature             Float    @default(0.7)
+  maxTokens               Int      @default(500)
+  enableAutoReply         Boolean  @default(true)
+  enableBooking           Boolean  @default(true)
+  enableLeadQualification Boolean  @default(true)
+  languages               String[] @default(["en"])
+  greetingMessage         String?
+  fallbackMessage         String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -1961,38 +2035,38 @@ enum EmployeeDeliveryStatus {
 }
 
 model Employee {
-  id              String          @id @default(uuid())
-  businessId      String
-  employeeCode    String?
-  fullName        String
-  jobTitle        String?
-  department      String?
-  role            String?
-  phone           String
-  whatsappNumber  String?
-  email           String?
-  status          EmployeeStatus  @default(ACTIVE)
-  profilePhotoUrl String?
-  branch          String?
-  managerId       String?
-  hireDate        DateTime?
-  employmentType  EmploymentType  @default(FULL_TIME)
-  permissions     Json?
-  tags            String[]        @default([])
-  notes           String?
+  id               String         @id @default(uuid())
+  businessId       String
+  employeeCode     String?
+  fullName         String
+  jobTitle         String?
+  department       String?
+  role             String?
+  phone            String
+  whatsappNumber   String?
+  email            String?
+  status           EmployeeStatus @default(ACTIVE)
+  profilePhotoUrl  String?
+  branch           String?
+  managerId        String?
+  hireDate         DateTime?
+  employmentType   EmploymentType @default(FULL_TIME)
+  permissions      Json?
+  tags             String[]       @default([])
+  notes            String?
   emergencyContact String?
-  language        String          @default("so")
-  timezone        String?
-  lastActiveAt    DateTime?
-  userId          String?
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  language         String         @default("so")
+  timezone         String?
+  lastActiveAt     DateTime?
+  userId           String?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  business            Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  manager             Employee?                   @relation("EmployeeManager", fields: [managerId], references: [id])
-  directReports       Employee[]                  @relation("EmployeeManager")
-  user                User?                       @relation(fields: [userId], references: [id])
+  business            Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  manager             Employee?                    @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports       Employee[]                   @relation("EmployeeManager")
+  user                User?                        @relation(fields: [userId], references: [id])
   groupMembers        EmployeeGroupMember[]
   broadcastRecipients EmployeeBroadcastRecipient[]
   conversations       EmployeeConversation[]
@@ -2149,21 +2223,21 @@ model EmployeeBroadcastRecipient {
 }
 
 model EmployeeConversation {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   businessId        String
   employeeId        String
   whatsappAccountId String?
-  status            String   @default("OPEN")
-  unreadCount       Int      @default(0)
+  status            String    @default("OPEN")
+  unreadCount       Int       @default(0)
   lastMessageAt     DateTime?
-  labels            String[] @default([])
-  isArchived        Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  labels            String[]  @default([])
+  isArchived        Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  business  Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  employee  Employee                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  messages  EmployeeConversationMessage[]
+  business Business                      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  employee Employee                      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  messages EmployeeConversationMessage[]
 
   @@unique([businessId, employeeId])
   @@index([businessId, status])
@@ -2261,27 +2335,27 @@ model Invoice {
 // ─── ENTERPRISE SUBSCRIPTION & LICENSE ───────────────────────────────────────
 
 model SubscriptionPlanCatalog {
-  id                   String           @id @default(uuid())
-  code                 SubscriptionPlan @unique
-  name                 String
-  description          String?
-  features             Json?
-  featureFlags         Json?
-  monthlyPrice         Decimal          @default(0) @db.Decimal(10, 2)
-  yearlyPrice          Decimal          @default(0) @db.Decimal(10, 2)
-  maxUsers             Int              @default(1)
-  maxConversations     Int              @default(100)
-  maxWhatsappNumbers   Int              @default(1)
-  maxAiAgents          Int              @default(1)
-  storageLimitMb       Int              @default(512)
-  knowledgeBaseLimit   Int              @default(1)
-  teamLimit            Int              @default(1)
-  campaignLimit        Int              @default(0)
-  appointmentLimit     Int              @default(50)
-  sortOrder            Int              @default(0)
-  isActive             Boolean          @default(true)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                 String           @id @default(uuid())
+  code               SubscriptionPlan @unique
+  name               String
+  description        String?
+  features           Json?
+  featureFlags       Json?
+  monthlyPrice       Decimal          @default(0) @db.Decimal(10, 2)
+  yearlyPrice        Decimal          @default(0) @db.Decimal(10, 2)
+  maxUsers           Int              @default(1)
+  maxConversations   Int              @default(100)
+  maxWhatsappNumbers Int              @default(1)
+  maxAiAgents        Int              @default(1)
+  storageLimitMb     Int              @default(512)
+  knowledgeBaseLimit Int              @default(1)
+  teamLimit          Int              @default(1)
+  campaignLimit      Int              @default(0)
+  appointmentLimit   Int              @default(50)
+  sortOrder          Int              @default(0)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   businessSubscriptions BusinessSubscription[]
   history               SubscriptionHistory[]
@@ -2290,50 +2364,50 @@ model SubscriptionPlanCatalog {
 }
 
 model BusinessSubscription {
-  id                String                     @id @default(uuid())
-  businessId        String                     @unique
-  planId            String
-  previousPlanId    String?
-  status            BusinessLicenseStatus      @default(PENDING)
-  durationPreset    SubscriptionDurationPreset?
-  durationDays      Int?
-  activatedAt       DateTime?
-  expiresAt         DateTime?
-  pausedAt          DateTime?
-  cancelledAt       DateTime?
-  lockedAt          DateTime?
-  isPaused          Boolean                    @default(false)
-  isTrial           Boolean                    @default(false)
-  internalNotes     String?
-  paymentStatus     SubscriptionPaymentStatus  @default(NOT_APPLICABLE)
-  paymentMethod     SubscriptionPaymentMethod?
-  referenceNumber   String?
-  invoiceNumber     String?
-  lastPaymentAt     DateTime?
-  nextRenewalAt     DateTime?
-  assignedById      String?
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  id              String                      @id @default(uuid())
+  businessId      String                      @unique
+  planId          String
+  previousPlanId  String?
+  status          BusinessLicenseStatus       @default(PENDING)
+  durationPreset  SubscriptionDurationPreset?
+  durationDays    Int?
+  activatedAt     DateTime?
+  expiresAt       DateTime?
+  pausedAt        DateTime?
+  cancelledAt     DateTime?
+  lockedAt        DateTime?
+  isPaused        Boolean                     @default(false)
+  isTrial         Boolean                     @default(false)
+  internalNotes   String?
+  paymentStatus   SubscriptionPaymentStatus   @default(NOT_APPLICABLE)
+  paymentMethod   SubscriptionPaymentMethod?
+  referenceNumber String?
+  invoiceNumber   String?
+  lastPaymentAt   DateTime?
+  nextRenewalAt   DateTime?
+  assignedById    String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
 
-  business       Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  plan           SubscriptionPlanCatalog @relation(fields: [planId], references: [id])
-  assignedBy     User?                 @relation("SubscriptionAssignedBy", fields: [assignedById], references: [id])
-  history        SubscriptionHistory[]
-  notifications  SubscriptionNotification[]
-  activityLogs   SubscriptionActivityLog[]
-  payments       SubscriptionPayment[]
-  renewals       SubscriptionRenewal[]
-  discounts      SubscriptionDiscount[]
-  billingCycle   BillingCycle               @default(MONTHLY)
-  currency       String                     @default("USD")
-  gracePeriodDays Int                       @default(0)
-  trialEndsAt    DateTime?
-  paymentGateway String?
-  taxRatePercent Decimal?                   @db.Decimal(5, 2)
-  discountPercent Decimal?                  @db.Decimal(5, 2)
-  lifetimeRevenueUsd Decimal                @default(0) @db.Decimal(12, 2)
-  mrrContributionUsd Decimal                @default(0) @db.Decimal(12, 2)
-  arrContributionUsd Decimal                @default(0) @db.Decimal(12, 2)
+  business           Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan               SubscriptionPlanCatalog    @relation(fields: [planId], references: [id])
+  assignedBy         User?                      @relation("SubscriptionAssignedBy", fields: [assignedById], references: [id])
+  history            SubscriptionHistory[]
+  notifications      SubscriptionNotification[]
+  activityLogs       SubscriptionActivityLog[]
+  payments           SubscriptionPayment[]
+  renewals           SubscriptionRenewal[]
+  discounts          SubscriptionDiscount[]
+  billingCycle       BillingCycle               @default(MONTHLY)
+  currency           String                     @default("USD")
+  gracePeriodDays    Int                        @default(0)
+  trialEndsAt        DateTime?
+  paymentGateway     String?
+  taxRatePercent     Decimal?                   @db.Decimal(5, 2)
+  discountPercent    Decimal?                   @db.Decimal(5, 2)
+  lifetimeRevenueUsd Decimal                    @default(0) @db.Decimal(12, 2)
+  mrrContributionUsd Decimal                    @default(0) @db.Decimal(12, 2)
+  arrContributionUsd Decimal                    @default(0) @db.Decimal(12, 2)
 
   @@index([status])
   @@index([expiresAt])
@@ -2342,7 +2416,7 @@ model BusinessSubscription {
 }
 
 model SubscriptionHistory {
-  id                     String                @id @default(uuid())
+  id                     String                     @id @default(uuid())
   businessSubscriptionId String
   businessId             String
   planId                 String?
@@ -2353,12 +2427,12 @@ model SubscriptionHistory {
   reason                 String?
   metadata               Json?
   performedById          String?
-  createdAt              DateTime              @default(now())
+  createdAt              DateTime                   @default(now())
 
-  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
-  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription     @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  business             Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
   plan                 SubscriptionPlanCatalog? @relation(fields: [planId], references: [id])
-  performedBy          User?                @relation("SubscriptionHistoryPerformedBy", fields: [performedById], references: [id])
+  performedBy          User?                    @relation("SubscriptionHistoryPerformedBy", fields: [performedById], references: [id])
 
   @@index([businessId])
   @@index([businessSubscriptionId])
@@ -2367,18 +2441,18 @@ model SubscriptionHistory {
 }
 
 model SubscriptionNotification {
-  id                     String                       @id @default(uuid())
+  id                     String                          @id @default(uuid())
   businessId             String
   businessSubscriptionId String
   channel                SubscriptionNotificationChannel
   type                   SubscriptionNotificationType
-  status                 SubscriptionNotificationStatus @default(PENDING)
+  status                 SubscriptionNotificationStatus  @default(PENDING)
   scheduledFor           DateTime
   sentAt                 DateTime?
   message                String?
   error                  String?
   metadata               Json?
-  createdAt              DateTime                     @default(now())
+  createdAt              DateTime                        @default(now())
 
   business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
@@ -2391,7 +2465,7 @@ model SubscriptionNotification {
 }
 
 model SubscriptionActivityLog {
-  id                     String                   @id @default(uuid())
+  id                     String                     @id @default(uuid())
   businessId             String
   businessSubscriptionId String?
   action                 SubscriptionActivityAction
@@ -2401,7 +2475,7 @@ model SubscriptionActivityLog {
   oldValue               Json?
   newValue               Json?
   notes                  String?
-  createdAt              DateTime                 @default(now())
+  createdAt              DateTime                   @default(now())
 
   business             Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
   businessSubscription BusinessSubscription? @relation(fields: [businessSubscriptionId], references: [id], onDelete: SetNull)
@@ -2414,12 +2488,12 @@ model SubscriptionActivityLog {
 }
 
 model SubscriptionPayment {
-  id                     String                    @id @default(uuid())
+  id                     String                     @id @default(uuid())
   businessId             String
   businessSubscriptionId String
-  amount                 Decimal                   @db.Decimal(10, 2)
-  currency               String                    @default("USD")
-  status                 SubscriptionPaymentStatus @default(PENDING)
+  amount                 Decimal                    @db.Decimal(10, 2)
+  currency               String                     @default("USD")
+  status                 SubscriptionPaymentStatus  @default(PENDING)
   paymentMethod          SubscriptionPaymentMethod?
   referenceNumber        String?
   invoiceNumber          String?
@@ -2429,12 +2503,12 @@ model SubscriptionPayment {
   notes                  String?
   metadata               Json?
   recordedById           String?
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
-  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
-  recordedBy           User?                @relation("SubscriptionPaymentRecordedBy", fields: [recordedById], references: [id])
+  business             Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription      @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
+  recordedBy           User?                     @relation("SubscriptionPaymentRecordedBy", fields: [recordedById], references: [id])
   transactions         SubscriptionTransaction[]
   renewals             SubscriptionRenewal[]
 
@@ -2446,17 +2520,17 @@ model SubscriptionPayment {
 }
 
 model SubscriptionTransaction {
-  id          String                      @id @default(uuid())
+  id          String                        @id @default(uuid())
   businessId  String
   paymentId   String?
   type        SubscriptionTransactionType
-  amount      Decimal                     @db.Decimal(10, 2)
-  currency    String                      @default("USD")
+  amount      Decimal                       @db.Decimal(10, 2)
+  currency    String                        @default("USD")
   provider    String?
   providerRef String?
   status      SubscriptionTransactionStatus @default(PENDING)
   metadata    Json?
-  createdAt   DateTime                    @default(now())
+  createdAt   DateTime                      @default(now())
 
   business Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   payment  SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
@@ -2468,14 +2542,14 @@ model SubscriptionTransaction {
 }
 
 model SubscriptionRenewal {
-  id                     String   @id @default(uuid())
+  id                     String    @id @default(uuid())
   businessSubscriptionId String
   paymentId              String?
   previousExpiresAt      DateTime?
   newExpiresAt           DateTime
   renewedById            String?
   reason                 String?
-  createdAt              DateTime @default(now())
+  createdAt              DateTime  @default(now())
 
   businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
   payment              SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
@@ -2514,8 +2588,8 @@ model SubscriptionDiscount {
   appliedById            String?
 
   businessSubscription BusinessSubscription @relation(fields: [businessSubscriptionId], references: [id], onDelete: Cascade)
-  coupon               SubscriptionCoupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  appliedBy            User?                  @relation("SubscriptionDiscountAppliedBy", fields: [appliedById], references: [id])
+  coupon               SubscriptionCoupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  appliedBy            User?                @relation("SubscriptionDiscountAppliedBy", fields: [appliedById], references: [id])
 
   @@index([businessSubscriptionId])
   @@map("subscription_discounts")
@@ -2700,12 +2774,12 @@ model AiTrainingVersion {
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  workspace            AiTrainingWorkspace     @relation("WorkspaceVersions", fields: [workspaceId], references: [id], onDelete: Cascade)
-  business             Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  trainedByUser        User?                   @relation("AiVersionTrainedByUser", fields: [trainedByUserId], references: [id], onDelete: SetNull)
-  trainedByTrainer     AiTrainer?              @relation(fields: [trainedByTrainerId], references: [id], onDelete: SetNull)
-  productionWorkspaces AiTrainingWorkspace[]   @relation("ProductionVersion")
-  sandboxWorkspaces    AiTrainingWorkspace[]   @relation("SandboxVersion")
+  workspace            AiTrainingWorkspace   @relation("WorkspaceVersions", fields: [workspaceId], references: [id], onDelete: Cascade)
+  business             Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  trainedByUser        User?                 @relation("AiVersionTrainedByUser", fields: [trainedByUserId], references: [id], onDelete: SetNull)
+  trainedByTrainer     AiTrainer?            @relation(fields: [trainedByTrainerId], references: [id], onDelete: SetNull)
+  productionWorkspaces AiTrainingWorkspace[] @relation("ProductionVersion")
+  sandboxWorkspaces    AiTrainingWorkspace[] @relation("SandboxVersion")
   jobs                 AiTrainingJob[]
   deploymentRequests   AiDeploymentRequest[]
   sandboxSessions      AiSandboxSession[]
@@ -2739,11 +2813,11 @@ model AiTrainingJob {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
-  business         Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  workspace        AiTrainingWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  version          AiTrainingVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  createdByUser    User?               @relation("AiJobCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdByTrainer AiTrainer?          @relation(fields: [createdByTrainerId], references: [id], onDelete: SetNull)
+  business         Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  workspace        AiTrainingWorkspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  version          AiTrainingVersion?    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  createdByUser    User?                 @relation("AiJobCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByTrainer AiTrainer?            @relation(fields: [createdByTrainerId], references: [id], onDelete: SetNull)
   sessionLog       AiTrainingSessionLog?
 
   @@index([businessId])
@@ -2781,31 +2855,31 @@ model AiTrainingVerificationRequest {
 }
 
 model AiTrainingSessionLog {
-  id                 String              @id @default(uuid())
-  jobId              String?             @unique
-  businessId         String
-  operatorUserId     String?
-  startedAt          DateTime
-  finishedAt         DateTime?
-  durationMs         Int?
-  trainingType       AiTrainingJobType
-  knowledgeCount     Int                 @default(0)
-  documentsCount     Int                 @default(0)
-  faqCount           Int                 @default(0)
-  productCount       Int                 @default(0)
-  serviceCount       Int                 @default(0)
-  embeddingsCreated  Int                 @default(0)
-  embeddingsUpdated  Int                 @default(0)
-  embeddingsDeleted  Int                 @default(0)
-  tokensUsed         Int                 @default(0)
-  estimatedCost      Decimal             @default(0) @db.Decimal(12, 4)
-  warnings           Json?
-  errors             Json?
-  validationResult   Json?
-  qualityScore       Float?
-  status             AiTrainingJobStatus
-  metadata           Json?
-  createdAt          DateTime            @default(now())
+  id                String              @id @default(uuid())
+  jobId             String?             @unique
+  businessId        String
+  operatorUserId    String?
+  startedAt         DateTime
+  finishedAt        DateTime?
+  durationMs        Int?
+  trainingType      AiTrainingJobType
+  knowledgeCount    Int                 @default(0)
+  documentsCount    Int                 @default(0)
+  faqCount          Int                 @default(0)
+  productCount      Int                 @default(0)
+  serviceCount      Int                 @default(0)
+  embeddingsCreated Int                 @default(0)
+  embeddingsUpdated Int                 @default(0)
+  embeddingsDeleted Int                 @default(0)
+  tokensUsed        Int                 @default(0)
+  estimatedCost     Decimal             @default(0) @db.Decimal(12, 4)
+  warnings          Json?
+  errors            Json?
+  validationResult  Json?
+  qualityScore      Float?
+  status            AiTrainingJobStatus
+  metadata          Json?
+  createdAt         DateTime            @default(now())
 
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   job      AiTrainingJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
@@ -2824,7 +2898,7 @@ model AiDeploymentRequest {
   businessId           String
   versionId            String
   status               AiDeploymentRequestStatus @default(PENDING)
-  requestedByTrainerId   String?
+  requestedByTrainerId String?
   requestedByUserId    String?
   approvedByUserId     String?
   rejectedByUserId     String?
@@ -2841,12 +2915,12 @@ model AiDeploymentRequest {
   ipAddress            String?
   userAgent            String?
 
-  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  version           AiTrainingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  requestedByTrainer AiTrainer?       @relation(fields: [requestedByTrainerId], references: [id], onDelete: SetNull)
-  requestedByUser   User?             @relation("AiDeploymentRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
-  approvedByUser      User?             @relation("AiDeploymentApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
-  rejectedByUser      User?             @relation("AiDeploymentRejecter", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  version            AiTrainingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  requestedByTrainer AiTrainer?        @relation(fields: [requestedByTrainerId], references: [id], onDelete: SetNull)
+  requestedByUser    User?             @relation("AiDeploymentRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedByUser     User?             @relation("AiDeploymentApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedByUser     User?             @relation("AiDeploymentRejecter", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([versionId])
@@ -2864,10 +2938,10 @@ model AiSandboxSession {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  version  AiTrainingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  trainer  AiTrainer?        @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  user     User?             @relation("AiSandboxUser", fields: [userId], references: [id], onDelete: SetNull)
+  business Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  version  AiTrainingVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  trainer  AiTrainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  user     User?              @relation("AiSandboxUser", fields: [userId], references: [id], onDelete: SetNull)
   messages AiSandboxMessage[]
 
   @@index([businessId])
@@ -2930,13 +3004,13 @@ model AiTrainerBusiness {
 }
 
 model AiTrainerLoginHistory {
-  id        String   @id @default(uuid())
-  trainerId String
-  ipAddress String?
-  userAgent String?
+  id          String   @id @default(uuid())
+  trainerId   String
+  ipAddress   String?
+  userAgent   String?
   deviceLabel String?
-  success   Boolean
-  createdAt DateTime @default(now())
+  success     Boolean
+  createdAt   DateTime @default(now())
 
   trainer AiTrainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
 
@@ -2993,30 +3067,30 @@ model AiTrainingAuditLog {
 // ─── RAG KNOWLEDGE CHUNKS ────────────────────────────────────────────────────
 
 model KnowledgeChunk {
-  id               String    @id @default(uuid())
-  businessId       String
-  documentId       String?
-  versionId        String?
-  title            String?
-  description      String?
-  category         String?
-  tags             String[]  @default([])
-  language         String    @default("so")
-  content          String
-  embedding        Json?
-  priority         Int       @default(0)
-  chunkIndex       Int       @default(0)
-  isActive         Boolean   @default(true)
-  status           String    @default("ACTIVE")
-  source           String?
-  embeddingVersion String?
-  knowledgeVersion Int?
-  confidenceScore  Float?
-  usageCount       Int       @default(0)
-  lastRetrievedAt  DateTime?
+  id                 String    @id @default(uuid())
+  businessId         String
+  documentId         String?
+  versionId          String?
+  title              String?
+  description        String?
+  category           String?
+  tags               String[]  @default([])
+  language           String    @default("so")
+  content            String
+  embedding          Json?
+  priority           Int       @default(0)
+  chunkIndex         Int       @default(0)
+  isActive           Boolean   @default(true)
+  status             String    @default("ACTIVE")
+  source             String?
+  embeddingVersion   String?
+  knowledgeVersion   Int?
+  confidenceScore    Float?
+  usageCount         Int       @default(0)
+  lastRetrievedAt    DateTime?
   lastRetrievalScore Float?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   business Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   document KnowledgeDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -3153,37 +3227,37 @@ model AiCustomerMetric {
 }
 
 model AiBusinessSnapshot {
-  businessId              String   @id
-  totalCustomers          Int      @default(0)
-  activeCustomers         Int      @default(0)
-  returningCustomers      Int      @default(0)
-  totalConversations      Int      @default(0)
-  totalCustomerMessages   Int      @default(0)
-  totalAiMessages         Int      @default(0)
-  inputTokens             Int      @default(0)
-  outputTokens            Int      @default(0)
-  totalTokens             Int      @default(0)
-  dailyTokens             Int      @default(0)
-  weeklyTokens            Int      @default(0)
-  monthlyTokens           Int      @default(0)
-  lifetimeTokens          Int      @default(0)
-  estimatedAiCost         Decimal  @default(0) @db.Decimal(12, 4)
-  monthlyAiCost           Decimal  @default(0) @db.Decimal(12, 4)
-  lifetimeAiCost          Decimal  @default(0) @db.Decimal(12, 4)
-  avgTokensPerConversation Float   @default(0)
-  avgTokensPerCustomer    Float    @default(0)
-  avgResponseTimeMs       Int      @default(0)
-  topProvider             String?
-  knowledgeBaseSize       Int      @default(0)
-  trainingStatus          String?
-  lastTrainingAt          DateTime?
-  healthScore             Float?
-  automationSuccessRate   Float    @default(0)
-  tokenSavingsPercent     Float    @default(0)
-  tokenSavingsTokens      Int      @default(0)
-  lastActivityAt          DateTime?
-  backfilledAt            DateTime?
-  updatedAt               DateTime @updatedAt
+  businessId               String    @id
+  totalCustomers           Int       @default(0)
+  activeCustomers          Int       @default(0)
+  returningCustomers       Int       @default(0)
+  totalConversations       Int       @default(0)
+  totalCustomerMessages    Int       @default(0)
+  totalAiMessages          Int       @default(0)
+  inputTokens              Int       @default(0)
+  outputTokens             Int       @default(0)
+  totalTokens              Int       @default(0)
+  dailyTokens              Int       @default(0)
+  weeklyTokens             Int       @default(0)
+  monthlyTokens            Int       @default(0)
+  lifetimeTokens           Int       @default(0)
+  estimatedAiCost          Decimal   @default(0) @db.Decimal(12, 4)
+  monthlyAiCost            Decimal   @default(0) @db.Decimal(12, 4)
+  lifetimeAiCost           Decimal   @default(0) @db.Decimal(12, 4)
+  avgTokensPerConversation Float     @default(0)
+  avgTokensPerCustomer     Float     @default(0)
+  avgResponseTimeMs        Int       @default(0)
+  topProvider              String?
+  knowledgeBaseSize        Int       @default(0)
+  trainingStatus           String?
+  lastTrainingAt           DateTime?
+  healthScore              Float?
+  automationSuccessRate    Float     @default(0)
+  tokenSavingsPercent      Float     @default(0)
+  tokenSavingsTokens       Int       @default(0)
+  lastActivityAt           DateTime?
+  backfilledAt             DateTime?
+  updatedAt                DateTime  @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -3285,8 +3359,8 @@ model PlatformFeature {
   createdBy      User? @relation("PlatformFeatureCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   lastModifiedBy User? @relation("PlatformFeatureModifiedBy", fields: [lastModifiedById], references: [id], onDelete: SetNull)
 
-  dependencies         PlatformFeatureDependency[] @relation("FeatureDependencies")
-  dependents           PlatformFeatureDependency[] @relation("FeatureDependents")
+  dependencies         PlatformFeatureDependency[]          @relation("FeatureDependencies")
+  dependents           PlatformFeatureDependency[]          @relation("FeatureDependents")
   verificationRequests PlatformFeatureVerificationRequest[]
   auditLogs            PlatformFeatureAuditLog[]
   businessScopes       PlatformFeatureBusinessScope[]
@@ -3299,9 +3373,9 @@ model PlatformFeature {
 }
 
 model PlatformFeatureDependency {
-  id                  String @id @default(uuid())
-  featureId           String
-  dependsOnFeatureId  String
+  id                 String @id @default(uuid())
+  featureId          String
+  dependsOnFeatureId String
 
   feature          PlatformFeature @relation("FeatureDependencies", fields: [featureId], references: [id], onDelete: Cascade)
   dependsOnFeature PlatformFeature @relation("FeatureDependents", fields: [dependsOnFeatureId], references: [id], onDelete: Cascade)
@@ -3363,29 +3437,29 @@ model PlatformFeatureVerificationRequest {
 }
 
 model PlatformFeatureAuditLog {
-  id                   String                     @id @default(uuid())
-  featureId            String
-  featureKey           String
-  featureName          String
-  businessId           String?
-  action               PlatformFeatureAuditAction
-  previousStatus       PlatformFeatureStatus?
-  newStatus            PlatformFeatureStatus?
-  superAdminId         String?
-  verificationStatus   String?
-  verificationCodeId   String?
-  ipAddress            String?
-  userAgent            String?
-  browser              String?
-  operatingSystem      String?
-  reason               String?
-  metadata             Json?
-  createdAt            DateTime                   @default(now())
+  id                 String                     @id @default(uuid())
+  featureId          String
+  featureKey         String
+  featureName        String
+  businessId         String?
+  action             PlatformFeatureAuditAction
+  previousStatus     PlatformFeatureStatus?
+  newStatus          PlatformFeatureStatus?
+  superAdminId       String?
+  verificationStatus String?
+  verificationCodeId String?
+  ipAddress          String?
+  userAgent          String?
+  browser            String?
+  operatingSystem    String?
+  reason             String?
+  metadata           Json?
+  createdAt          DateTime                   @default(now())
 
-  feature              PlatformFeature                     @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  superAdmin           User?                               @relation("PlatformFeatureAuditUser", fields: [superAdminId], references: [id], onDelete: SetNull)
-  verificationRequest  PlatformFeatureVerificationRequest? @relation(fields: [verificationCodeId], references: [id], onDelete: SetNull)
-  business             Business?                           @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  feature             PlatformFeature                     @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  superAdmin          User?                               @relation("PlatformFeatureAuditUser", fields: [superAdminId], references: [id], onDelete: SetNull)
+  verificationRequest PlatformFeatureVerificationRequest? @relation(fields: [verificationCodeId], references: [id], onDelete: SetNull)
+  business            Business?                           @relation(fields: [businessId], references: [id], onDelete: SetNull)
 
   @@index([featureId])
   @@index([featureKey])
@@ -3432,71 +3506,71 @@ enum FinancialCostProviderKey {
 }
 
 model PlatformFinancialConfig {
-  id                              String   @id @default("default")
-  currency                        String   @default("USD")
-  infrastructureMonthlyCostUsd    Decimal  @default(120) @db.Decimal(12, 2)
-  databaseMonthlyCostUsd          Decimal  @default(25) @db.Decimal(12, 2)
-  redisMonthlyCostUsd             Decimal  @default(15) @db.Decimal(12, 2)
-  monitoringMonthlyCostUsd        Decimal  @default(10) @db.Decimal(12, 2)
-  backupMonthlyCostUsd              Decimal  @default(8) @db.Decimal(12, 2)
-  whatsappAuthCostPerConversation   Decimal  @default(0.005) @db.Decimal(10, 6)
-  whatsappMarketingCostPerConversation Decimal @default(0.04) @db.Decimal(10, 6)
-  whatsappUtilityCostPerConversation Decimal @default(0.02) @db.Decimal(10, 6)
-  whatsappServiceCostPerConversation Decimal @default(0.01) @db.Decimal(10, 6)
-  emailCostPerSend                  Decimal  @default(0.001) @db.Decimal(10, 6)
-  storageCostPerGbMonth             Decimal  @default(0.023) @db.Decimal(10, 6)
-  profitMarginAlertThresholdPercent Decimal  @default(20) @db.Decimal(5, 2)
-  useWeightedInfrastructureAllocation Boolean @default(false)
-  updatedById                     String?
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  id                                   String   @id @default("default")
+  currency                             String   @default("USD")
+  infrastructureMonthlyCostUsd         Decimal  @default(120) @db.Decimal(12, 2)
+  databaseMonthlyCostUsd               Decimal  @default(25) @db.Decimal(12, 2)
+  redisMonthlyCostUsd                  Decimal  @default(15) @db.Decimal(12, 2)
+  monitoringMonthlyCostUsd             Decimal  @default(10) @db.Decimal(12, 2)
+  backupMonthlyCostUsd                 Decimal  @default(8) @db.Decimal(12, 2)
+  whatsappAuthCostPerConversation      Decimal  @default(0.005) @db.Decimal(10, 6)
+  whatsappMarketingCostPerConversation Decimal  @default(0.04) @db.Decimal(10, 6)
+  whatsappUtilityCostPerConversation   Decimal  @default(0.02) @db.Decimal(10, 6)
+  whatsappServiceCostPerConversation   Decimal  @default(0.01) @db.Decimal(10, 6)
+  emailCostPerSend                     Decimal  @default(0.001) @db.Decimal(10, 6)
+  storageCostPerGbMonth                Decimal  @default(0.023) @db.Decimal(10, 6)
+  profitMarginAlertThresholdPercent    Decimal  @default(20) @db.Decimal(5, 2)
+  useWeightedInfrastructureAllocation  Boolean  @default(false)
+  updatedById                          String?
+  createdAt                            DateTime @default(now())
+  updatedAt                            DateTime @updatedAt
 
   @@map("platform_financial_config")
 }
 
 model BusinessFinancialProfile {
-  businessId              String   @id
-  subscriptionId          String?
-  planCode                String?
-  planName                String?
-  billingCycle            BillingCycle?
-  currency                String   @default("USD")
-  monthlyRevenueUsd       Decimal  @default(0) @db.Decimal(12, 2)
-  yearlyRevenueUsd        Decimal  @default(0) @db.Decimal(12, 2)
-  lifetimeRevenueUsd      Decimal  @default(0) @db.Decimal(12, 2)
-  mrrContributionUsd      Decimal  @default(0) @db.Decimal(12, 2)
-  arrContributionUsd      Decimal  @default(0) @db.Decimal(12, 2)
-  failedPaymentsUsd       Decimal  @default(0) @db.Decimal(12, 2)
-  refundsUsd              Decimal  @default(0) @db.Decimal(12, 2)
-  outstandingInvoicesUsd  Decimal  @default(0) @db.Decimal(12, 2)
-  aiCostUsd               Decimal  @default(0) @db.Decimal(12, 4)
-  whatsappCostUsd         Decimal  @default(0) @db.Decimal(12, 4)
-  emailCostUsd            Decimal  @default(0) @db.Decimal(12, 4)
-  storageCostUsd          Decimal  @default(0) @db.Decimal(12, 4)
-  infrastructureCostUsd   Decimal  @default(0) @db.Decimal(12, 4)
-  databaseCostUsd         Decimal  @default(0) @db.Decimal(12, 4)
-  redisCostUsd            Decimal  @default(0) @db.Decimal(12, 4)
-  monitoringCostUsd       Decimal  @default(0) @db.Decimal(12, 4)
-  backupCostUsd           Decimal  @default(0) @db.Decimal(12, 4)
-  totalOperatingCostUsd   Decimal  @default(0) @db.Decimal(12, 4)
-  grossProfitUsd          Decimal  @default(0) @db.Decimal(12, 2)
-  netProfitUsd            Decimal  @default(0) @db.Decimal(12, 2)
-  profitMarginPercent     Float    @default(0)
-  operatingMarginPercent  Float    @default(0)
-  costRecoveryPercent     Float    @default(0)
-  roiPercent              Float    @default(0)
-  customerLifetimeValueUsd Decimal @default(0) @db.Decimal(12, 2)
-  avgProfitPerCustomerUsd Decimal  @default(0) @db.Decimal(12, 4)
-  avgProfitPerConversationUsd Decimal @default(0) @db.Decimal(12, 6)
-  avgProfitPerTokenUsd    Decimal  @default(0) @db.Decimal(12, 8)
-  isProfitable            Boolean  @default(false)
-  isOperatingAtLoss       Boolean  @default(false)
-  revenueBreakdown        Json?
-  costBreakdown           Json?
-  usageBreakdown          Json?
-  calculatedAt            DateTime @default(now())
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  businessId                  String        @id
+  subscriptionId              String?
+  planCode                    String?
+  planName                    String?
+  billingCycle                BillingCycle?
+  currency                    String        @default("USD")
+  monthlyRevenueUsd           Decimal       @default(0) @db.Decimal(12, 2)
+  yearlyRevenueUsd            Decimal       @default(0) @db.Decimal(12, 2)
+  lifetimeRevenueUsd          Decimal       @default(0) @db.Decimal(12, 2)
+  mrrContributionUsd          Decimal       @default(0) @db.Decimal(12, 2)
+  arrContributionUsd          Decimal       @default(0) @db.Decimal(12, 2)
+  failedPaymentsUsd           Decimal       @default(0) @db.Decimal(12, 2)
+  refundsUsd                  Decimal       @default(0) @db.Decimal(12, 2)
+  outstandingInvoicesUsd      Decimal       @default(0) @db.Decimal(12, 2)
+  aiCostUsd                   Decimal       @default(0) @db.Decimal(12, 4)
+  whatsappCostUsd             Decimal       @default(0) @db.Decimal(12, 4)
+  emailCostUsd                Decimal       @default(0) @db.Decimal(12, 4)
+  storageCostUsd              Decimal       @default(0) @db.Decimal(12, 4)
+  infrastructureCostUsd       Decimal       @default(0) @db.Decimal(12, 4)
+  databaseCostUsd             Decimal       @default(0) @db.Decimal(12, 4)
+  redisCostUsd                Decimal       @default(0) @db.Decimal(12, 4)
+  monitoringCostUsd           Decimal       @default(0) @db.Decimal(12, 4)
+  backupCostUsd               Decimal       @default(0) @db.Decimal(12, 4)
+  totalOperatingCostUsd       Decimal       @default(0) @db.Decimal(12, 4)
+  grossProfitUsd              Decimal       @default(0) @db.Decimal(12, 2)
+  netProfitUsd                Decimal       @default(0) @db.Decimal(12, 2)
+  profitMarginPercent         Float         @default(0)
+  operatingMarginPercent      Float         @default(0)
+  costRecoveryPercent         Float         @default(0)
+  roiPercent                  Float         @default(0)
+  customerLifetimeValueUsd    Decimal       @default(0) @db.Decimal(12, 2)
+  avgProfitPerCustomerUsd     Decimal       @default(0) @db.Decimal(12, 4)
+  avgProfitPerConversationUsd Decimal       @default(0) @db.Decimal(12, 6)
+  avgProfitPerTokenUsd        Decimal       @default(0) @db.Decimal(12, 8)
+  isProfitable                Boolean       @default(false)
+  isOperatingAtLoss           Boolean       @default(false)
+  revenueBreakdown            Json?
+  costBreakdown               Json?
+  usageBreakdown              Json?
+  calculatedAt                DateTime      @default(now())
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -3508,31 +3582,31 @@ model BusinessFinancialProfile {
 }
 
 model PlatformFinancialSnapshot {
-  id                      String   @id @default(uuid())
-  snapshotDate            DateTime @db.Date
-  totalMrrUsd             Decimal  @default(0) @db.Decimal(14, 2)
-  totalArrUsd             Decimal  @default(0) @db.Decimal(14, 2)
-  monthlyRevenueUsd       Decimal  @default(0) @db.Decimal(14, 2)
-  yearlyRevenueUsd        Decimal  @default(0) @db.Decimal(14, 2)
-  lifetimeRevenueUsd      Decimal  @default(0) @db.Decimal(14, 2)
-  totalOperatingCostUsd   Decimal  @default(0) @db.Decimal(14, 4)
-  aiCostUsd               Decimal  @default(0) @db.Decimal(14, 4)
-  whatsappCostUsd         Decimal  @default(0) @db.Decimal(14, 4)
-  emailCostUsd            Decimal  @default(0) @db.Decimal(14, 4)
-  storageCostUsd          Decimal  @default(0) @db.Decimal(14, 4)
-  infrastructureCostUsd   Decimal  @default(0) @db.Decimal(14, 4)
-  databaseCostUsd         Decimal  @default(0) @db.Decimal(14, 4)
-  redisCostUsd            Decimal  @default(0) @db.Decimal(14, 4)
-  monitoringCostUsd       Decimal  @default(0) @db.Decimal(14, 4)
-  backupCostUsd           Decimal  @default(0) @db.Decimal(14, 4)
-  grossProfitUsd          Decimal  @default(0) @db.Decimal(14, 2)
-  netProfitUsd            Decimal  @default(0) @db.Decimal(14, 2)
-  platformProfitMarginPercent Float @default(0)
-  activeBusinessCount     Int      @default(0)
-  profitableBusinessCount Int      @default(0)
-  lossBusinessCount       Int      @default(0)
-  breakdown               Json?
-  createdAt               DateTime @default(now())
+  id                          String   @id @default(uuid())
+  snapshotDate                DateTime @db.Date
+  totalMrrUsd                 Decimal  @default(0) @db.Decimal(14, 2)
+  totalArrUsd                 Decimal  @default(0) @db.Decimal(14, 2)
+  monthlyRevenueUsd           Decimal  @default(0) @db.Decimal(14, 2)
+  yearlyRevenueUsd            Decimal  @default(0) @db.Decimal(14, 2)
+  lifetimeRevenueUsd          Decimal  @default(0) @db.Decimal(14, 2)
+  totalOperatingCostUsd       Decimal  @default(0) @db.Decimal(14, 4)
+  aiCostUsd                   Decimal  @default(0) @db.Decimal(14, 4)
+  whatsappCostUsd             Decimal  @default(0) @db.Decimal(14, 4)
+  emailCostUsd                Decimal  @default(0) @db.Decimal(14, 4)
+  storageCostUsd              Decimal  @default(0) @db.Decimal(14, 4)
+  infrastructureCostUsd       Decimal  @default(0) @db.Decimal(14, 4)
+  databaseCostUsd             Decimal  @default(0) @db.Decimal(14, 4)
+  redisCostUsd                Decimal  @default(0) @db.Decimal(14, 4)
+  monitoringCostUsd           Decimal  @default(0) @db.Decimal(14, 4)
+  backupCostUsd               Decimal  @default(0) @db.Decimal(14, 4)
+  grossProfitUsd              Decimal  @default(0) @db.Decimal(14, 2)
+  netProfitUsd                Decimal  @default(0) @db.Decimal(14, 2)
+  platformProfitMarginPercent Float    @default(0)
+  activeBusinessCount         Int      @default(0)
+  profitableBusinessCount     Int      @default(0)
+  lossBusinessCount           Int      @default(0)
+  breakdown                   Json?
+  createdAt                   DateTime @default(now())
 
   @@unique([snapshotDate])
   @@index([snapshotDate])
@@ -3553,8 +3627,8 @@ model FinancialAuditLog {
   verificationStatus String?
   createdAt          DateTime @default(now())
 
-  business  Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
-  operator  User?     @relation("FinancialAuditOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  operator User?     @relation("FinancialAuditOperator", fields: [operatorId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([action])
@@ -3563,16 +3637,16 @@ model FinancialAuditLog {
 }
 
 model FinancialAlert {
-  id             String                 @id @default(uuid())
-  businessId     String?
-  type           FinancialAlertType
-  severity       FinancialAlertSeverity @default(WARNING)
-  title          String
-  message        String
-  metadata       Json?
-  acknowledgedAt DateTime?
+  id               String                 @id @default(uuid())
+  businessId       String?
+  type             FinancialAlertType
+  severity         FinancialAlertSeverity @default(WARNING)
+  title            String
+  message          String
+  metadata         Json?
+  acknowledgedAt   DateTime?
   acknowledgedById String?
-  createdAt      DateTime               @default(now())
+  createdAt        DateTime               @default(now())
 
   business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
 

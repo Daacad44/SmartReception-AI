@@ -11,7 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoadingState } from '@/components/LoadingState';
+import { WorkingHoursSettings } from '@/components/settings/WorkingHoursSettings';
+import { AppointmentSettingsForm } from '@/components/settings/AppointmentSettingsForm';
+import { BusinessExceptionsManager } from '@/components/settings/BusinessExceptionsManager';
 import { toast } from 'sonner';
 
 interface BusinessProfile {
@@ -22,13 +26,16 @@ interface BusinessProfile {
   mission?: string;
   vision?: string;
   businessDescription?: string;
+  targetAudience?: string;
   website?: string;
   email?: string;
+  supportEmail?: string;
   phone?: string;
   whatsapp?: string;
   address?: string;
   city?: string;
   country?: string;
+  timezone?: string;
   workingHours?: string;
   whyChooseUs?: string;
   companyIntroduction?: string;
@@ -149,7 +156,15 @@ export function BusinessProfileSettings({
   if (isLoading) return <LoadingState rows={6} />;
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="profile" className="space-y-6">
+      <TabsList className="flex-wrap">
+        <TabsTrigger value="profile">Company Profile</TabsTrigger>
+        <TabsTrigger value="hours">Working Hours</TabsTrigger>
+        <TabsTrigger value="appointments">Appointment Settings</TabsTrigger>
+        <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="profile" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Upload Business Profile PDF</CardTitle>
@@ -254,6 +269,10 @@ export function BusinessProfileSettings({
             <Label>Why Choose Us</Label>
             <Textarea rows={3} value={form.whyChooseUs ?? ''} onChange={(e) => set('whyChooseUs', e.target.value)} />
           </div>
+          <div className="space-y-2">
+            <Label>Target Audience</Label>
+            <Textarea rows={2} value={form.targetAudience ?? ''} onChange={(e) => set('targetAudience', e.target.value)} placeholder="Who are your customers?" />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Website</Label>
@@ -262,6 +281,10 @@ export function BusinessProfileSettings({
             <div className="space-y-2">
               <Label>Email</Label>
               <Input value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Support Email</Label>
+              <Input value={form.supportEmail ?? ''} onChange={(e) => set('supportEmail', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>
@@ -273,8 +296,12 @@ export function BusinessProfileSettings({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Working Hours</Label>
+            <Label>Working Hours (summary text)</Label>
             <Input value={form.workingHours ?? ''} onChange={(e) => set('workingHours', e.target.value)} placeholder="Mon–Fri 9AM–6PM" />
+            <p className="text-xs text-muted-foreground">
+              Free-text summary. For the real appointment calendar the AI uses, set the
+              &quot;Working Hours&quot; tab above.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Call To Action</Label>
@@ -367,6 +394,19 @@ export function BusinessProfileSettings({
         </DialogContent>
       </Dialog>
       )}
-    </div>
+      </TabsContent>
+
+      <TabsContent value="hours">
+        <WorkingHoursSettings readOnly={readOnly} />
+      </TabsContent>
+
+      <TabsContent value="appointments">
+        <AppointmentSettingsForm readOnly={readOnly} />
+      </TabsContent>
+
+      <TabsContent value="exceptions">
+        <BusinessExceptionsManager readOnly={readOnly} />
+      </TabsContent>
+    </Tabs>
   );
 }

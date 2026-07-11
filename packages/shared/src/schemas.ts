@@ -618,40 +618,195 @@ export const createMessageTemplateSchema = z.object({
 
 export const updateMessageTemplateSchema = createMessageTemplateSchema.partial();
 
+/**
+ * The Business Profile GET endpoint returns the full row (with many `null`
+ * columns). The frontend seeds its form from that response and PATCHes the whole
+ * form back, so every empty field arrives as `null` (or `''`), NOT `undefined`.
+ *
+ * A plain `.optional()` field only accepts `string | undefined` and throws on
+ * `null` — which is the ROOT CAUSE of "Failed to save Business Profile": a single
+ * unset column (website, email, mission, …) failed Zod validation and returned a
+ * 400 for the entire save. These helpers accept `null` and `''`, treat blanks as
+ * "clear this field" (→ `null`), and keep real validation for non-empty values.
+ */
+const blankToNull = (v: unknown) =>
+  typeof v === 'string' && v.trim() === '' ? null : v;
+
+const optionalText = (max: number) =>
+  z.preprocess(blankToNull, z.string().max(max).nullable().optional());
+
+const optionalUrl = () =>
+  z.preprocess(blankToNull, z.string().url().max(2000).nullable().optional());
+
+const optionalEmail = () =>
+  z.preprocess(blankToNull, z.string().email().max(200).nullable().optional());
+
+const optionalStringArray = (max = 200) =>
+  z.preprocess(
+    (v) => (v == null ? v : v),
+    z.array(z.string().max(max)).nullable().optional()
+  );
+
 export const updateBusinessProfileSchema = z.object({
-  businessName: z.string().max(200).optional(),
-  logoUrl: z.string().url().optional().or(z.literal('')),
-  businessCategory: z.string().max(100).optional(),
-  industryLabel: z.string().max(100).optional(),
-  companyOverview: z.string().max(5000).optional(),
-  aboutUs: z.string().max(5000).optional(),
-  mission: z.string().max(2000).optional(),
-  vision: z.string().max(2000).optional(),
-  coreValues: z.array(z.string().max(200)).optional(),
-  businessDescription: z.string().max(5000).optional(),
-  founder: z.string().max(200).optional(),
-  website: z.string().url().optional().or(z.literal('')),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().max(20).optional(),
-  whatsapp: z.string().max(20).optional(),
-  address: z.string().max(500).optional(),
-  country: z.string().max(100).optional(),
-  city: z.string().max(100).optional(),
-  workingHours: z.string().max(500).optional(),
-  googleMapsUrl: z.string().url().optional().or(z.literal('')),
-  socialMedia: z.record(z.string()).optional(),
-  yearsInBusiness: z.number().int().min(0).max(200).optional(),
-  certifications: z.array(z.string().max(200)).optional(),
-  awards: z.array(z.string().max(200)).optional(),
-  brandTone: z.string().max(200).optional(),
-  languages: z.array(z.string().max(20)).optional(),
-  callToAction: z.string().max(500).optional(),
-  whyChooseUs: z.string().max(3000).optional(),
-  companyIntroduction: z.string().max(5000).optional(),
-  companySummary: z.string().max(3000).optional(),
-  shortIntroduction: z.string().max(1500).optional(),
-  longIntroduction: z.string().max(8000).optional(),
+  businessName: optionalText(200),
+  logoUrl: optionalUrl(),
+  coverImageUrl: optionalUrl(),
+  businessCategory: optionalText(100),
+  industryLabel: optionalText(100),
+  companyOverview: optionalText(5000),
+  aboutUs: optionalText(5000),
+  mission: optionalText(2000),
+  vision: optionalText(2000),
+  coreValues: optionalStringArray(),
+  businessDescription: optionalText(5000),
+  targetAudience: optionalText(2000),
+  founder: optionalText(200),
+  website: optionalUrl(),
+  email: optionalEmail(),
+  supportEmail: optionalEmail(),
+  phone: optionalText(30),
+  whatsapp: optionalText(30),
+  address: optionalText(500),
+  country: optionalText(100),
+  city: optionalText(100),
+  timezone: optionalText(100),
+  latitude: z.preprocess(blankToNull, z.number().min(-90).max(90).nullable().optional()),
+  longitude: z.preprocess(blankToNull, z.number().min(-180).max(180).nullable().optional()),
+  workingHours: optionalText(500),
+  googleMapsUrl: optionalUrl(),
+  socialMedia: z.record(z.string()).nullable().optional(),
+  yearsInBusiness: z.preprocess(blankToNull, z.number().int().min(0).max(200).nullable().optional()),
+  certifications: optionalStringArray(),
+  awards: optionalStringArray(),
+  brandTone: optionalText(200),
+  languages: optionalStringArray(20),
+  callToAction: optionalText(500),
+  whyChooseUs: optionalText(3000),
+  companyIntroduction: optionalText(5000),
+  companySummary: optionalText(3000),
+  shortIntroduction: optionalText(1500),
+  longIntroduction: optionalText(8000),
 });
+
+// ─── Structured Working Hours + Appointment Settings + Exceptions ─────────────
+
+const HHMM = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be HH:MM (24-hour)');
+
+export const dayHoursSchema = z
+  .object({
+    isOpen: z.boolean().default(true),
+    openTime: HHMM.default('09:00'),
+    closeTime: HHMM.default('18:00'),
+    breakStart: z.preprocess(blankToNull, HHMM.nullable().optional()),
+    breakEnd: z.preprocess(blankToNull, HHMM.nullable().optional()),
+  })
+  .refine((d) => !d.isOpen || d.closeTime > d.openTime, {
+    message: 'Closing time must be after opening time',
+    path: ['closeTime'],
+  })
+  .refine(
+    (d) => (!d.breakStart && !d.breakEnd) || (!!d.breakStart && !!d.breakEnd && d.breakEnd > d.breakStart),
+    { message: 'Break end must be after break start', path: ['breakEnd'] }
+  );
+
+export const WEEKDAY_KEYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+export const weeklyHoursSchema = z.object({
+  monday: dayHoursSchema,
+  tuesday: dayHoursSchema,
+  wednesday: dayHoursSchema,
+  thursday: dayHoursSchema,
+  friday: dayHoursSchema,
+  saturday: dayHoursSchema,
+  sunday: dayHoursSchema,
+});
+
+export function defaultDayHours(isOpen: boolean): z.infer<typeof dayHoursSchema> {
+  return { isOpen, openTime: '09:00', closeTime: '18:00', breakStart: null, breakEnd: null };
+}
+
+/** Sensible default week: open Mon–Sat, closed Sunday. */
+export function defaultWeeklyHours(): z.infer<typeof weeklyHoursSchema> {
+  return {
+    monday: defaultDayHours(true),
+    tuesday: defaultDayHours(true),
+    wednesday: defaultDayHours(true),
+    thursday: defaultDayHours(true),
+    friday: defaultDayHours(true),
+    saturday: defaultDayHours(true),
+    sunday: defaultDayHours(false),
+  };
+}
+
+export const appointmentSettingsSchema = z.object({
+  timezone: z.string().max(100).default('Africa/Mogadishu'),
+  slotDurationMinutes: z.number().int().min(5).max(480).default(30),
+  bufferBeforeMinutes: z.number().int().min(0).max(240).default(0),
+  bufferAfterMinutes: z.number().int().min(0).max(240).default(0),
+  minNoticeMinutes: z.number().int().min(0).max(20160).default(60),
+  maxAdvanceDays: z.number().int().min(1).max(365).default(60),
+  maxDailyBookings: z.preprocess(blankToNull, z.number().int().min(0).max(1000).nullable().optional()),
+  allowSameDay: z.boolean().default(true),
+  weeklyHours: weeklyHoursSchema.optional(),
+  blockedDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(365).optional(),
+  unavailableSlots: z
+    .array(
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        start: HHMM,
+        end: HHMM,
+      })
+    )
+    .max(500)
+    .optional(),
+});
+
+export const updateAppointmentSettingsSchema = appointmentSettingsSchema.partial();
+
+export const BUSINESS_EXCEPTION_TYPES = [
+  'NATIONAL_HOLIDAY',
+  'RELIGIOUS_HOLIDAY',
+  'EMERGENCY_CLOSURE',
+  'MAINTENANCE',
+  'VACATION',
+  'SPECIAL_HOURS',
+  'HALF_DAY',
+  'TEMPORARY_CLOSURE',
+] as const;
+
+const businessExceptionBaseSchema = z.object({
+  title: z.string().min(1).max(200),
+  type: z.enum(BUSINESS_EXCEPTION_TYPES),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.preprocess(
+    blankToNull,
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()
+  ),
+  isClosed: z.boolean().default(true),
+  openTime: z.preprocess(blankToNull, HHMM.nullable().optional()),
+  closeTime: z.preprocess(blankToNull, HHMM.nullable().optional()),
+  note: optionalText(1000),
+});
+
+const requireSpecialHours = (e: { isClosed?: boolean; openTime?: unknown; closeTime?: unknown }) =>
+  e.isClosed !== false || (!!e.openTime && !!e.closeTime);
+
+export const businessExceptionSchema = businessExceptionBaseSchema.refine(requireSpecialHours, {
+  message: 'Special/half-day hours require both open and close time',
+  path: ['openTime'],
+});
+
+export const updateBusinessExceptionSchema = businessExceptionBaseSchema.partial();
 
 export const superAdminCreateBusinessSchema = z.object({
   name: z.string().min(1).max(200),
@@ -745,6 +900,13 @@ export type CreateJourneyInput = z.infer<typeof createJourneySchema>;
 export type CreateMessageTemplateInput = z.infer<typeof createMessageTemplateSchema>;
 export type UpdateMessageTemplateInput = z.infer<typeof updateMessageTemplateSchema>;
 export type UpdateBusinessProfileInput = z.infer<typeof updateBusinessProfileSchema>;
+export type DayHours = z.infer<typeof dayHoursSchema>;
+export type WeeklyHours = z.infer<typeof weeklyHoursSchema>;
+export type AppointmentSettingsInput = z.infer<typeof appointmentSettingsSchema>;
+export type UpdateAppointmentSettingsInput = z.infer<typeof updateAppointmentSettingsSchema>;
+export type BusinessExceptionType = (typeof BUSINESS_EXCEPTION_TYPES)[number];
+export type BusinessExceptionInput = z.infer<typeof businessExceptionSchema>;
+export type UpdateBusinessExceptionInput = z.infer<typeof updateBusinessExceptionSchema>;
 export type SuperAdminCreateBusinessInput = z.infer<typeof superAdminCreateBusinessSchema>;
 export type SuperAdminUpdateBusinessInput = z.infer<typeof superAdminUpdateBusinessSchema>;
 export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;
