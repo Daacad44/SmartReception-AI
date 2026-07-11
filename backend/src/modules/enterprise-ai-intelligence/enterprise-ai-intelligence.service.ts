@@ -1,4 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
+import { knowledgeService } from '../knowledge/knowledge.service';
 import { aiTrainingMgmtService } from '../ai-training-mgmt/ai-training-mgmt.service';
 import { trainingCenterService } from '../ai-training-mgmt/training-center.service';
 import { trainingSessionLogService } from '../ai-training-mgmt/training-session-log.service';
@@ -102,6 +103,33 @@ export class EnterpriseAiIntelligenceService {
         fallbackMessage: NO_KNOWLEDGE_REPLY,
       },
     };
+  }
+
+  // --- Super Admin knowledge management (business-scoped for tenant isolation) ---
+
+  async listKnowledgeDocuments(businessId: string) {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true },
+    });
+    if (!business) return null;
+    await knowledgeService.ensureDefaultBase(businessId);
+    return knowledgeService.listDocuments(businessId);
+  }
+
+  async uploadKnowledgeDocument(businessId: string, file: Express.Multer.File, title?: string) {
+    const base = await knowledgeService.ensureDefaultBase(businessId);
+    // uploadDocument stores the file, writes metadata scoped to this business,
+    // and queues embedding generation — identical to the tenant upload path.
+    return knowledgeService.uploadDocument(businessId, file, title, base.id);
+  }
+
+  async getKnowledgeDocumentStatus(businessId: string, documentId: string) {
+    return knowledgeService.getDocumentStatus(businessId, documentId);
+  }
+
+  async deleteKnowledgeDocument(businessId: string, documentId: string, userId: string) {
+    return knowledgeService.deleteDocument(businessId, documentId, userId);
   }
 
   async getMonitoring(filters?: { businessId?: string; limit?: number }) {

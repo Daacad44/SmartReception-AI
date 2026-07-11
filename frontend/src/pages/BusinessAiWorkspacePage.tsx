@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,11 +19,14 @@ import {
   LayoutDashboard,
   Library,
   Lightbulb,
+  Loader2,
   Rocket,
   ScrollText,
   Send,
   Settings2,
   Sparkles,
+  Trash2,
+  Upload,
   Zap,
 } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
@@ -40,6 +43,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { DeploymentPanel, AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
 import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { formatNumber } from '@/lib/utils';
@@ -233,10 +237,21 @@ export function BusinessAiWorkspacePage() {
 
   const detailQuery = useQuery({
     queryKey: ['ai-workspace', 'detail', businessId],
-    queryFn: async () =>
-      extractData<BusinessWorkspaceDetail>(
+    queryFn: async () => {
+      const raw = extractData<BusinessWorkspaceDetail>(
         await api.get(`/super-admin/enterprise-ai-intelligence/businesses/${businessId}`)
-      ),
+      );
+      // Normalize collections so no section can crash on an undefined array,
+      // regardless of backend shape drift.
+      return {
+        ...raw,
+        versions: raw.versions ?? [],
+        sessions: raw.sessions ?? [],
+        jobs: raw.jobs ?? [],
+        insights: raw.insights ?? [],
+        deployments: raw.deployments ?? [],
+      } as BusinessWorkspaceDetail;
+    },
     enabled: Boolean(businessId),
     refetchInterval: 20_000,
   });
@@ -382,8 +397,12 @@ export function BusinessAiWorkspacePage() {
           </div>
         </nav>
 
-        {/* Content */}
+        {/* Content — each section is isolated so one failure never blanks the page */}
         <div className="min-w-0 flex-1 space-y-6">
+          <SectionErrorBoundary
+            resetKey={section}
+            label={SECTIONS.find((s) => s.key === section)?.label}
+          >
           {section === 'overview' && (
             <OverviewSection
               detail={detail}
@@ -394,7 +413,9 @@ export function BusinessAiWorkspacePage() {
             />
           )}
           {section === 'business' && <BusinessInfoSection detail={detail} />}
-          {section === 'knowledge' && <KnowledgeLibrarySection detail={detail} />}
+          {section === 'knowledge' && (
+            <KnowledgeLibrarySection businessId={detail.businessId} detail={detail} />
+          )}
           {section === 'training' && (
             <TrainingSection
               businessId={detail.businessId}
@@ -422,6 +443,7 @@ export function BusinessAiWorkspacePage() {
             />
           )}
           {section === 'settings' && <SettingsSection detail={detail} />}
+          </SectionErrorBoundary>
         </div>
       </div>
 
@@ -553,15 +575,122 @@ function BusinessInfoSection({ detail }: { detail: BusinessWorkspaceDetail }) {
   );
 }
 
-function KnowledgeLibrarySection({ detail }: { detail: BusinessWorkspaceDetail }) {
-  const formats = detail.uploadCenter?.supportedFormats ?? [
-    'PDF',
-    'DOCX',
-    'TXT',
-    'CSV',
-    'Markdown',
-    'HTML',
-  ];
+interface KnowledgeDoc {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  fileSize?: number | null;
+  processingError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const KNOWLEDGE_ACCEPT = '.pdf,.doc,.docx,.txt,.csv,.md,.markdown';
+const KNOWLEDGE_EXT = ['.pdf', '.doc', '.docx', '.txt', '.csv', '.md', '.markdown'];
+const KNOWLEDGE_MAX_BYTES = 15 * 1024 * 1024;
+const PROCESSING_STATES = ['UPLOADED', 'PENDING', 'PROCESSING', 'INDEXING'];
+const DOC_STATUS_PROGRESS: Record<string, number> = {
+  UPLOADED: 15,
+  PENDING: 25,
+  PROCESSING: 55,
+  INDEXING: 80,
+  INDEXED: 100,
+  FAILED: 0,
+};
+
+function validateKnowledgeFile(file: File): string | null {
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
+  if (!KNOWLEDGE_EXT.includes(ext)) return 'Unsupported type. Use PDF, DOCX, TXT, CSV or Markdown.';
+  if (file.size === 0) return 'File is empty.';
+  if (file.size > KNOWLEDGE_MAX_BYTES) return 'File exceeds the 15MB limit.';
+  return null;
+}
+
+function KnowledgeLibrarySection({
+  businessId,
+  detail,
+}: {
+  businessId: string;
+  detail: BusinessWorkspaceDetail;
+}) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+
+  const docsQuery = useQuery({
+    queryKey: ['ai-workspace', 'knowledge', businessId],
+    queryFn: async () =>
+      extractData<KnowledgeDoc[]>(
+        await api.get(
+          `/super-admin/enterprise-ai-intelligence/businesses/${businessId}/knowledge/documents`
+        )
+      ),
+    // Poll while any document is still processing so status advances live.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((d) => PROCESSING_STATES.includes(d.status)) ? 4000 : false,
+  });
+
+  const docs = docsQuery.data ?? [];
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('title', file.name);
+      const res = await api.post(
+        `/super-admin/enterprise-ai-intelligence/businesses/${businessId}/knowledge/documents/upload`,
+        form,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (e) => {
+            if (e.total) setUploadPct(Math.round((e.loaded / e.total) * 100));
+          },
+        }
+      );
+      return extractData<KnowledgeDoc>(res);
+    },
+    onSuccess: () => {
+      toast.success('Document uploaded — embedding generation queued');
+      setUploadPct(null);
+      queryClient.invalidateQueries({ queryKey: ['ai-workspace', 'knowledge', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['ai-workspace', 'detail', businessId] });
+    },
+    onError: (error) => {
+      setUploadPct(null);
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      await api.delete(
+        `/super-admin/enterprise-ai-intelligence/businesses/${businessId}/knowledge/documents/${documentId}`
+      );
+    },
+    onSuccess: () => {
+      toast.success('Document deleted');
+      queryClient.invalidateQueries({ queryKey: ['ai-workspace', 'knowledge', businessId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      const error = validateKnowledgeFile(file);
+      if (error) {
+        toast.error(`${file.name}: ${error}`);
+        continue;
+      }
+      uploadMutation.mutate(file);
+    }
+  };
+
+  const indexed = docs.filter((d) => d.status === 'INDEXED').length;
+  const processing = docs.filter((d) => PROCESSING_STATES.includes(d.status)).length;
+  const failed = docs.filter((d) => d.status === 'FAILED').length;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -571,56 +700,127 @@ function KnowledgeLibrarySection({ detail }: { detail: BusinessWorkspaceDetail }
             Knowledge Library
           </CardTitle>
           <CardDescription>
-            Uploaded documents are automatically parsed, embedded, indexed, versioned and scoped to this business.
+            Upload documents for this business. Each file is stored, embedded, indexed and scoped to
+            this business only — training here never affects another business.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatTile label="Documents" value={formatNumber(detail.documents)} icon={FileText} />
-            <StatTile label="FAQs" value={formatNumber(detail.faqs)} icon={Info} />
-            <StatTile label="Embeddings" value={formatNumber(detail.embeddingsCount)} icon={Zap} />
-            <StatTile label="Embedding Status" value={detail.embeddingStatus} icon={Database} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={KNOWLEDGE_ACCEPT}
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleFiles(e.dataTransfer.files);
+            }}
+            className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:bg-muted/50"
+          >
+            <Upload className="mb-3 h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Click or drag files to upload</p>
+            <p className="mt-1 text-xs text-muted-foreground">PDF, DOCX, TXT, CSV, Markdown · up to 15MB</p>
           </div>
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Supported Formats
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {formats.map((f) => (
-                <Badge key={f} variant="secondary">
-                  {f}
-                </Badge>
-              ))}
+          {uploadMutation.isPending && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {uploadPct != null ? `Uploading… ${uploadPct}%` : 'Processing…'}
+              </div>
+              <Progress value={uploadPct ?? 40} className="h-1" />
             </div>
+          )}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatTile label="Documents" value={formatNumber(docs.length)} icon={FileText} />
+            <StatTile label="Indexed" value={formatNumber(indexed)} icon={CheckCircle2} />
+            <StatTile label="Processing" value={formatNumber(processing)} icon={Loader2} />
+            <StatTile label="Failed" value={formatNumber(failed)} icon={Info} />
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Ingestion &amp; Embedding Runs</CardTitle>
+          <CardTitle className="text-base">Documents</CardTitle>
+          <CardDescription>
+            Embeddings: {formatNumber(detail.embeddingsCount)} · Status {detail.embeddingStatus}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {detail.sessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No processing runs recorded yet.</p>
+          {docsQuery.isLoading ? (
+            <LoadingState rows={3} />
+          ) : docsQuery.isError ? (
+            <ErrorState message="Unable to load documents." onRetry={() => docsQuery.refetch()} />
+          ) : docs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No documents yet. Upload PDF, DOCX, TXT, CSV or Markdown files to build this business's knowledge.
+            </p>
           ) : (
             <div className="space-y-2">
-              {detail.sessions.slice(0, 8).map((s) => (
-                <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-                  <div>
-                    <span className="font-medium">{s.trainingType}</span>
-                    <p className="text-xs text-muted-foreground">{fmtDate(s.startedAt)}</p>
+              {docs.map((doc) => {
+                const isProcessing = PROCESSING_STATES.includes(doc.status);
+                return (
+                  <div key={doc.id} className="rounded-lg border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                          ) : (
+                            <FileText className="h-4 w-4 text-accent" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.type} · {fmtDate(doc.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            doc.status === 'INDEXED'
+                              ? 'default'
+                              : doc.status === 'FAILED'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                          className="capitalize"
+                        >
+                          {doc.status.toLowerCase()}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteMutation.mutate(doc.id)}
+                          disabled={deleteMutation.isPending}
+                          aria-label="Delete document"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                    {isProcessing && (
+                      <Progress value={DOC_STATUS_PROGRESS[doc.status] ?? 30} className="mt-2 h-1" />
+                    )}
+                    {doc.status === 'FAILED' && doc.processingError && (
+                      <p className="mt-1 text-xs text-destructive">{doc.processingError}</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{s.documentsCount} docs</span>
-                    <span>{s.faqCount} FAQs</span>
-                    <span>+{s.embeddingsCreated} embeddings</span>
-                    <Badge variant={s.status === 'COMPLETED' ? 'default' : s.status === 'FAILED' ? 'destructive' : 'secondary'}>
-                      {s.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -934,7 +1134,38 @@ function AnalyticsSection({
   if (query.isError || !query.data) {
     return <ErrorState message="Unable to load analytics." onRetry={() => query.refetch()} />;
   }
-  const a = query.data;
+  const d = query.data;
+  // Tolerate partial payloads so a missing sub-object never crashes the section.
+  const c = d.conversations;
+  const a = {
+    conversations: {
+      total: c?.total ?? 0,
+      aiHandled: c?.aiHandled ?? 0,
+      humanHandover: c?.humanHandover ?? 0,
+      aiResolutionRate: c?.aiResolutionRate ?? 0,
+      humanHandoverRate: c?.humanHandoverRate ?? 0,
+    },
+    messages: { ai: d.messages?.ai ?? 0, human: d.messages?.human ?? 0 },
+    knowledge: {
+      documentCount: d.knowledge?.documentCount ?? 0,
+      embeddingCount: d.knowledge?.embeddingCount ?? 0,
+      knowledgeScore: d.knowledge?.knowledgeScore ?? 0,
+      openInsights: d.knowledge?.openInsights ?? 0,
+    },
+    training: {
+      retrainingFrequency: d.training?.retrainingFrequency ?? 0,
+      lastTrainedAt: d.training?.lastTrainedAt ?? null,
+    },
+    quality: {
+      aiReadinessScore: d.quality?.aiReadinessScore ?? 0,
+      confidenceScore: d.quality?.confidenceScore ?? 0,
+      failedQuestions: d.quality?.failedQuestions ?? 0,
+    },
+    usage: {
+      estimatedTokens: d.usage?.estimatedTokens ?? 0,
+      embeddingUsage: d.usage?.embeddingUsage ?? 0,
+    },
+  };
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
