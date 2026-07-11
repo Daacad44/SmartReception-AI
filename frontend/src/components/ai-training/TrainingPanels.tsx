@@ -29,9 +29,12 @@ export function DeploymentPanel({ readOnly, businessId }: DeploymentPanelProps) 
   const isAdmin = Boolean(businessId);
 
   const { data: dashboard } = useQuery({
+    // Distinct key from the versions panel: both panels return different
+    // shapes, so sharing one key cross-contaminates the cache and crashes
+    // whichever panel reads a field the other's shape does not have.
     queryKey: isAdmin
-      ? ['enterprise-ai-intelligence', 'business', businessId]
-      : ['ai-training', 'overview'],
+      ? ['enterprise-ai-intelligence', 'business', businessId, 'deployment']
+      : ['ai-training', 'overview', 'deployment'],
     queryFn: async () => {
       if (isAdmin) {
         const response = await api.get(
@@ -183,8 +186,8 @@ export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTraini
 
   const { data: dashboard, refetch } = useQuery({
     queryKey: isAdmin
-      ? ['enterprise-ai-intelligence', 'business', businessId]
-      : ['ai-training', 'overview'],
+      ? ['enterprise-ai-intelligence', 'business', businessId, 'versions']
+      : ['ai-training', 'overview', 'versions'],
     queryFn: async () => {
       if (isAdmin) {
         const response = await api.get(
@@ -269,7 +272,7 @@ export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTraini
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {dashboard?.workspace.productionVersion
+              {dashboard?.workspace?.productionVersion
                 ? `v${dashboard.workspace.productionVersion.versionNumber}`
                 : '—'}
             </p>
@@ -281,7 +284,7 @@ export function AiTrainingVersionsPanel({ businessId, onRequestTrain }: AiTraini
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {dashboard?.workspace.sandboxVersion
+              {dashboard?.workspace?.sandboxVersion
                 ? `v${dashboard.workspace.sandboxVersion.versionNumber}`
                 : '—'}
             </p>
