@@ -51,6 +51,43 @@ export class KnowledgeService {
     return base;
   }
 
+  /**
+   * Guarantees a business has a knowledge base. Registration seeds one, but
+   * businesses created through other paths (imports, legacy data) may not have
+   * one yet — so uploads must never fail with "Knowledge base not found".
+   */
+  async ensureDefaultBase(businessId: string) {
+    const existing = await knowledgeRepository.getDefaultBase(businessId);
+    if (existing) return existing;
+    return prisma.knowledgeBase.create({
+      data: { businessId, name: 'Default Knowledge Base' },
+    });
+  }
+
+  /** Lists documents for a business (default or a specific base), newest first. */
+  async listDocuments(businessId: string, knowledgeBaseId?: string) {
+    return prisma.knowledgeDocument.findMany({
+      where: {
+        type: { not: 'FAQ' },
+        knowledgeBase: {
+          businessId,
+          ...(knowledgeBaseId ? { id: knowledgeBaseId } : {}),
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        fileSize: true,
+        processingError: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async uploadDocument(
     businessId: string,
     file: Express.Multer.File,

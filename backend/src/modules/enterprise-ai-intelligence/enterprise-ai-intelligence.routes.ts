@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { requireBusiness } from '../../core/middleware/authorize.middleware';
 import { requireSuperAdmin } from '../../core/middleware/super-admin.middleware';
@@ -13,6 +14,11 @@ import type { AiTrainingJobType, AiTrainingOperation } from '@prisma/client';
 
 const tenantRouter = Router();
 const adminRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
 
 tenantRouter.use(authenticate, requireBusiness);
 
@@ -110,6 +116,76 @@ adminRouter.get(
         limit
       );
       res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+adminRouter.get(
+  '/businesses/:businessId/knowledge/documents',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await enterpriseAiIntelligenceService.listKnowledgeDocuments(
+        String(req.params.businessId)
+      );
+      if (data === null) {
+        res.status(404).json({ success: false, error: 'Business not found' });
+        return;
+      }
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+adminRouter.post(
+  '/businesses/:businessId/knowledge/documents/upload',
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+      const document = await enterpriseAiIntelligenceService.uploadKnowledgeDocument(
+        String(req.params.businessId),
+        req.file,
+        req.body.title
+      );
+      res.status(201).json({ success: true, data: document });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+adminRouter.get(
+  '/businesses/:businessId/knowledge/documents/:documentId/status',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await enterpriseAiIntelligenceService.getKnowledgeDocumentStatus(
+        String(req.params.businessId),
+        String(req.params.documentId)
+      );
+      res.json({ success: true, data: status });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+adminRouter.delete(
+  '/businesses/:businessId/knowledge/documents/:documentId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await enterpriseAiIntelligenceService.deleteKnowledgeDocument(
+        String(req.params.businessId),
+        String(req.params.documentId),
+        req.user!.userId
+      );
+      res.json({ success: true, message: 'Document deleted' });
     } catch (error) {
       next(error);
     }
