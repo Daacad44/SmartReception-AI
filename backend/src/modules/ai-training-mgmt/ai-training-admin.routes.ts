@@ -56,15 +56,33 @@ router.get('/deployments', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+router.get('/deployments/:requestId/readiness', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const request = await deploymentService.getRequest(String(req.params.requestId));
+    const readiness = await deploymentService.evaluateDeploymentReadiness(
+      request.businessId,
+      request.versionId
+    );
+    res.json({ success: true, data: readiness });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/deployments/:requestId/approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await deploymentService.approve(String(req.params.requestId), req.user!.userId, {
-      businessId: '',
-      userId: req.user!.userId,
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent') ?? undefined,
-      deviceLabel: parseDeviceLabel(req.get('user-agent') ?? undefined),
-    });
+    const result = await deploymentService.approve(
+      String(req.params.requestId),
+      req.user!.userId,
+      {
+        businessId: '',
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent') ?? undefined,
+        deviceLabel: parseDeviceLabel(req.get('user-agent') ?? undefined),
+      },
+      { override: req.body?.override === true }
+    );
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);

@@ -28,6 +28,10 @@ router.get('/sandbox/sessions/:sessionId', authorize(PERMISSIONS['knowledge:read
 router.post('/sandbox/sessions/:sessionId/messages', authorize(PERMISSIONS['knowledge:write']), aiTrainingMgmtController.sendSandboxMessage);
 router.get('/sandbox/sessions/:sessionId/report', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.getSandboxReport);
 
+router.get('/readiness', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.getReadinessChecklist);
+router.get('/knowledge-gaps', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.listKnowledgeGaps);
+router.patch('/knowledge-gaps/:gapId', authorize(PERMISSIONS['knowledge:write']), aiTrainingMgmtController.updateKnowledgeGap);
+
 router.post('/deployments/request', authorize(PERMISSIONS['knowledge:write']), aiTrainingMgmtController.requestDeployment);
 router.get('/deployments', authorize(PERMISSIONS['knowledge:read']), aiTrainingMgmtController.listDeploymentRequests);
 

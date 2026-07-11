@@ -7,6 +7,7 @@ import { trainingJobService } from './training-job.service';
 import { versionService } from './version.service';
 import { sandboxService } from './sandbox.service';
 import { deploymentService } from './deployment.service';
+import { knowledgeGapService } from './knowledge-gap.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { parseDeviceLabel } from './audit.service';
@@ -214,6 +215,43 @@ export class AiTrainingMgmtController {
     try {
       const report = await sandboxService.getTestReport(req.user!.businessId!, String(req.params.sessionId));
       res.json({ success: true, data: report });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getReadinessChecklist = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const versionId = (req.query.versionId as string | undefined) ?? undefined;
+      const checklist = await sandboxService.getReadinessChecklist(req.user!.businessId!, versionId);
+      res.json({ success: true, data: checklist });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listKnowledgeGaps = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = req.query.status as 'OPEN' | 'RESOLVED' | 'DISMISSED' | undefined;
+      const [gaps, summary] = await Promise.all([
+        knowledgeGapService.list(req.user!.businessId!, { status }),
+        knowledgeGapService.summary(req.user!.businessId!),
+      ]);
+      res.json({ success: true, data: gaps, meta: summary });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateKnowledgeGap = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const gap = await knowledgeGapService.updateStatus(
+        req.user!.businessId!,
+        String(req.params.gapId),
+        req.body.status,
+        req.user!.userId
+      );
+      res.json({ success: true, data: gap });
     } catch (error) {
       next(error);
     }

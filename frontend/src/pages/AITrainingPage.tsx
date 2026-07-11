@@ -34,6 +34,7 @@ import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { ActivationCodeDialog } from '@/components/governance/ActivationCodeDialog';
 import { GovernanceApprovalBanner } from '@/components/governance/GovernanceApprovalBanner';
 import { SandboxChat } from '@/components/ai-training/SandboxChat';
+import { SandboxValidationPanel } from '@/components/ai-training/SandboxValidationPanel';
 import { DeploymentPanel, AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
 import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { toast } from 'sonner';
@@ -610,9 +611,12 @@ export function AITrainingPage() {
           </TabsContent>
 
           {/* Sandbox */}
-          <TabsContent value="sandbox">
+          <TabsContent value="sandbox" className="space-y-4">
             {sandboxVersionId ? (
-              <SandboxChat versionId={sandboxVersionId} readOnly={isReadOnly} />
+              <>
+                <SandboxChat versionId={sandboxVersionId} readOnly={isReadOnly} />
+                <SandboxValidationPanel versionId={sandboxVersionId} />
+              </>
             ) : (
               <Card>
                 <CardContent className="p-6 text-sm text-muted-foreground">

@@ -662,6 +662,7 @@ model Business {
   aiTrainingJobs                AiTrainingJob[]
   aiDeploymentRequests          AiDeploymentRequest[]
   aiSandboxSessions             AiSandboxSession[]
+  aiKnowledgeGaps               AiKnowledgeGap[]
   aiTrainingInsights            AiTrainingInsight[]
   aiTrainerAssignments          AiTrainerBusiness[]
   knowledgeChunks               KnowledgeChunk[]
@@ -2681,6 +2682,12 @@ enum AiSandboxMessageRole {
   SYSTEM
 }
 
+enum AiKnowledgeGapStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 enum AiTrainingAuditAction {
   TRAIN_STARTED
   TRAIN_COMPLETED
@@ -2950,20 +2957,62 @@ model AiSandboxSession {
 }
 
 model AiSandboxMessage {
-  id                String               @id @default(uuid())
-  sessionId         String
-  role              AiSandboxMessageRole
-  content           String
-  confidence        Float?
-  sources           Json?
-  hallucinationRisk Float?
-  missingKnowledge  Boolean              @default(false)
-  createdAt         DateTime             @default(now())
+  id                  String               @id @default(uuid())
+  sessionId           String
+  role                AiSandboxMessageRole
+  content             String
+  confidence          Float?
+  groundedConfidence  Float?
+  sources             Json?
+  hallucinationRisk   Float?
+  missingKnowledge    Boolean              @default(false)
+  intent              String?
+  route               String?
+  modelUsed           String?
+  provider            String?
+  retrievedChunkCount Int?
+  embeddingMatchScore Float?
+  latencyMs           Int?
+  createdAt           DateTime             @default(now())
 
   session AiSandboxSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@map("ai_sandbox_messages")
+}
+
+/// Missing-knowledge / hallucination-gap report. Every sandbox (or live) question
+/// that could not be answered from the approved knowledge base is captured here so
+/// Super Admin can see what to train next. Recurring questions increment `frequency`.
+model AiKnowledgeGap {
+  id                 String               @id @default(uuid())
+  businessId         String
+  versionId          String?
+  sessionId          String?
+  question           String
+  normalizedQuestion String
+  category           String?
+  intent             String?
+  frequency          Int                  @default(1)
+  groundedConfidence Float?
+  hallucinationRisk  Float?
+  recommendation     String?
+  status             AiKnowledgeGapStatus @default(OPEN)
+  source             String               @default("SANDBOX")
+  resolvedByUserId   String?
+  resolvedAt         DateTime?
+  firstAskedAt       DateTime             @default(now())
+  lastAskedAt        DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, normalizedQuestion])
+  @@index([businessId])
+  @@index([status])
+  @@index([businessId, status])
+  @@map("ai_knowledge_gaps")
 }
 
 model AiTrainer {
