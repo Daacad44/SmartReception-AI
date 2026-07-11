@@ -6,6 +6,7 @@ import { requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { resolveAiProvider, resolveEmbeddingProvider } from './providers/provider-factory';
 import { executeRagPipeline } from './rag/rag-pipeline.service';
+import type { RagPipelineMeta } from './rag/rag-pipeline.service';
 import type { AiResourceRoute } from './ai-intent-router.service';
 
 export interface GenerateResponseOptions {
@@ -14,6 +15,7 @@ export interface GenerateResponseOptions {
   forceRoute?: AiResourceRoute;
   customerId?: string;
   messageId?: string;
+  sandbox?: boolean;
 }
 
 const CHAT_MODEL = 'gemini-2.5-flash';
@@ -33,7 +35,7 @@ export async function generateResponse(
   conversationId: string,
   customerMessage: string,
   options: GenerateResponseOptions = {}
-): Promise<AIResponse> {
+): Promise<AIResponse & { _meta?: RagPipelineMeta }> {
   return executeRagPipeline(businessId, conversationId, customerMessage, options);
 }
 

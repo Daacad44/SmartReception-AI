@@ -6,9 +6,56 @@ import { NotFoundError, ValidationError, ForbiddenError } from '../../core/error
 import { workspaceService } from './workspace.service';
 import { recordAiTrainingAudit, type AuditContext } from './audit.service';
 import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
+import { sandboxService } from './sandbox.service';
+import { VALIDATION_THRESHOLD } from './ai-knowledge.constants';
 import { config } from '../../config';
 
+export interface DeploymentReadiness {
+  ready: boolean;
+  blockers: string[];
+  checklist: Awaited<ReturnType<typeof sandboxService.getReadinessChecklist>>;
+  threshold: number;
+}
+
 export class DeploymentService {
+  /**
+   * Deployment gate (Phase 13). Approval is blocked unless every hard
+   * requirement is satisfied: knowledge approved & indexed, training completed,
+   * sandbox tested, AI quality above threshold, and no failed checklist items.
+   */
+  async evaluateDeploymentReadiness(
+    businessId: string,
+    versionId: string
+  ): Promise<DeploymentReadiness> {
+    const checklist = await sandboxService.getReadinessChecklist(businessId, versionId);
+    const byKey = new Map(checklist.items.map((i) => [i.key, i]));
+    const blockers: string[] = [];
+
+    const requireComplete = (key: string, message: string) => {
+      const item = byKey.get(key);
+      if (!item || item.state !== 'COMPLETE') blockers.push(message);
+    };
+
+    requireComplete('knowledge_approved', 'Knowledge must be approved and indexed');
+    requireComplete('training_completed', 'Training must be completed');
+    requireComplete('embeddings_generated', 'Embeddings must be generated');
+    requireComplete('knowledge_indexed', 'Knowledge must be indexed');
+    requireComplete('sandbox_tested', 'Sandbox testing must be run');
+
+    const evaluation = byKey.get('evaluation_passed');
+    if (evaluation?.state === 'FAILED') {
+      blockers.push(`AI quality is below the ${VALIDATION_THRESHOLD}% threshold`);
+    } else if (evaluation?.state === 'PENDING') {
+      blockers.push('AI evaluation has not produced a readiness score yet');
+    }
+
+    if (checklist.failed > 0) {
+      blockers.push('One or more readiness checks have failed');
+    }
+
+    return { ready: blockers.length === 0, blockers, checklist, threshold: VALIDATION_THRESHOLD };
+  }
+
   async requestDeployment(
     businessId: string,
     versionId: string,
@@ -171,10 +218,24 @@ export class DeploymentService {
     return request;
   }
 
-  async approve(requestId: string, userId: string, audit: AuditContext) {
+  async approve(
+    requestId: string,
+    userId: string,
+    audit: AuditContext,
+    opts: { override?: boolean } = {}
+  ) {
     const request = await this.getRequest(requestId);
     if (request.status !== 'PENDING' && request.status !== 'CHANGES_REQUESTED') {
       throw new ValidationError('Request is not pending approval');
+    }
+
+    if (!opts.override) {
+      const readiness = await this.evaluateDeploymentReadiness(request.businessId, request.versionId);
+      if (!readiness.ready) {
+        throw new ValidationError(
+          `Deployment blocked — resolve the following before approving: ${readiness.blockers.join('; ')}`
+        );
+      }
     }
 
     return prisma.aiDeploymentRequest.update({
