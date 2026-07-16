@@ -650,6 +650,10 @@ model Business {
   businessProfile               BusinessProfile?
   appointmentSettings           AppointmentSettings?
   businessExceptions            BusinessException[]
+  appointmentSlots              AppointmentSlot[]
+  waitlistEntries               WaitlistEntry[]
+  notificationQueueEntries      NotificationQueue[]
+  aiBookingLogs                 AiBookingLog[]
   employees                     Employee[]
   employeeGroups                EmployeeGroup[]
   employeeBroadcasts            EmployeeBroadcast[]
@@ -872,6 +876,8 @@ model Customer {
   targetedCampaigns        Campaign[]                  @relation("CampaignTargetCustomer")
   journeyEnrollments       CampaignJourneyEnrollment[]
   campaignOptOut           CustomerCampaignOptOut?
+  waitlistEntries          WaitlistEntry[]
+  aiBookingLogs            AiBookingLog[]
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -1042,18 +1048,21 @@ model ConversationFeedback {
 // ─── APPOINTMENTS & SERVICES ─────────────────────────────────────────────────
 
 model Service {
-  id          String   @id @default(uuid())
-  businessId  String
-  name        String
-  description String?
-  duration    Int      @default(30)
-  price       Decimal? @db.Decimal(10, 2)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  businessId     String
+  name           String
+  description    String?
+  duration       Int      @default(30)
+  bufferMinutes  Int      @default(0)
+  price          Decimal? @db.Decimal(10, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
+  business      Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  slots         AppointmentSlot[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([businessId])
   @@index([businessId, isActive])
@@ -1065,6 +1074,7 @@ model Appointment {
   businessId             String
   customerId             String
   serviceId              String?
+  slotId                 String?
   assignedToId           String?
   createdById            String?
   workflowId             String?
@@ -1118,6 +1128,7 @@ model Appointment {
   business           Business                       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer           Customer                       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   service            Service?                       @relation(fields: [serviceId], references: [id])
+  slot               AppointmentSlot?               @relation(fields: [slotId], references: [id], onDelete: SetNull)
   assignedTo         User?                          @relation("AssignedStaff", fields: [assignedToId], references: [id])
   createdBy          User?                          @relation("AppointmentCreator", fields: [createdById], references: [id])
   workflow           AppointmentWorkflow?           @relation(fields: [workflowId], references: [id])
@@ -1137,6 +1148,7 @@ model Appointment {
   @@index([createdById])
   @@index([workflowId])
   @@index([priority])
+  @@index([slotId])
   @@map("appointments")
 }
 
@@ -1855,6 +1867,34 @@ enum BusinessExceptionType {
   TEMPORARY_CLOSURE
 }
 
+enum AppointmentSlotStatus {
+  AVAILABLE
+  BOOKED
+  FULL
+  BLOCKED
+  HELD
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  BOOKED
+  CANCELLED
+}
+
+enum NotificationQueueChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+}
+
+enum NotificationQueueStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 /// One row per business. Single source of truth for the appointment engine:
 /// weekly working hours (structured), slot config, buffers and blocked dates.
 model AppointmentSettings {
@@ -1902,6 +1942,115 @@ model BusinessException {
   @@index([businessId])
   @@index([businessId, startDate])
   @@map("business_exceptions")
+}
+
+/// A concrete, bookable time window materialized from working hours + service
+/// duration/buffer. Persisted (rather than purely computed) so it can carry
+/// capacity, a booked count, and a soft-lock (`heldUntil`) for the waitlist flow.
+model AppointmentSlot {
+  id          String                @id @default(uuid())
+  businessId  String
+  serviceId   String?
+  date        DateTime              @db.Date
+  startTime   DateTime
+  endTime     DateTime
+  status      AppointmentSlotStatus @default(AVAILABLE)
+  capacity    Int                   @default(1)
+  bookedCount Int                   @default(0)
+  heldUntil   DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  service      Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+
+  @@unique([businessId, serviceId, startTime])
+  @@index([businessId, date])
+  @@index([businessId, status])
+  @@index([businessId, serviceId, date])
+  @@index([heldUntil])
+  @@map("appointment_slots")
+}
+
+/// A customer waiting for a slot that is currently full/unavailable. Notified
+/// automatically (via NotificationQueue) as soon as a matching slot opens up.
+model WaitlistEntry {
+  id             String          @id @default(uuid())
+  businessId     String
+  customerId     String?
+  customerPhone  String
+  serviceId      String?
+  preferredDate  DateTime?       @db.Date
+  preferredTime  String?
+  priority       Int             @default(0)
+  status         WaitlistStatus  @default(WAITING)
+  notifiedAt     DateTime?
+  heldSlotId     String?
+  bookedAppointmentId String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  service  Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@index([businessId, serviceId, status])
+  @@index([businessId, priority, createdAt])
+  @@map("waitlist_entries")
+}
+
+/// Generic outbound notification queue (WhatsApp / Email / SMS-stubbed) with
+/// retry, used by the waitlist notifier and reminder engine.
+model NotificationQueue {
+  id            String                   @id @default(uuid())
+  businessId    String
+  channel       NotificationQueueChannel
+  recipient     String
+  payload       Json
+  status        NotificationQueueStatus  @default(PENDING)
+  scheduledFor  DateTime                 @default(now())
+  sentAt        DateTime?
+  failedAt      DateTime?
+  retryCount    Int                      @default(0)
+  maxRetries    Int                      @default(5)
+  errorMessage  String?
+  relatedType   String?
+  relatedId     String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@index([scheduledFor, status])
+  @@index([status, retryCount])
+  @@index([relatedType, relatedId])
+  @@map("notification_queue")
+}
+
+/// Audit trail of every AI booking decision — what it checked, what it picked,
+/// and why — so booking behavior is inspectable and never "from memory".
+model AiBookingLog {
+  id                 String   @id @default(uuid())
+  businessId         String
+  customerId         String?
+  conversationId     String?
+  intent             String
+  selectedSlotId     String?
+  slotsCheckedCount  Int      @default(0)
+  conflictCheckResult String?
+  source             String   @default("WHATSAPP_AI")
+  confidence         Float?
+  createdAt          DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, intent])
+  @@map("ai_booking_logs")
 }
 
 // ─── AI CONFIGURATION ────────────────────────────────────────────────────────
