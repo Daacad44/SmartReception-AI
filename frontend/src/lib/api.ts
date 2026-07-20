@@ -91,10 +91,15 @@ async function refreshAccessToken(): Promise<string> {
 
   const storeRefreshToken = useAuthStore.getState().refreshToken;
 
+  if (!storeRefreshToken) {
+    clearSession();
+    return Promise.reject(new Error('No refresh token available'));
+  }
+
   refreshPromise = axios
     .post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
       `${API_BASE_URL}/auth/refresh`,
-      storeRefreshToken ? { refreshToken: storeRefreshToken } : {},
+      { refreshToken: storeRefreshToken },
       { timeout: 10_000, withCredentials: true }
     )
     .then((response) => {
