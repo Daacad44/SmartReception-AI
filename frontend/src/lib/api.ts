@@ -82,6 +82,20 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+// Auth endpoints where a 401 means "bad/expired credentials", NOT an expired
+// access token. These must never trigger the refresh-token retry, otherwise a
+// failed login surfaces "No refresh token available" instead of the real error.
+const AUTH_ENDPOINTS_NO_REFRESH = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/verify-2fa',
+  '/auth/verify-otp',
+  '/auth/verify-approval',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
@@ -151,8 +165,12 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (originalRequest.url?.includes('/auth/refresh')) {
-      clearSession();
+    if (AUTH_ENDPOINTS_NO_REFRESH.some((path) => originalRequest.url?.includes(path))) {
+      // Only the refresh endpoint itself should clear the session on 401;
+      // login/register/etc. must surface their real error (e.g. wrong password).
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        clearSession();
+      }
       return Promise.reject(error);
     }
 
