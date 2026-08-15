@@ -2,6 +2,8 @@ import type { AIConfiguration, Business, KnowledgeBase, WhatsAppAccount } from '
 import { prisma } from '../../infrastructure/database/prisma';
 import { NotFoundError } from '../../core/errors';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
+import { logger } from '../../core/logger';
+import { phoneLast6 } from '@smartreception/shared';
 import { knowledgeRepository } from '../knowledge/knowledge.repository';
 import type { WebhookMetadata, WhatsAppTenantContext } from './whatsapp-tenant.types';
 
@@ -19,21 +21,56 @@ export class WhatsAppTenantResolver {
   /**
    * Resolve tenant by Meta phone_number_id.
    * Never falls back to a default workspace or global assistant.
+   *
+   * Ingestion (storing + displaying the inbound message) must NOT depend on the
+   * outbound access token: a missing/undecryptable token here previously threw,
+   * which dropped the whole webhook (message never reached the system). We now
+   * resolve the tenant even without a usable token — the reply stage handles a
+   * missing token gracefully — so inbound messages always land in the inbox.
    */
-  async resolveByPhoneNumberId(phoneNumberId: string): Promise<WhatsAppTenantContext> {
-    const account = await prisma.whatsAppAccount.findUnique({
+  async resolveByPhoneNumberId(
+    phoneNumberId: string,
+    displayPhoneNumber?: string
+  ): Promise<WhatsAppTenantContext> {
+    let account = await prisma.whatsAppAccount.findUnique({
       where: { phoneNumberId },
       include: { business: true },
     });
 
+    // Fallback: the stored phoneNumberId can be stale/mismatched while the
+    // display number still identifies the tenant. Match on the last 6 digits.
+    if ((!account || !account.isActive) && displayPhoneNumber) {
+      account = await this.findActiveAccountByDisplayNumber(displayPhoneNumber);
+      if (account) {
+        logger.warn('WhatsApp tenant resolved via display_phone_number fallback', {
+          receivedPhoneNumberId: phoneNumberId,
+          displayPhoneNumber,
+          matchedAccountId: account.id,
+          storedPhoneNumberId: account.phoneNumberId,
+        });
+      }
+    }
+
     if (!account || !account.isActive) {
+      const activeIds = await prisma.whatsAppAccount.findMany({
+        where: { isActive: true },
+        select: { phoneNumberId: true },
+      });
+      logger.warn('WhatsApp webhook: no active account matched inbound phone_number_id', {
+        receivedPhoneNumberId: phoneNumberId,
+        displayPhoneNumber,
+        knownActivePhoneNumberIds: activeIds.map((a) => a.phoneNumberId),
+      });
       throw new NotFoundError(`WhatsApp account not found for phone_number_id: ${phoneNumberId}`);
     }
 
     const accessToken = resolveStoredToken(account.accessToken);
     if (!accessToken) {
-      throw new NotFoundError(
-        `WhatsApp access token not configured for phone_number_id: ${phoneNumberId}`
+      // Do NOT throw — ingest the message so it shows in the system. The reply
+      // stage will surface a token-error notice instead of silently dropping it.
+      logger.warn(
+        'WhatsApp stored access token missing/undecryptable — ingesting inbound without reply capability',
+        { phoneNumberId: account.phoneNumberId, businessId: account.businessId }
       );
     }
 
@@ -43,12 +80,34 @@ export class WhatsAppTenantResolver {
     ]);
 
     return this.buildContext({
-      phoneNumberId,
+      phoneNumberId: account.phoneNumberId,
       account,
-      accessToken,
+      accessToken: accessToken ?? '',
       aiConfiguration,
       knowledgeBase,
+      displayPhoneNumber,
     });
+  }
+
+  /** Find an active WhatsApp account whose stored number matches the last 6 digits. */
+  private async findActiveAccountByDisplayNumber(
+    displayPhoneNumber: string
+  ): Promise<WhatsAppAccountWithBusiness | null> {
+    const last6 = phoneLast6(displayPhoneNumber);
+    if (last6.length < 6) return null;
+
+    const accounts = await prisma.whatsAppAccount.findMany({
+      where: { isActive: true },
+      include: { business: true },
+    });
+
+    return (
+      accounts.find(
+        (a) =>
+          phoneLast6(a.phoneNumber ?? '') === last6 ||
+          phoneLast6(a.phoneNumberId ?? '') === last6
+      ) ?? null
+    );
   }
 
   async resolveInbound(
@@ -60,7 +119,7 @@ export class WhatsAppTenantResolver {
       throw new NotFoundError('Webhook missing phone_number_id');
     }
 
-    const context = await this.resolveByPhoneNumberId(phoneNumberId);
+    const context = await this.resolveByPhoneNumberId(phoneNumberId, metadata.display_phone_number);
     return {
       ...context,
       displayPhoneNumber: metadata.display_phone_number,

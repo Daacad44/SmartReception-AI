@@ -1,36 +1,35 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import type { Customer } from '@prisma/client';
 import { normalizeEmail } from '../../infrastructure/appointments/email-validation';
+import { normalizeSomaliPhone, phoneLast6, somaliPhonesMatch } from '@smartreception/shared';
 
 export function phoneDigits(phone: string): string {
   return phone.replace(/\D/g, '');
 }
 
-/** True when two phones refer to the same WhatsApp subscriber (handles +252 vs local). */
+/**
+ * True when two phones refer to the same WhatsApp subscriber. Somali numbers are
+ * matched on their LAST 6 digits (after normalizing +252 vs local formats).
+ */
 export function phonesMatchDigitized(a: string, b: string): boolean {
-  const da = phoneDigits(a);
-  const db = phoneDigits(b);
-  if (!da || !db) return false;
-  if (da === db) return true;
-  return da.endsWith(db) || db.endsWith(da);
+  return somaliPhonesMatch(a, b);
 }
 
-/** Find a customer by phone regardless of formatting (+252, spaces, local vs international). */
+/**
+ * Find a customer by phone regardless of formatting (+252, spaces, local vs
+ * international). Matching is done on the last 6 digits of the stored number.
+ */
 export async function findCustomerByPhoneDigits(
   businessId: string,
   phone: string
 ): Promise<Customer | null> {
-  const digits = phoneDigits(phone);
-  if (!digits) return null;
+  const last6 = phoneLast6(normalizeSomaliPhone(phone));
+  if (last6.length < 6) return null;
 
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM customers
     WHERE "businessId" = ${businessId}
-      AND (
-        regexp_replace(phone, '[^0-9]', '', 'g') = ${digits}
-        OR regexp_replace(phone, '[^0-9]', '', 'g') LIKE '%' || ${digits}
-        OR ${digits} LIKE '%' || regexp_replace(phone, '[^0-9]', '', 'g')
-      )
+      AND right(regexp_replace(phone, '[^0-9]', '', 'g'), 6) = ${last6}
     ORDER BY "createdAt" ASC
     LIMIT 1
   `;
@@ -39,22 +38,18 @@ export async function findCustomerByPhoneDigits(
   return prisma.customer.findUnique({ where: { id: rows[0].id } });
 }
 
-/** All customer IDs for a business that share the same WhatsApp phone (suffix-safe). */
+/** All customer IDs for a business that share the same WhatsApp phone (last-6 match). */
 export async function findCustomerIdsByPhoneDigits(
   businessId: string,
   phone: string
 ): Promise<string[]> {
-  const digits = phoneDigits(phone);
-  if (!digits) return [];
+  const last6 = phoneLast6(normalizeSomaliPhone(phone));
+  if (last6.length < 6) return [];
 
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM customers
     WHERE "businessId" = ${businessId}
-      AND (
-        regexp_replace(phone, '[^0-9]', '', 'g') = ${digits}
-        OR regexp_replace(phone, '[^0-9]', '', 'g') LIKE '%' || ${digits}
-        OR ${digits} LIKE '%' || regexp_replace(phone, '[^0-9]', '', 'g')
-      )
+      AND right(regexp_replace(phone, '[^0-9]', '', 'g'), 6) = ${last6}
   `;
 
   return rows.map((row) => row.id);

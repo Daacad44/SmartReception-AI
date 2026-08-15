@@ -1,6 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { Prisma } from '@prisma/client';
 import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/customer-phone';
+import { normalizeSomaliPhone } from '@smartreception/shared';
 import { resolveInboundTimestamp } from './whatsapp-session.service';
 
 export class WhatsAppRepository {
@@ -41,6 +42,10 @@ export class WhatsAppRepository {
       throw new Error('Invalid phone number');
     }
 
+    // Store WhatsApp senders in canonical +252 form so dashboard-created customers
+    // (also normalized to +252) and inbound senders line up on the last 6 digits.
+    const normalizedPhone = normalizeSomaliPhone(phone) || digits;
+
     const existing = await findCustomerByPhoneDigits(businessId, phone);
 
     if (existing) {
@@ -56,8 +61,8 @@ export class WhatsAppRepository {
     const customer = await prisma.customer.create({
       data: {
         businessId,
-        phone: digits,
-        name: name || digits,
+        phone: normalizedPhone,
+        name: name || normalizedPhone,
         whatsappId: phone,
         source: 'whatsapp',
       },

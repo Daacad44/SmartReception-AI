@@ -1,4 +1,20 @@
 import { z } from 'zod';
+import { isValidSomaliPhone, normalizeSomaliPhone } from './phone';
+
+/**
+ * Somali customer phone: must be a +252 number with a 61/62/63/68 prefix.
+ * Accepts local input (0612345678, 612345678, 252612345678) and normalizes it
+ * to the canonical +252XXXXXXXX form; rejects anything that is not Somali.
+ */
+const somaliCustomerPhoneSchema = z
+  .string()
+  .min(1)
+  .max(20)
+  .transform((value) => normalizeSomaliPhone(value))
+  .refine(isValidSomaliPhone, {
+    message:
+      'Phone must be a Somali number like +252612345678 (starts with +252 and a 61, 62, 63, or 68 prefix)',
+  });
 
 const strongPasswordSchema = z
   .string()
@@ -184,14 +200,14 @@ export const customerTypeSchema = z.enum(CUSTOMER_TYPES);
 
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
-  phone: z.string().min(1).max(20),
+  phone: somaliCustomerPhoneSchema,
   email: z.string().email().optional().or(z.literal('')),
   notes: z.string().max(5000).optional(),
   companyName: z.string().max(200).optional(),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
-  whatsappNumber: z.string().max(20).optional(),
+  whatsappNumber: somaliCustomerPhoneSchema.optional(),
   customerType: customerTypeSchema.optional(),
   leadStatus: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'WON', 'LOST']).optional(),
   customerValue: z.number().min(0).optional(),

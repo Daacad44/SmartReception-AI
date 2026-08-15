@@ -219,7 +219,10 @@ export class WhatsAppModuleService {
       throw new NotFoundError('Webhook missing phone_number_id');
     }
 
-    const tenant = await whatsappTenantResolver.resolveByPhoneNumberId(phoneNumberId);
+    const tenant = await whatsappTenantResolver.resolveByPhoneNumberId(
+      phoneNumberId,
+      parsed.displayPhoneNumber
+    );
     const account = tenant.account;
 
     if (!parsed.messages.length && !parsed.statuses.length) {
@@ -241,25 +244,38 @@ export class WhatsAppModuleService {
       );
       if (!recorded) continue;
 
-      const contactName = resolveContactName(parsed.contacts, msg.from);
-      const extracted = extractMessageContent(msg);
-      console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
+      // Isolate each message: one failure must not abort the rest of the batch
+      // or vanish silently. Every failure is logged with the tenant + message id.
+      try {
+        const contactName = resolveContactName(parsed.contacts, msg.from);
+        const extracted = extractMessageContent(msg);
+        console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
 
-      startPipelineTrace(msg.id, {
-        businessId: tenant.businessId,
-        whatsappMsgId: msg.id,
-      });
+        startPipelineTrace(msg.id, {
+          businessId: tenant.businessId,
+          whatsappMsgId: msg.id,
+        });
 
-      await handleIncomingMessage({
-        businessId: tenant.businessId,
-        whatsappAccountId: account.id,
-        phoneNumberId: tenant.phoneNumberId,
-        accessToken: tenant.accessToken,
-        msg,
-        contactName: contactName ?? undefined,
-        pipelineKey: msg.id,
-        extracted,
-      });
+        await handleIncomingMessage({
+          businessId: tenant.businessId,
+          whatsappAccountId: account.id,
+          phoneNumberId: tenant.phoneNumberId,
+          accessToken: tenant.accessToken,
+          msg,
+          contactName: contactName ?? undefined,
+          pipelineKey: msg.id,
+          extracted,
+        });
+      } catch (error) {
+        logger.error('[WhatsApp] Inbound message processing failed', {
+          error: error instanceof Error ? error.message : String(error),
+          businessId: tenant.businessId,
+          phoneNumberId: tenant.phoneNumberId,
+          whatsappMsgId: msg.id,
+          from: msg.from,
+          type: msg.type,
+        });
+      }
     }
 
     void this.deferWebhookMaintenance(account, parsed);
