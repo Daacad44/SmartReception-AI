@@ -129,7 +129,7 @@ export function AssignSubscriptionModal({
         durationPreset: form.durationPreset,
         customDurationDays:
           form.durationPreset === 'CUSTOM' ? Number(form.customDurationDays) : undefined,
-        endDate: form.endDate || undefined,
+        expiresAt: form.endDate ? new Date(form.endDate).toISOString() : undefined,
         isTrial: form.isTrial,
       });
       return res.data.data as {
@@ -156,7 +156,7 @@ export function AssignSubscriptionModal({
         customDurationDays:
           form.durationPreset === 'CUSTOM' ? Number(form.customDurationDays) : undefined,
         startDate: form.startDate,
-        endDate: form.endDate || undefined,
+        expiresAt: form.endDate ? new Date(form.endDate).toISOString() : undefined,
         isTrial: form.isTrial,
         paymentStatus: form.paymentStatus,
         paymentMethod: form.paymentMethod,
@@ -262,9 +262,9 @@ export function AssignSubscriptionModal({
                 />
               </div>
               <div>
-                <Label className="text-slate-300">End Date (optional)</Label>
+                <Label className="text-slate-300">Exact End Date &amp; Time (optional)</Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   className="border-slate-700 bg-slate-900"
                   value={form.endDate}
                   onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
@@ -291,7 +291,7 @@ export function AssignSubscriptionModal({
 
         <div className="grid gap-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 md:grid-cols-4">
           <PreviewStat label="Start" value={preview ? new Date(preview.startDate).toLocaleDateString() : '—'} />
-          <PreviewStat label="End" value={preview ? new Date(preview.endDate).toLocaleDateString() : '—'} />
+          <PreviewStat label="End" value={preview ? new Date(preview.endDate).toLocaleString() : '—'} />
           <PreviewStat label="Duration" value={preview ? `${preview.durationDays} days` : '—'} />
           <PreviewStat label="Status" value={preview?.status ?? '—'} />
         </div>

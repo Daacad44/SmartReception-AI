@@ -22,6 +22,9 @@ adminRouter.post('/:businessId/assign', (req, res, next) =>
 adminRouter.post('/:businessId/extend', (req, res, next) =>
   subscriptionAdminController.extend(req, res, next)
 );
+adminRouter.post('/:businessId/set-expiry', (req, res, next) =>
+  subscriptionAdminController.setExpiry(req, res, next)
+);
 adminRouter.post('/:businessId/shorten', (req, res, next) =>
   subscriptionAdminController.shorten(req, res, next)
 );

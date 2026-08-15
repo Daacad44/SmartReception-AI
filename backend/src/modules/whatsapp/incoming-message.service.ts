@@ -80,13 +80,6 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     extracted,
   } = params;
 
-  const { isWhatsAppAutomationAllowed } = await import('../subscription/subscription-license.service');
-  if (!(await isWhatsAppAutomationAllowed(businessId))) {
-    logger.info('WhatsApp automation blocked — invalid subscription license', { businessId });
-    logPipelineStep(pipelineKey, 'deferred_tasks_done');
-    return;
-  }
-
   const { tryHandleEmployeeInbound } = await import('../employee-comms/employee-inbound.service');
   const handledAsEmployee = await tryHandleEmployeeInbound({
     businessId,
@@ -218,8 +211,22 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
   logPipelineStep(pipelineKey, 'message_saved', { timings });
 
   const aiText = extracted.content?.trim() ?? '';
+
+  // The subscription/license check gates the AI auto-reply ONLY. The customer's
+  // message has already been stored and the conversation created above, and the
+  // realtime broadcast runs in runDeferredInboundTasks regardless — so a human
+  // agent can always see and answer the message even when the license is invalid.
+  const { isWhatsAppAutomationAllowed } = await import('../subscription/subscription-license.service');
+  const licenseAllowsAi = await isWhatsAppAutomationAllowed(businessId);
+  if (!licenseAllowsAi) {
+    logger.info('WhatsApp AI auto-reply skipped — invalid subscription license', {
+      businessId,
+      conversationId: conversation.id,
+    });
+  }
+
   const autoReplyEnabled =
-    config.aiReply.enabled && (await isAutoReplyEnabled(businessId));
+    config.aiReply.enabled && licenseAllowsAi && (await isAutoReplyEnabled(businessId));
   const canReplyWithAi =
     autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
 
