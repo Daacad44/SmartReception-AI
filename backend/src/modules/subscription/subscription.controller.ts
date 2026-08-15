@@ -68,6 +68,7 @@ export class SubscriptionAdminController {
               ? new Date(req.body.activationDate)
               : undefined,
           endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+          expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : undefined,
           isTrial: req.body.isTrial === true,
           internalNotes: req.body.internalNotes,
           paymentStatus: req.body.paymentStatus,
@@ -92,6 +93,20 @@ export class SubscriptionAdminController {
         Number(req.body.additionalDays),
         actorFromReq(req),
         req.body.reason
+      );
+      res.json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setExpiry(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await subscriptionService.setExpiry(
+        businessIdFromReq(req),
+        new Date(req.body.expiresAt),
+        actorFromReq(req),
+        { planCode: req.body.planCode as SubscriptionPlan | undefined, reason: req.body.reason }
       );
       res.json({ data: result });
     } catch (error) {

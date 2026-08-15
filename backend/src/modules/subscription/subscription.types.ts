@@ -80,6 +80,8 @@ export interface AssignSubscriptionInput {
   customDurationDays?: number;
   activationDate?: Date;
   endDate?: Date;
+  /** Exact expiry timestamp (hour + minute preserved). Overrides endDate/preset when set. */
+  expiresAt?: Date;
   isTrial?: boolean;
   internalNotes?: string;
   paymentStatus?: SubscriptionPaymentStatus;
@@ -117,6 +119,7 @@ export function calculateSubscriptionDates(params: {
   durationPreset: SubscriptionDurationPreset;
   customDurationDays?: number;
   endDate?: Date;
+  expiresAt?: Date;
   isTrial?: boolean;
 }): SubscriptionCalculation {
   const startDate = new Date(params.startDate);
@@ -125,7 +128,14 @@ export function calculateSubscriptionDates(params: {
   let durationDays: number;
   let endDate: Date;
 
-  if (params.endDate) {
+  if (params.expiresAt) {
+    // Exact expiry timestamp — used verbatim (hour + minute preserved), no rounding.
+    endDate = new Date(params.expiresAt);
+    durationDays = Math.max(
+      1,
+      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
+  } else if (params.endDate) {
     endDate = new Date(params.endDate);
     endDate.setHours(23, 59, 59, 999);
     durationDays = Math.max(

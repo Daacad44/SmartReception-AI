@@ -30,6 +30,7 @@ export function ExtendSubscriptionModal({
 }: ExtendSubscriptionModalProps) {
   const [additionalDays, setAdditionalDays] = useState('30');
   const [reason, setReason] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
 
   const extendMutation = useMutation({
     mutationFn: async (days: number) =>
@@ -43,6 +44,27 @@ export function ExtendSubscriptionModal({
       onOpenChange(false);
     },
     onError: () => toast.error('Failed to extend subscription'),
+  });
+
+  // Activate (or re-open) until an exact date & time. Works even for a business
+  // that has never had a subscription (PENDING) — the backend resolves a plan.
+  const setExpiryMutation = useMutation({
+    mutationFn: async (localDateTime: string) =>
+      api.post(`/super-admin/subscriptions/${businessId}/set-expiry`, {
+        expiresAt: new Date(localDateTime).toISOString(),
+        reason: reason || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Business activated until the selected date & time');
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (err: unknown) => {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to set expiry';
+      toast.error(message);
+    },
   });
 
   return (
@@ -78,6 +100,28 @@ export function ExtendSubscriptionModal({
               onChange={(e) => setAdditionalDays(e.target.value)}
             />
           </div>
+
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+            <Label className="text-slate-300">Active until — exact date &amp; time</Label>
+            <p className="text-xs text-slate-400">
+              Business stays fully active (nothing blocked) until this exact moment.
+              Works even if it has no subscription yet.
+            </p>
+            <Input
+              type="datetime-local"
+              className="border-slate-700 bg-slate-900"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+            <Button
+              className="w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+              onClick={() => setExpiryMutation.mutate(expiresAt)}
+              disabled={setExpiryMutation.isPending || !expiresAt}
+            >
+              Activate until this date &amp; time
+            </Button>
+          </div>
+
           <div>
             <Label className="text-slate-300">Reason</Label>
             <Input

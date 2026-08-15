@@ -70,6 +70,7 @@ export class SubscriptionService {
       durationPreset: input.durationPreset,
       customDurationDays: input.customDurationDays,
       endDate: input.endDate,
+      expiresAt: input.expiresAt,
       isTrial: input.isTrial,
     });
 
@@ -274,6 +275,99 @@ export class SubscriptionService {
       oldValue: { expiresAt: oldExpires },
       newValue: { expiresAt, additionalDays },
       notes: reason,
+    });
+
+    await scheduleSubscriptionReminders(updated.id);
+    return this.getAdminBusinessDetail(businessId);
+  }
+
+  /**
+   * Activate a business until an exact expiry timestamp (e.g. 2026-08-29 01:50).
+   * Works even when the business has never had a subscription (PENDING): a plan
+   * is resolved (the current one, or the cheapest active plan) and a subscription
+   * is created. Until the exact expiry moment nothing is blocked; after it, the
+   * license simply becomes invalid (AI stops, but messages still reach humans).
+   */
+  async setExpiry(
+    businessId: string,
+    expiresAt: Date,
+    actor: SubscriptionActorContext,
+    opts?: { planCode?: AssignSubscriptionInput['planCode']; reason?: string }
+  ) {
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new ValidationError('Invalid expiry date');
+    }
+    if (expiresAt.getTime() <= Date.now()) {
+      throw new ValidationError('Expiry date must be in the future');
+    }
+
+    const business = await subscriptionRepository.getBusinessLicense(businessId);
+    if (!business) throw new NotFoundError('Business not found');
+
+    const existing = business.businessSubscription;
+
+    // Resolve a plan: keep the current one, else the cheapest active plan.
+    let planId = existing?.planId ?? null;
+    if (!planId) {
+      const plan = opts?.planCode
+        ? await subscriptionRepository.getPlanByCode(opts.planCode)
+        : (await subscriptionRepository.listPlans())[0];
+      if (!plan) throw new ValidationError('No subscription plan available to activate');
+      planId = plan.id;
+    }
+
+    const oldExpires = existing?.expiresAt ?? null;
+    const activatedAt = existing?.activatedAt ?? new Date();
+    const durationDays = Math.max(
+      1,
+      Math.ceil((expiresAt.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24))
+    );
+    const status: BusinessLicenseStatus = existing?.isTrial ? 'TRIAL' : 'ACTIVE';
+
+    const updated = await subscriptionRepository.upsertBusinessSubscription(businessId, {
+      businessId,
+      planId,
+      status,
+      durationPreset: existing?.durationPreset ?? 'CUSTOM',
+      durationDays,
+      activatedAt,
+      expiresAt,
+      isPaused: false,
+      isTrial: existing?.isTrial ?? false,
+      pausedAt: null,
+      cancelledAt: null,
+      lockedAt: null,
+      internalNotes: existing?.internalNotes ?? null,
+      paymentStatus: existing?.paymentStatus ?? 'NOT_APPLICABLE',
+      paymentMethod: existing?.paymentMethod ?? null,
+      referenceNumber: existing?.referenceNumber ?? null,
+      invoiceNumber: existing?.invoiceNumber ?? null,
+      lastPaymentAt: existing?.lastPaymentAt ?? null,
+      nextRenewalAt: expiresAt,
+      assignedById: existing?.assignedById ?? actor.userId,
+    });
+
+    await subscriptionRepository.updateBusinessLicense(businessId, status, false);
+    await subscriptionRepository.syncLegacySubscription(businessId, updated.plan.code, expiresAt);
+
+    await subscriptionRepository.createRenewal({
+      businessSubscriptionId: updated.id,
+      previousExpiresAt: oldExpires,
+      newExpiresAt: expiresAt,
+      renewedById: actor.userId,
+      reason: opts?.reason ?? 'Exact expiry set by super admin',
+    });
+
+    await subscriptionRepository.logAction({
+      businessId,
+      businessSubscriptionId: updated.id,
+      action: 'EXTENDED',
+      performedById: actor.userId,
+      performedByEmail: actor.email,
+      ipAddress: actor.ipAddress,
+      oldValue: { status: existing?.status ?? 'PENDING', expiresAt: oldExpires },
+      newValue: { status, expiresAt },
+      notes: opts?.reason,
     });
 
     await scheduleSubscriptionReminders(updated.id);
@@ -641,6 +735,7 @@ export class SubscriptionService {
     durationPreset: AssignSubscriptionInput['durationPreset'];
     customDurationDays?: number;
     endDate?: string;
+    expiresAt?: string;
     isTrial?: boolean;
   }) {
     const calc = calculateSubscriptionDates({
@@ -648,6 +743,7 @@ export class SubscriptionService {
       durationPreset: input.durationPreset,
       customDurationDays: input.customDurationDays,
       endDate: input.endDate ? new Date(input.endDate) : undefined,
+      expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
       isTrial: input.isTrial,
     });
     return {
