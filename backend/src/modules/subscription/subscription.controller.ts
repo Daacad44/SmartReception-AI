@@ -19,7 +19,7 @@ export class SubscriptionAdminController {
   async listPlans(_req: Request, res: Response, next: NextFunction) {
     try {
       const plans = await subscriptionService.listPlans();
-      res.json({ data: plans });
+      res.json({ success: true, data: plans });
     } catch (error) {
       next(error);
     }

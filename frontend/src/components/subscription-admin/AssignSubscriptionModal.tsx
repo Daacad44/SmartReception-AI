@@ -44,6 +44,10 @@ interface PlanOption {
   monthlyPrice: number;
 }
 
+// $0 / non-sellable plans hidden from the assignable dropdown. Admins assign only
+// the paid tiers (Starter $49, Business $79, Professional $129, Enterprise $299).
+const HIDDEN_PLAN_CODES = ['FREE', 'CUSTOM'];
+
 const DURATIONS = [
   { value: 'DAYS_7', label: '7 Days' },
   { value: 'DAYS_14', label: '14 Days' },
@@ -143,8 +147,11 @@ export function AssignSubscriptionModal({
   });
 
   useEffect(() => {
-    if (detail?.business.subscription?.plan.code && open) {
-      setForm((f) => ({ ...f, planCode: detail.business.subscription!.plan.code }));
+    const currentCode = detail?.business.subscription?.plan.code;
+    // Don't preselect a hidden ($0) plan — keep the paid default so the dropdown
+    // always shows a valid selection.
+    if (currentCode && open && !HIDDEN_PLAN_CODES.includes(currentCode)) {
+      setForm((f) => ({ ...f, planCode: currentCode }));
     }
   }, [detail, open]);
 
@@ -213,11 +220,13 @@ export function AssignSubscriptionModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(plans ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.code}>
-                      {p.name} — ${Number(p.monthlyPrice)}/mo
-                    </SelectItem>
-                  ))}
+                  {(plans ?? [])
+                    .filter((p) => !HIDDEN_PLAN_CODES.includes(p.code))
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.code}>
+                        {p.name} — ${Number(p.monthlyPrice)}/mo
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
