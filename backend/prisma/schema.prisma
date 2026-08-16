@@ -560,6 +560,14 @@ enum WhatsAppStatus {
   NOT_CONNECTED
 }
 
+enum WhatsAppConnectionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CONNECTED
+}
+
 model BusinessTypeDefinition {
   id          String   @id
   label       String
@@ -661,6 +669,7 @@ model Business {
   employeeConversations         EmployeeConversation[]
   employeeImportJobs            EmployeeImportJob[]
   governanceApprovalRequests    GovernanceApprovalRequest[]
+  whatsappConnectionRequests    WhatsAppConnectionRequest[]
   aiTrainingWorkspace           AiTrainingWorkspace?
   aiTrainingVersions            AiTrainingVersion[]
   aiTrainingJobs                AiTrainingJob[]
@@ -762,6 +771,9 @@ model User {
   governanceRequestsSubmitted  GovernanceApprovalRequest[]          @relation("GovernanceRequester")
   governanceRequestsApproved   GovernanceApprovalRequest[]          @relation("GovernanceApprover")
   governanceRequestsRejected   GovernanceApprovalRequest[]          @relation("GovernanceRejecter")
+  waConnectionRequestsSubmitted WhatsAppConnectionRequest[]         @relation("WaConnReqRequester")
+  waConnectionRequestsApproved  WhatsAppConnectionRequest[]         @relation("WaConnReqApprover")
+  waConnectionRequestsRejected  WhatsAppConnectionRequest[]         @relation("WaConnReqRejecter")
   aiVersionsTrained            AiTrainingVersion[]                  @relation("AiVersionTrainedByUser")
   aiTrainingJobsCreated        AiTrainingJob[]                      @relation("AiJobCreatedByUser")
   aiDeploymentRequests         AiDeploymentRequest[]                @relation("AiDeploymentRequester")
@@ -2786,6 +2798,38 @@ model GovernanceApprovalRequest {
   @@index([actionType])
   @@index([createdAt])
   @@map("governance_approval_requests")
+}
+
+// WhatsApp connection-access request + time-boxed approval window. Distinct from
+// GovernanceApprovalRequest: this grants a *permission window* during which a
+// business may self-connect WhatsApp (via any connect method) — it is not a
+// single staged action gated by an activation code. Once the business connects
+// within the window the connection is permanent and the window no longer matters.
+model WhatsAppConnectionRequest {
+  id               String                          @id @default(uuid())
+  businessId       String
+  requesterUserId  String
+  status           WhatsAppConnectionRequestStatus @default(PENDING)
+  requestedAt      DateTime                        @default(now())
+  approvedByUserId String?
+  approvedAt       DateTime?
+  windowExpiresAt  DateTime?
+  rejectedByUserId String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  connectedAt      DateTime?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requester User     @relation("WaConnReqRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  approver  User?    @relation("WaConnReqApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejecter  User?    @relation("WaConnReqRejecter", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@index([status])
+  @@index([requesterUserId])
+  @@map("whatsapp_connection_requests")
 }
 
 // ─── AI TRAINING MANAGEMENT PLATFORM ─────────────────────────────────────────

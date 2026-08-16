@@ -452,3 +452,114 @@ export function governanceActivationCodeEmail(
     }),
   };
 }
+
+interface WhatsAppConnectionRequestEmailData {
+  firstName: string;
+  businessName: string;
+  requesterName: string;
+  reviewUrl: string;
+}
+
+export function whatsappConnectionRequestEmail(
+  data: WhatsAppConnectionRequestEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">WhatsApp connection request</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.firstName}, a business is requesting a window to connect their own WhatsApp.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Business:</strong> ${data.businessName}<br />
+        <strong>Requested by:</strong> ${data.requesterName}
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.7;">
+      Approve to open a time-boxed connection window, or reject the request.
+    </p>
+    ${renderButton(data.reviewUrl, 'Review Request')}
+  `;
+
+  return {
+    subject: `[Action Required] ${data.businessName} — WhatsApp connection request`,
+    html: renderEmailLayout({
+      preheader: `${data.requesterName} requested a WhatsApp connection window`,
+      title: 'WhatsApp connection request',
+      body,
+    }),
+  };
+}
+
+interface WhatsAppConnectionApprovedEmailData {
+  firstName: string;
+  businessName: string;
+  windowExpiresAt: Date;
+  connectUrl: string;
+}
+
+export function whatsappConnectionApprovedEmail(
+  data: WhatsAppConnectionApprovedEmailData
+): { subject: string; html: string } {
+  const expiry = data.windowExpiresAt.toUTCString();
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Your connection window is open</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.firstName}, your request to connect WhatsApp for <strong>${data.businessName}</strong> was approved.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Window closes:</strong> ${expiry}
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.7;">
+      Connect your WhatsApp before the window closes. Once connected, your access is permanent —
+      the window expiry will not disconnect you. If the window closes before you connect, submit a new request.
+    </p>
+    ${renderButton(data.connectUrl, 'Connect WhatsApp Now')}
+  `;
+
+  return {
+    subject: `WhatsApp connection approved — ${data.businessName}`,
+    html: renderEmailLayout({
+      preheader: `Connect before ${expiry}`,
+      title: 'Connection window open',
+      body,
+    }),
+  };
+}
+
+interface WhatsAppConnectionRejectedEmailData {
+  firstName: string;
+  businessName: string;
+  reason: string;
+  requestUrl: string;
+}
+
+export function whatsappConnectionRejectedEmail(
+  data: WhatsAppConnectionRejectedEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">WhatsApp request rejected</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hi ${data.firstName}, your request to connect WhatsApp for <strong>${data.businessName}</strong> was not approved.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Reason:</strong> ${data.reason}
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.7;">
+      You can submit a new request at any time.
+    </p>
+    ${renderButton(data.requestUrl, 'Open WhatsApp Settings')}
+  `;
+
+  return {
+    subject: `WhatsApp connection request rejected — ${data.businessName}`,
+    html: renderEmailLayout({
+      preheader: `Reason: ${data.reason}`,
+      title: 'Request rejected',
+      body,
+    }),
+  };
+}

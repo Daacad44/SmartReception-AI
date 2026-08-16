@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import api, { extractData } from '@/lib/api';
-import type { GovernanceCapabilities } from '@/lib/governance';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import api, { extractData, getErrorMessage } from '@/lib/api';
+import type { GovernanceCapabilities, WhatsAppConnectionWindow } from '@/lib/governance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,7 @@ import {
 } from '@/hooks/useMutations';
 import { useFacebookEmbeddedSignup } from '@/hooks/useFacebookEmbeddedSignup';
 import { LoadingState } from '@/components/LoadingState';
-import { Copy, Trash2, Plug, Wifi, RefreshCw, Lock, Link2 } from 'lucide-react';
+import { Copy, Trash2, Plug, Wifi, RefreshCw, Lock, Link2, Clock, Send, XCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -44,6 +44,19 @@ function formatStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
+function formatWindowRemaining(expiresAt: string | null): string {
+  if (!expiresAt) return '';
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'expired';
+  const totalMinutes = Math.floor(ms / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h remaining`;
+  if (hours > 0) return `${hours}h ${minutes}m remaining`;
+  return `${minutes}m remaining`;
+}
+
 export function WhatsAppSettings() {
   const queryClient = useQueryClient();
   const [debugEnabled, setDebugEnabled] = useState(false);
@@ -53,8 +66,28 @@ export function WhatsAppSettings() {
       const response = await api.get('/governance/capabilities');
       return extractData<GovernanceCapabilities>(response);
     },
+    // Poll while a connection request is in flight so the tab flips to the full
+    // UI the moment the Super Admin approves, and reflects EXPIRED when it lapses.
+    refetchInterval: (query) => {
+      const status = (query.state.data as GovernanceCapabilities | undefined)
+        ?.whatsappConnectionWindow?.status;
+      return status === 'PENDING' || status === 'APPROVED' ? 15_000 : false;
+    },
   });
   const whatsappManaged = governanceCaps?.whatsappAccess === 'hidden';
+  const connectionWindow = governanceCaps?.whatsappConnectionWindow ?? null;
+
+  const submitConnectionRequest = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/whatsapp/connection-request');
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['governance', 'capabilities'] });
+      toast.success('Request submitted — your Super Administrator will review it.');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
   const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } =
     useWhatsAppAccounts();
   const { data: webhookInfo } = useWhatsAppWebhookInfo();
@@ -171,17 +204,28 @@ export function WhatsAppSettings() {
           </CardTitle>
           <CardDescription>
             On your {governanceCaps?.planCode ?? 'current'} plan, WhatsApp integration is configured
-            exclusively by your Super Administrator. Connection status is shown below.
+            by your Super Administrator. You can request a time-limited window to connect your own
+            WhatsApp.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Badge variant={workspaceStatus === 'CONNECTED' ? 'success' : 'secondary'}>
-            {workspaceStatus === 'CONNECTED' ? 'Connected' : 'Not Connected'}
-          </Badge>
-          {activeAccount && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Number: {activeAccount.phoneNumber} · {activeAccount.displayName}
-            </p>
+        <CardContent className="space-y-4">
+          <div>
+            <Badge variant={workspaceStatus === 'CONNECTED' ? 'success' : 'secondary'}>
+              {workspaceStatus === 'CONNECTED' ? 'Connected' : 'Not Connected'}
+            </Badge>
+            {activeAccount && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Number: {activeAccount.phoneNumber} · {activeAccount.displayName}
+              </p>
+            )}
+          </div>
+
+          {workspaceStatus !== 'CONNECTED' && (
+            <ConnectionRequestPanel
+              window={connectionWindow}
+              submitting={submitConnectionRequest.isPending}
+              onRequest={() => submitConnectionRequest.mutate()}
+            />
           )}
         </CardContent>
       </Card>
@@ -203,6 +247,18 @@ export function WhatsAppSettings() {
 
   return (
     <div className="space-y-6">
+      {connectionWindow?.windowOpen && workspaceStatus !== 'CONNECTED' && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Connection window open · {formatWindowRemaining(connectionWindow.windowExpiresAt)}</p>
+            <p className="mt-0.5 text-amber-800/90 dark:text-amber-200/80">
+              Connect your WhatsApp before the window closes. Once connected it stays connected —
+              the window expiry will not disconnect you.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">WhatsApp Integration</h2>
@@ -617,6 +673,103 @@ export function WhatsAppSettings() {
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ConnectionRequestPanel({
+  window,
+  submitting,
+  onRequest,
+}: {
+  window: WhatsAppConnectionWindow | null;
+  submitting: boolean;
+  onRequest: () => void;
+}) {
+  const status = window?.status;
+
+  // PENDING — awaiting Super Admin review.
+  if (status === 'PENDING') {
+    return (
+      <div className="rounded-lg border bg-muted/40 p-4">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-amber-600" />
+          <p className="text-sm font-medium">Request pending</p>
+          <Badge variant="warning">PENDING</Badge>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your request to connect WhatsApp is waiting for Super Administrator approval. You&apos;ll be
+          notified by email and in-app once it&apos;s reviewed.
+        </p>
+      </div>
+    );
+  }
+
+  // REJECTED — show reason, allow re-request.
+  if (status === 'REJECTED') {
+    return (
+      <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <XCircle className="h-4 w-4 text-destructive" />
+          <p className="text-sm font-medium">Request rejected</p>
+          <Badge variant="destructive">REJECTED</Badge>
+        </div>
+        {window?.rejectionReason && (
+          <p className="text-sm text-muted-foreground">Reason: {window.rejectionReason}</p>
+        )}
+        <Button onClick={onRequest} disabled={submitting}>
+          <Send className="mr-2 h-4 w-4" />
+          {submitting ? 'Submitting…' : 'Request Again'}
+        </Button>
+      </div>
+    );
+  }
+
+  // EXPIRED — window lapsed without connecting; allow re-request.
+  if (status === 'EXPIRED') {
+    return (
+      <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Connection window expired</p>
+          <Badge variant="secondary">EXPIRED</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          The approved window closed before WhatsApp was connected. Submit a new request to get
+          another window.
+        </p>
+        <Button onClick={onRequest} disabled={submitting}>
+          <Send className="mr-2 h-4 w-4" />
+          {submitting ? 'Submitting…' : 'Request Again'}
+        </Button>
+      </div>
+    );
+  }
+
+  // CONNECTED — terminal (typically the full UI renders instead; shown for safety).
+  if (status === 'CONNECTED') {
+    return (
+      <div className="rounded-lg border bg-muted/40 p-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <p className="text-sm font-medium">WhatsApp connected</p>
+          <Badge variant="success">CONNECTED</Badge>
+        </div>
+      </div>
+    );
+  }
+
+  // No request yet (or APPROVED-but-open which renders the full UI elsewhere).
+  return (
+    <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Request a connection window from your Super Administrator. When approved, you&apos;ll get a
+        time-limited window to connect your own WhatsApp. Once connected, it stays connected.
+      </p>
+      <Button onClick={onRequest} disabled={submitting}>
+        <Send className="mr-2 h-4 w-4" />
+        {submitting ? 'Submitting…' : 'Request Connection Access'}
+      </Button>
     </div>
   );
 }

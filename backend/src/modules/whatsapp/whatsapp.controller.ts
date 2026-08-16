@@ -12,6 +12,8 @@ import { config } from '../../config';
 import { NotFoundError, ForbiddenError } from '../../core/errors';
 import { withGovernanceGuard } from '../governance/governance.helpers';
 import { getGovernanceCapabilities } from '../governance/plan-capabilities.service';
+import { whatsappConnectionRequestService } from './whatsapp-connection-request.service';
+import { z } from 'zod';
 
 export class WhatsAppController {
   async verify(req: Request, res: Response, next: NextFunction) {
@@ -275,6 +277,28 @@ export class WhatsAppController {
     }
   }
 
+  // ─── Connection-access request (business self-service) ───────────────────
+  async submitConnectionRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await whatsappConnectionRequestService.submitRequest(
+        req.user!.businessId!,
+        req.user!.userId
+      );
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getConnectionRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await whatsappConnectionRequestService.getOwnLatest(req.user!.businessId!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async disconnectAccount(req: Request, res: Response, next: NextFunction) {
     try {
       if (
@@ -296,3 +320,56 @@ export class WhatsAppController {
 }
 
 export const whatsappController = new WhatsAppController();
+
+const approveWindowSchema = z
+  .object({
+    windowMinutes: z.number().int().positive().optional(),
+    windowExpiresAt: z.string().datetime().optional(),
+  })
+  .refine((v) => v.windowMinutes !== undefined || v.windowExpiresAt !== undefined, {
+    message: 'Provide windowMinutes or windowExpiresAt',
+  });
+
+export class SuperAdminWhatsAppRequestController {
+  async list(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 50;
+      const status = req.query.status as string | undefined;
+      const data = await whatsappConnectionRequestService.listForAdmin({ page, limit, status });
+      res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async approve(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = approveWindowSchema.parse(req.body);
+      const data = await whatsappConnectionRequestService.approve(
+        routeParam(req.params.id),
+        req.user!.userId,
+        input
+      );
+      res.json({ success: true, data, message: 'Connection window opened' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reject(req: Request, res: Response, next: NextFunction) {
+    try {
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+      const data = await whatsappConnectionRequestService.reject(
+        routeParam(req.params.id),
+        req.user!.userId,
+        reason
+      );
+      res.json({ success: true, data, message: 'Request rejected' });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+export const superAdminWhatsAppRequestController = new SuperAdminWhatsAppRequestController();

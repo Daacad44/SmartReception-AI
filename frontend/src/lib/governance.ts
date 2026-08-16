@@ -15,6 +15,24 @@ export interface GovernanceApprovalRequest {
   rejectionReason?: string | null;
 }
 
+export type WhatsAppConnectionRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'EXPIRED'
+  | 'CONNECTED';
+
+export interface WhatsAppConnectionWindow {
+  id: string;
+  status: WhatsAppConnectionRequestStatus;
+  requestedAt: string;
+  approvedAt: string | null;
+  windowExpiresAt: string | null;
+  rejectionReason: string | null;
+  connectedAt: string | null;
+  windowOpen: boolean;
+}
+
 export interface GovernanceCapabilities {
   planCode: string;
   aiTrainingAccess: 'readonly' | 'approval_required' | 'full';
@@ -22,6 +40,15 @@ export interface GovernanceCapabilities {
   canRequestAiChanges: boolean;
   canRequestWhatsAppConnect: boolean;
   requiresSuperAdminForAi: boolean;
+  whatsappConnectionWindow?: WhatsAppConnectionWindow | null;
+}
+
+// Admin queue row (super-admin listing).
+export interface WhatsAppConnectionRequestAdmin extends WhatsAppConnectionWindow {
+  businessId: string;
+  businessName?: string;
+  requester?: { firstName: string; lastName: string; email: string };
+  approver?: { firstName: string; lastName: string; email: string } | null;
 }
 
 export type MutationResult<T> =
