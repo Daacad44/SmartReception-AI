@@ -50,6 +50,12 @@ router.get('/status', authorize(PERMISSIONS['settings:read']), (req, res, next) 
 router.get('/webhook-info', authorize(PERMISSIONS['settings:read']), (req, res, next) =>
   whatsappController.getWebhookInfo(req, res, next)
 );
+router.get('/connection-request', authorize(PERMISSIONS['settings:read']), (req, res, next) =>
+  whatsappController.getConnectionRequest(req, res, next)
+);
+router.post('/connection-request', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
+  whatsappController.submitConnectionRequest(req, res, next)
+);
 router.post('/accounts', authorize(PERMISSIONS['settings:write']), (req, res, next) =>
   whatsappController.connectAccount(req, res, next)
 );

@@ -49,6 +49,33 @@ export type AiTrainingAccessMode = 'readonly' | 'approval_required' | 'full';
 
 export type WhatsAppAccessMode = 'hidden' | 'approval_required' | 'full';
 
+export const WHATSAPP_CONNECTION_REQUEST_STATUSES = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  CONNECTED: 'CONNECTED',
+} as const;
+
+export type WhatsAppConnectionRequestStatus =
+  (typeof WHATSAPP_CONNECTION_REQUEST_STATUSES)[keyof typeof WHATSAPP_CONNECTION_REQUEST_STATUSES];
+
+// Snapshot of a business's current WhatsApp connection-access request, surfaced
+// on the governance capabilities response so the business tab can render its
+// request button / status / open-window banner from a single source of truth.
+export interface WhatsAppConnectionWindow {
+  id: string;
+  status: WhatsAppConnectionRequestStatus;
+  requestedAt: string;
+  approvedAt: string | null;
+  windowExpiresAt: string | null;
+  rejectionReason: string | null;
+  connectedAt: string | null;
+  // Derived: an APPROVED window that is still open (now < windowExpiresAt) and
+  // not yet connected. When true, the full self-serve WhatsApp UI is unlocked.
+  windowOpen: boolean;
+}
+
 export interface GovernanceCapabilities {
   planCode: string;
   aiTrainingAccess: AiTrainingAccessMode;
@@ -56,6 +83,9 @@ export interface GovernanceCapabilities {
   canRequestAiChanges: boolean;
   canRequestWhatsAppConnect: boolean;
   requiresSuperAdminForAi: boolean;
+  // Present when the business is on a plan where WhatsApp is admin-managed
+  // ('hidden'): describes their latest connection-access request, if any.
+  whatsappConnectionWindow?: WhatsAppConnectionWindow | null;
 }
 
 export const GOVERNANCE_ACTIVATION_CODE_LENGTH = 6;

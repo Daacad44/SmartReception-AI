@@ -20,6 +20,7 @@ import { whatsappOAuthService } from './whatsapp-oauth.service';
 import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { startPipelineTrace } from './message-pipeline.logger';
 import { whatsappTenantResolver } from './whatsapp-tenant-resolver.service';
+import { whatsappConnectionRequestService } from './whatsapp-connection-request.service';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -754,6 +755,9 @@ export class WhatsAppModuleService {
 
     await ensureAiConfiguration(businessId);
     await this.setBusinessWhatsAppStatus(businessId, 'CONNECTED');
+    // If the business connected during an approved connection window, mark that
+    // window CONNECTED so their self-serve access becomes permanent.
+    await whatsappConnectionRequestService.markConnected(businessId);
 
     return account;
   }

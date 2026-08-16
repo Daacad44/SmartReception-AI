@@ -91,6 +91,9 @@ const SuperAdminPage = lazyWithRetry(() =>
 const GovernanceAdminPage = lazyWithRetry(() =>
   import('@/pages/GovernanceAdminPage').then((m) => ({ default: m.GovernanceAdminPage }))
 );
+const WhatsAppRequestsAdminPage = lazyWithRetry(() =>
+  import('@/pages/WhatsAppRequestsAdminPage').then((m) => ({ default: m.WhatsAppRequestsAdminPage }))
+);
 const AiDeploymentsAdminPage = lazyWithRetry(() =>
   import('@/pages/AiDeploymentsAdminPage').then((m) => ({ default: m.AiDeploymentsAdminPage }))
 );
@@ -525,6 +528,16 @@ export default function App() {
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <FeatureRoute featureKey="governance-admin">
                           <GovernanceAdminPage />
+                        </FeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/whatsapp-requests"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <FeatureRoute featureKey="governance-admin">
+                          <WhatsAppRequestsAdminPage />
                         </FeatureRoute>
                       </PermissionRoute>
                     }

@@ -2,6 +2,7 @@ import { prisma } from '../../infrastructure/database/prisma';
 import type { GovernanceCapabilities } from '@smartreception/shared';
 import { DEFAULT_FEATURE_FLAGS, type PlanFeatureFlags } from '../subscription/subscription.types';
 import type { SubscriptionPlan } from '@prisma/client';
+import { whatsappConnectionRequestService } from '../whatsapp/whatsapp-connection-request.service';
 
 function parseFeatureFlags(raw: unknown): PlanFeatureFlags {
   if (!raw || typeof raw !== 'object') return DEFAULT_FEATURE_FLAGS;
@@ -24,13 +25,26 @@ export async function getGovernanceCapabilities(
   const flags = parseFeatureFlags(sub?.plan?.featureFlags);
   const enterprise = isEnterprisePlan(planCode) && flags.aiTrainingManage;
 
+  const planWhatsappAccess: GovernanceCapabilities['whatsappAccess'] =
+    enterprise && flags.whatsappSelfService ? 'approval_required' : 'hidden';
+
+  // A time-boxed connection window (or a completed self-serve connection) widens
+  // the plan-derived access to 'full' — never narrows it. This single override
+  // both unlocks the business self-serve UI and lets the WhatsApp connect guard
+  // proceed, because everything keys off `whatsappAccess`.
+  const { effectiveFull, window } =
+    await whatsappConnectionRequestService.getConnectionWindowState(businessId);
+  const whatsappAccess: GovernanceCapabilities['whatsappAccess'] = effectiveFull
+    ? 'full'
+    : planWhatsappAccess;
+
   return {
     planCode,
     aiTrainingAccess: enterprise ? 'approval_required' : 'readonly',
-    whatsappAccess:
-      enterprise && flags.whatsappSelfService ? 'approval_required' : 'hidden',
+    whatsappAccess,
     canRequestAiChanges: enterprise,
     canRequestWhatsAppConnect: enterprise && flags.whatsappSelfService,
     requiresSuperAdminForAi: !enterprise,
+    whatsappConnectionWindow: window,
   };
 }

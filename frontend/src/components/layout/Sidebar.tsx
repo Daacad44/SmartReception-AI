@@ -59,6 +59,7 @@ const adminNavItems = [
   { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
   { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
+  { to: '/admin/whatsapp-requests', icon: MessageSquare, label: 'WhatsApp Requests', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
   { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
 ];
 

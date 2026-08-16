@@ -291,6 +291,18 @@ async function startWorkers(): Promise<void> {
       logger.warn('Appointment notification retry scan failed', { error });
     });
   }, NOTIFICATION_RETRY_MS);
+
+  // Close WhatsApp connection windows that lapsed without a connection.
+  const { whatsappConnectionRequestService } = await import(
+    './modules/whatsapp/whatsapp-connection-request.service'
+  );
+  const WA_WINDOW_SCAN_MS = 60 * 1000;
+  setInterval(() => {
+    void whatsappConnectionRequestService.expireStaleWindows().catch((error) => {
+      logger.warn('WhatsApp connection window expiry scan failed', { error });
+    });
+  }, WA_WINDOW_SCAN_MS);
+  void whatsappConnectionRequestService.expireStaleWindows().catch(() => undefined);
 }
 
 const shutdown = async (signal: string) => {

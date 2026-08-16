@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { superAdminController } from './super-admin.controller';
 import { superAdminGovernanceController } from '../governance/governance.controller';
+import { superAdminWhatsAppRequestController } from '../whatsapp/whatsapp.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { requireSuperAdmin } from '../../core/middleware/super-admin.middleware';
 
@@ -78,6 +79,16 @@ router.post('/governance/requests/:id/approve', (req, res, next) =>
 );
 router.post('/governance/requests/:id/reject', (req, res, next) =>
   superAdminGovernanceController.reject(req, res, next)
+);
+
+router.get('/whatsapp/connection-requests', (req, res, next) =>
+  superAdminWhatsAppRequestController.list(req, res, next)
+);
+router.post('/whatsapp/connection-requests/:id/approve', (req, res, next) =>
+  superAdminWhatsAppRequestController.approve(req, res, next)
+);
+router.post('/whatsapp/connection-requests/:id/reject', (req, res, next) =>
+  superAdminWhatsAppRequestController.reject(req, res, next)
 );
 
 export default router;
