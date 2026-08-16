@@ -27,7 +27,7 @@ const strongPasswordSchema = z
 
 export const registerSchema = z
   .object({
-    email: z.string().email(),
+    email: z.string().trim().toLowerCase().email(),
     password: strongPasswordSchema,
     confirmPassword: z.string().min(8).max(128),
     firstName: z.string().min(1).max(100),
@@ -41,7 +41,7 @@ export const registerSchema = z
   });
 
 export const checkEmailSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
 });
 
 export const onboardingBusinessInfoSchema = z.object({
@@ -144,7 +144,7 @@ export const onboardingWhatsAppSchema = z
   });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
 });
 
@@ -153,20 +153,20 @@ export const refreshTokenSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
 });
 
 export const verifyOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   code: z.string().length(6).regex(/^\d{6}$/, 'Code must be 6 digits'),
 });
 
 export const resendOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
 });
 
 export const resetPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   code: z.string().length(6).regex(/^\d{6}$/, 'Code must be 6 digits'),
   password: z.string().min(8).max(128),
 });
