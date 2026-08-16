@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import api, { extractData } from '@/lib/api';
+import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -116,7 +116,7 @@ export function AssignSubscriptionModal({
     enabled: open,
     queryFn: async () => {
       const res = await api.get('/super-admin/subscriptions/plans');
-      return extractData<PlanOption[]>(res);
+      return (res.data?.data ?? []) as PlanOption[];
     },
   });
 
@@ -215,7 +215,7 @@ export function AssignSubscriptionModal({
                 <SelectContent>
                   {(plans ?? []).map((p) => (
                     <SelectItem key={p.id} value={p.code}>
-                      {p.name}
+                      {p.name} — ${Number(p.monthlyPrice)}/mo
                     </SelectItem>
                   ))}
                 </SelectContent>
