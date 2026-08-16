@@ -3,7 +3,7 @@ import { User, Business, BusinessMember, UserApprovalStatus } from '@prisma/clie
 
 export class AuthRepository {
   async findUserByEmail(email: string): Promise<User | null> {
-    return prisma.user.findUnique({ where: { email } });
+    return prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   }
 
   async findUserById(id: string): Promise<User | null> {
@@ -24,7 +24,9 @@ export class AuthRepository {
     isSuperAdmin?: boolean;
     approvalStatus?: UserApprovalStatus;
   }): Promise<User> {
-    return prisma.user.create({ data });
+    return prisma.user.create({
+      data: { ...data, email: data.email.trim().toLowerCase() },
+    });
   }
 
   async findUsersByApprovalStatus(status: UserApprovalStatus): Promise<User[]> {
