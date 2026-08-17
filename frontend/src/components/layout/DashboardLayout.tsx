@@ -30,7 +30,7 @@ export function DashboardLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       <div className="hidden md:flex">
-        <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
+        <Sidebar collapsed={sidebarCollapsed} />
       </div>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

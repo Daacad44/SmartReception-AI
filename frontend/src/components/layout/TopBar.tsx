@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { useBusiness } from '@/hooks/useBusiness';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useApi';
@@ -177,7 +176,7 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
                 View all
               </Button>
             </div>
-            <ScrollArea className="max-h-[min(60vh,320px)]">
+            <div className="max-h-[min(60vh,320px)] overflow-y-auto scrollbar-thin">
               {!notifications?.length ? (
                 <p className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications</p>
               ) : (
@@ -201,7 +200,7 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </PopoverContent>
         </Popover>
 

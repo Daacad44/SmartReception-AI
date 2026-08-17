@@ -96,7 +96,9 @@ export function createApp(): express.Application {
   app.use(
     createRateLimiter({
       windowMs: 15 * 60 * 1000,
-      max: config.env === 'production' ? 200 : 1000,
+      // Generous global ceiling so normal dashboard/polling usage never 429s.
+      // Sensitive endpoints (auth, login) enforce their own strict limiters.
+      max: config.env === 'production' ? 2000 : 5000,
       skip: (req) => WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
     })
   );
