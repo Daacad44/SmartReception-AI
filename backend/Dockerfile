@@ -15,7 +15,7 @@ COPY packages/shared ./packages/shared
 WORKDIR /app/packages/shared
 RUN npm run build
 WORKDIR /app/backend
-RUN npx prisma generate
+RUN npx prisma@6.3.1 generate
 RUN npm run build
 
 FROM base AS runner
