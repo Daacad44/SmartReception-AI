@@ -7,7 +7,9 @@ test.describe('Public navigation', () => {
   });
 
   test('verify OTP page loads', async ({ page }) => {
-    await page.goto('/verify-otp');
+    // The page requires an email in the query string; without it, it renders a
+    // "missing email" fallback instead of the verify form.
+    await page.goto('/verify-otp?email=test@example.com');
     await expect(page.getByRole('heading', { name: /verify/i })).toBeVisible();
   });
 });

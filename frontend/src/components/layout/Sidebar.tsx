@@ -19,57 +19,77 @@ import {
   Upload,
   Radio,
   ClipboardCheck,
-  PanelLeftClose,
-  PanelLeft,
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LogoMark } from '@/components/Logo';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConversationSummary, useBilling, useAppointments } from '@/hooks/useApi';
 import { usePermissions } from '@/hooks/usePermissions';
 import { usePlatformFeatures } from '@/hooks/usePlatformFeatures';
 import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', featureKey: 'dashboard' },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const, featureKey: 'conversations' },
-  { to: '/customers', icon: Users, label: 'Customers', featureKey: 'customers' },
-  { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const, featureKey: 'customer-import' },
-  { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const, featureKey: 'appointments' },
-  { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const, featureKey: 'campaigns' },
-  { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const, featureKey: 'employee-comms' },
-  { to: '/enterprise-ai-intelligence', icon: BookOpen, label: 'Enterprise AI Intelligence', featureKey: 'enterprise-ai-intelligence' },
-  { to: '/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'analytics:read' as const, featureKey: 'business-intelligence' },
-  { to: '/team', icon: UsersRound, label: 'Team', featureKey: 'team' },
-  { to: '/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
-  { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const, featureKey: 'audit-logs' },
-  { to: '/settings', icon: Settings, label: 'Settings', featureKey: 'settings' },
-  { to: '/billing', icon: CreditCard, label: 'Billing', featureKey: 'billing' },
+const navGroups = [
+  {
+    heading: 'Workspace',
+    items: [
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', featureKey: 'dashboard' },
+      { to: '/conversations', icon: MessageSquare, label: 'Conversations', badgeKey: 'conversations' as const, featureKey: 'conversations' },
+      { to: '/customers', icon: Users, label: 'Customers', featureKey: 'customers' },
+      { to: '/customers/import', icon: Upload, label: 'Customer Import', permission: 'customers:write' as const, featureKey: 'customer-import' },
+      { to: '/appointments', icon: Calendar, label: 'Appointments', badgeKey: 'appointments' as const, featureKey: 'appointments' },
+      { to: '/campaigns', icon: Megaphone, label: 'Campaign Center', permission: 'campaigns:read' as const, featureKey: 'campaigns' },
+      { to: '/employee-comms', icon: Radio, label: 'Employee Comms', permission: 'employee-comms:read' as const, featureKey: 'employee-comms' },
+    ],
+  },
+  {
+    heading: 'Intelligence',
+    items: [
+      { to: '/enterprise-ai-intelligence', icon: BookOpen, label: 'Enterprise AI Intelligence', featureKey: 'enterprise-ai-intelligence' },
+      { to: '/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'analytics:read' as const, featureKey: 'business-intelligence' },
+    ],
+  },
+  {
+    heading: 'Organization',
+    items: [
+      { to: '/team', icon: UsersRound, label: 'Team', featureKey: 'team' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
+      { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const, featureKey: 'audit-logs' },
+    ],
+  },
+  {
+    heading: 'Account',
+    items: [
+      { to: '/settings', icon: Settings, label: 'Settings', featureKey: 'settings' },
+      { to: '/billing', icon: CreditCard, label: 'Billing', featureKey: 'billing' },
+    ],
+  },
+  {
+    heading: 'Super Admin',
+    items: [
+      { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
+      { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
+      { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
+      { to: '/admin/applications', icon: ClipboardCheck, label: 'Business Applications', permission: 'platform:admin' as const },
+      { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
+      { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
+      { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
+      { to: '/admin/whatsapp-requests', icon: MessageSquare, label: 'WhatsApp Requests', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
+      { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
+    ],
+  },
 ];
 
-const adminNavItems = [
-  { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
-  { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
-  { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
-  { to: '/admin/applications', icon: ClipboardCheck, label: 'Business Applications', permission: 'platform:admin' as const },
-  { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
-  { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
-  { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
-  { to: '/admin/whatsapp-requests', icon: MessageSquare, label: 'WhatsApp Requests', permission: 'platform:admin' as const, featureKey: 'governance-admin' },
-  { to: '/admin/feature-management', icon: Layers, label: 'Feature Management', permission: 'platform:admin' as const, featureKey: 'feature-management' },
-];
+type NavItem = (typeof navGroups)[number]['items'][number];
 
 interface SidebarProps {
   onNavigate?: () => void;
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   const { data: summary } = useConversationSummary();
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
@@ -90,7 +110,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
     appointments: upcomingAppointments,
   };
 
-  const visibleItems = [...navItems, ...adminNavItems].filter((item) => {
+  const isItemVisible = (item: NavItem) => {
     const permission =
       'permission' in item && item.permission
         ? PERMISSIONS[item.permission]
@@ -98,7 +118,58 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
     if (permission && !hasPermission(permission)) return false;
     if ('featureKey' in item && item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
     return true;
-  });
+  };
+
+  const visibleGroups = navGroups
+    .map((group) => ({ heading: group.heading, items: group.items.filter(isItemVisible) }))
+    .filter((group) => group.items.length > 0);
+
+  const renderItem = (item: NavItem) => {
+    const linkContent = (
+      <NavLink
+        to={item.to}
+        onClick={onNavigate}
+        className={({ isActive }) =>
+          cn(
+            'relative flex items-center rounded-lg text-sm font-medium transition-colors',
+            collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
+            isActive
+              ? 'bg-white/10 text-white'
+              : 'text-white/70 hover:bg-white/5 hover:text-white'
+          )
+        }
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {!collapsed && <span className="flex-1">{item.label}</span>}
+        {!collapsed && 'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
+          <Badge className="h-5 min-w-5 justify-center bg-accent px-1.5 text-[10px] text-white hover:bg-accent/90">
+            {badges[item.badgeKey]}
+          </Badge>
+        )}
+        {collapsed && 'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
+          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">
+            {badges[item.badgeKey] > 9 ? '9+' : badges[item.badgeKey]}
+          </span>
+        )}
+      </NavLink>
+    );
+
+    if (collapsed) {
+      return (
+        <Tooltip key={item.to} delayDuration={0}>
+          <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">
+            {item.label}
+            {'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0
+              ? ` (${badges[item.badgeKey]})`
+              : ''}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return <div key={item.to}>{linkContent}</div>;
+  };
 
   return (
     <aside
@@ -122,80 +193,21 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
             <p className="text-xs text-white/60">AI Platform</p>
           </div>
         )}
-        {onToggleCollapse && !collapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
-            onClick={onToggleCollapse}
-            aria-label="Collapse sidebar"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </Button>
-        )}
       </div>
 
-      {onToggleCollapse && collapsed && (
-        <div className="flex justify-center border-b border-white/10 py-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/70 hover:bg-white/10 hover:text-white"
-            onClick={onToggleCollapse}
-            aria-label="Expand sidebar"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4 scrollbar-thin">
-        {visibleItems.map((item) => {
-          const linkContent = (
-            <NavLink
-              to={item.to}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'relative flex items-center rounded-lg text-sm font-medium transition-colors',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="flex-1">{item.label}</span>}
-              {!collapsed && 'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
-                <Badge className="h-5 min-w-5 justify-center bg-accent px-1.5 text-[10px] text-white hover:bg-accent/90">
-                  {badges[item.badgeKey]}
-                </Badge>
-              )}
-              {collapsed && 'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">
-                  {badges[item.badgeKey] > 9 ? '9+' : badges[item.badgeKey]}
-                </span>
-              )}
-            </NavLink>
-          );
-
-          if (collapsed) {
-            return (
-              <Tooltip key={item.to} delayDuration={0}>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                <TooltipContent side="right" className="font-medium">
-                  {item.label}
-                  {'badgeKey' in item && item.badgeKey && badges[item.badgeKey] > 0
-                    ? ` (${badges[item.badgeKey]})`
-                    : ''}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
-
-          return <div key={item.to}>{linkContent}</div>;
-        })}
+      <nav className="flex-1 overflow-y-auto px-2 py-4 scrollbar-thin">
+        {visibleGroups.map((group, groupIndex) => (
+          <div key={group.heading} className={cn('space-y-1', groupIndex > 0 && 'mt-4')}>
+            {!collapsed ? (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                {group.heading}
+              </p>
+            ) : (
+              groupIndex > 0 && <div className="mx-2 mb-2 border-t border-white/10" />
+            )}
+            {group.items.map((item) => renderItem(item))}
+          </div>
+        ))}
       </nav>
 
       {hasPermission('billing:read') && !collapsed && (
