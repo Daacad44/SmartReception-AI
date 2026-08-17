@@ -1,5 +1,7 @@
-import { NavLink, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
+  ChevronDown,
   LayoutDashboard,
   MessageSquare,
   Users,
@@ -89,12 +91,37 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
+const DEFAULT_OPEN_GROUP = 'Workspace';
+
+const isRouteMatch = (pathname: string, to: string) =>
+  pathname === to || pathname.startsWith(`${to}/`);
+
 export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
+  const { pathname } = useLocation();
   const { data: summary } = useConversationSummary();
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
   const { hasPermission } = usePermissions();
   const { isFeatureEnabled } = usePlatformFeatures();
+
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const open = new Set<string>([DEFAULT_OPEN_GROUP]);
+    const activeGroup = navGroups.find((group) =>
+      group.items.some((item) => isRouteMatch(pathname, item.to))
+    );
+    if (activeGroup) open.add(activeGroup.heading);
+    return open;
+  });
+
+  const toggleGroup = (heading: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(heading)) next.delete(heading);
+      else next.add(heading);
+      return next;
+    });
+  };
+
   const unreadCount = summary?.unreadTotal ?? 0;
   const upcomingAppointments =
     appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
@@ -196,18 +223,46 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4 scrollbar-thin">
-        {visibleGroups.map((group, groupIndex) => (
-          <div key={group.heading} className={cn('space-y-1', groupIndex > 0 && 'mt-4')}>
-            {!collapsed ? (
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                {group.heading}
-              </p>
-            ) : (
-              groupIndex > 0 && <div className="mx-2 mb-2 border-t border-white/10" />
-            )}
-            {group.items.map((item) => renderItem(item))}
-          </div>
-        ))}
+        {visibleGroups.map((group, groupIndex) => {
+          if (collapsed) {
+            return (
+              <div key={group.heading} className={cn('space-y-1', groupIndex > 0 && 'mt-4')}>
+                {groupIndex > 0 && <div className="mx-2 mb-2 border-t border-white/10" />}
+                {group.items.map((item) => renderItem(item))}
+              </div>
+            );
+          }
+
+          const isOpen = openGroups.has(group.heading);
+          return (
+            <div key={group.heading} className={cn(groupIndex > 0 && 'mt-4')}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.heading)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center justify-between rounded-lg px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-white/40 transition-colors hover:text-white/70"
+              >
+                <span>{group.heading}</span>
+                <ChevronDown
+                  className={cn(
+                    'h-3.5 w-3.5 shrink-0 transition-transform duration-200',
+                    isOpen ? 'rotate-0' : '-rotate-90'
+                  )}
+                />
+              </button>
+              <div
+                className={cn(
+                  'grid transition-[grid-template-rows] duration-200 ease-in-out',
+                  isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div className="space-y-1 pt-1">{group.items.map((item) => renderItem(item))}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       {hasPermission('billing:read') && !collapsed && (
