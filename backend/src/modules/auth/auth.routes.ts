@@ -15,13 +15,13 @@ const authLimiter = createRateLimiter({
 // the raised global limiter must NOT be relied on for login protection.
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
   message: 'Too many login attempts, please try again later'
 });
 
 router.post('/register', authLimiter, (req, res, next) => authController.register(req, res, next));
 router.get('/check-email', authLimiter, (req, res, next) => authController.checkEmail(req, res, next));
-// Login has a dedicated strict brute-force limiter (10 attempts / 15 min / IP).
+// Login has a dedicated brute-force limiter (30 attempts / 15 min / IP).
 router.post('/login', loginLimiter, (req, res, next) => authController.login(req, res, next));
 router.post('/verify-2fa', authLimiter, (req, res, next) => authController.verifyTwoFactor(req, res, next));
 router.post('/verify-otp', authLimiter, (req, res, next) => authController.verifyOtp(req, res, next));
