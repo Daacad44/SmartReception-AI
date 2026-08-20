@@ -24,6 +24,10 @@ import type { SalesFlowContext } from '../../infrastructure/ai/sales-flow.types'
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
 import { sendAutomatedReply, sendServiceMenu, sendTenantWelcomeMenu } from '../ai/menu-reply.service';
+import {
+  getMonthlyMessageUsage,
+  maybeNotifyUsageThresholds,
+} from '../subscription/subscription-message-limit.service';
 import { recordInboundMessage } from './whatsapp-pipeline-state';
 import { whatsappRepository } from './whatsapp.repository';
 import type { WhatsAppWebhookMessage } from '../../infrastructure/whatsapp/whatsapp.types';
@@ -225,10 +229,50 @@ export async function handleIncomingMessage(params: HandleIncomingMessageParams)
     });
   }
 
+  // Per-plan monthly message-limit gate. Same principle as the license gate:
+  // when the limit is reached we block ONLY the AI auto-reply — the inbound is
+  // already saved, the conversation exists, and the UI broadcast still runs, so
+  // a human can always take over. The usage counter is the shared AiUsageEvent
+  // meter (see subscription-message-limit.service). Threshold notifications
+  // (80% / 100%) fire once per period, off the hot path.
+  const messageUsage = await getMonthlyMessageUsage(businessId);
+  void maybeNotifyUsageThresholds(businessId, messageUsage);
+  if (messageUsage.blocked) {
+    logger.info('WhatsApp AI auto-reply skipped — monthly message limit reached', {
+      businessId,
+      conversationId: conversation.id,
+      used: messageUsage.used,
+      limit: messageUsage.limit,
+    });
+  }
+
   const autoReplyEnabled =
-    config.aiReply.enabled && licenseAllowsAi && (await isAutoReplyEnabled(businessId));
+    config.aiReply.enabled &&
+    licenseAllowsAi &&
+    !messageUsage.blocked &&
+    (await isAutoReplyEnabled(businessId));
   const canReplyWithAi =
     autoReplyEnabled && shouldAiRespond(conversation) && Boolean(aiText);
+
+  // Limit reached but the customer still deserves a response: send ONE canned
+  // "please contact us" reply per conversation per billing period (deduped so a
+  // chatty customer is not spammed). License must be valid — an invalid license
+  // stays silent as before.
+  if (
+    licenseAllowsAi &&
+    messageUsage.blocked &&
+    shouldAiRespond(conversation) &&
+    Boolean(aiText)
+  ) {
+    await maybeSendLimitReachedReply({
+      businessId,
+      conversationId: conversation.id,
+      phoneNumberId,
+      customerPhone: msg.from,
+      accessToken,
+      periodStart: messageUsage.periodStart,
+    });
+  }
 
   if (canReplyWithAi) {
     const tokenCheck = await resolveOutboundWhatsAppToken({ phoneNumberId, accessToken });
@@ -550,6 +594,52 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
     pipelineKey: params.pipelineKey,
     isFirstCustomerMessage,
   });
+}
+
+interface LimitReachedReplyParams {
+  businessId: string;
+  conversationId: string;
+  phoneNumberId: string;
+  customerPhone: string;
+  accessToken?: string;
+  periodStart: Date;
+}
+
+const LIMIT_REACHED_MESSAGE =
+  'Waan ka xumahay, adeegga otomaatigga ah ee AI-ga hadda lama heli karo. Fadlan si toos ah ula soo xiriir ganacsiga oo shaqaale ayaa kaa jawaabi doona. / Sorry, our automated AI service is currently unavailable. Please contact the business directly and a team member will get back to you.';
+
+// Sends the "limit reached, please contact us" auto-reply at most once per
+// conversation per billing period, so a customer sending several messages in a
+// row is not spammed with the same notice.
+async function maybeSendLimitReachedReply(params: LimitReachedReplyParams): Promise<void> {
+  try {
+    const alreadySent = await prisma.message.findFirst({
+      where: {
+        conversationId: params.conversationId,
+        direction: 'OUTBOUND',
+        createdAt: { gte: params.periodStart },
+        metadata: { path: ['type'], equals: 'service_limit_notice' },
+      },
+      select: { id: true },
+    });
+    if (alreadySent) return;
+
+    await sendAutomatedReply({
+      businessId: params.businessId,
+      conversationId: params.conversationId,
+      phoneNumberId: params.phoneNumberId,
+      customerPhone: params.customerPhone,
+      accessToken: params.accessToken,
+      content: LIMIT_REACHED_MESSAGE,
+      metadata: { type: 'service_limit_notice', language: 'so' },
+    });
+  } catch (error) {
+    logger.warn('Failed to send message-limit auto-reply', {
+      businessId: params.businessId,
+      conversationId: params.conversationId,
+      error,
+    });
+  }
 }
 
 async function downloadAndAttachMedia(params: {

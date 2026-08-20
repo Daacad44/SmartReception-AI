@@ -563,3 +563,68 @@ export function whatsappConnectionRejectedEmail(
     }),
   };
 }
+
+interface MessageUsageAlertEmailData {
+  audience: 'business' | 'admin';
+  threshold: 80 | 100;
+  businessName: string;
+  planName: string;
+  used: number;
+  limit: number;
+  actionUrl: string;
+}
+
+export function messageUsageAlertEmail(
+  data: MessageUsageAlertEmailData
+): { subject: string; html: string } {
+  const isBlock = data.threshold === 100;
+  const isAdmin = data.audience === 'admin';
+  const pct = data.threshold;
+  const usedStr = data.used.toLocaleString();
+  const limitStr = data.limit.toLocaleString();
+
+  const heading = isBlock
+    ? 'Monthly AI message limit reached'
+    : `You've used ${pct}% of your monthly AI messages`;
+
+  const lead = isAdmin
+    ? isBlock
+      ? `<strong>${data.businessName}</strong> (${data.planName} plan) has reached 100% of its monthly AI message allowance. Automated AI replies are now paused for this business until the plan is upgraded or the billing period resets.`
+      : `<strong>${data.businessName}</strong> (${data.planName} plan) has used ${pct}% of its monthly AI message allowance.`
+    : isBlock
+      ? `Your ${data.planName} plan has reached its monthly AI message limit. Automated AI replies are paused, and customers now receive a short "please contact us" message instead. Your team can still reply to every conversation manually from the dashboard.`
+      : `Your ${data.planName} plan has used ${pct}% of this month's AI message allowance. Once you reach 100%, automated AI replies pause until you upgrade or the new billing period begins.`;
+
+  const statusColor = isBlock ? '#DC2626' : BRAND.accentColor;
+
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">${heading}</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">${lead}</p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Business:</strong> ${data.businessName}<br />
+        <strong>Plan:</strong> ${data.planName}<br />
+        <strong>Usage this period:</strong>
+        <span style="color:${statusColor};font-weight:700;">${usedStr} / ${limitStr} (${pct}%)</span>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.7;">
+      ${isBlock
+        ? 'Upgrading the plan or the start of the next billing period restores automated AI replies immediately.'
+        : 'Consider upgrading the plan to avoid an interruption to automated AI replies.'}
+    </p>
+    ${renderButton(data.actionUrl, isAdmin ? 'Open Admin Console' : 'View Subscription')}
+  `;
+
+  const who = isAdmin ? `${data.businessName} — ` : '';
+  return {
+    subject: isBlock
+      ? `${who}Monthly AI message limit reached`
+      : `${who}${pct}% of monthly AI messages used`,
+    html: renderEmailLayout({
+      preheader: `${usedStr} / ${limitStr} AI messages used this period`,
+      title: heading,
+      body,
+    }),
+  };
+}

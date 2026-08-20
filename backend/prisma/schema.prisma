@@ -680,6 +680,7 @@ model Business {
   aiTrainerAssignments          AiTrainerBusiness[]
   knowledgeChunks               KnowledgeChunk[]
   aiUsageEvents                 AiUsageEvent[]
+  messageUsageAlerts            MessageUsageAlert[]
   aiDailyRollups                AiDailyRollup[]
   aiConversationMetrics         AiConversationMetric[]
   aiCustomerMetrics             AiCustomerMetric[]
@@ -3386,6 +3387,24 @@ model AiUsageEvent {
   @@index([customerId])
   @@index([provider, createdAt])
   @@map("ai_usage_events")
+}
+
+// Tracks which monthly-usage threshold notifications (80% / 100%) have already
+// been sent for a business in a given billing period, so each threshold fires
+// at most once per period. The unique constraint makes dedup atomic under
+// concurrent inbound messages; a new periodStart naturally re-arms the alerts.
+model MessageUsageAlert {
+  id          String   @id @default(uuid())
+  businessId  String
+  periodStart DateTime @db.Date
+  threshold   Int
+  createdAt   DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, periodStart, threshold])
+  @@index([businessId])
+  @@map("message_usage_alerts")
 }
 
 model AiDailyRollup {

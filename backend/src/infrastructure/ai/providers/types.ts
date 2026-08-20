@@ -48,8 +48,10 @@ export interface AiProviderCostRates {
   outputPer1M: number;
 }
 
+// Real published token prices (USD per 1M tokens), paid tier, text.
+// gemini-2.5-flash: $0.30 input / $2.50 output — https://ai.google.dev/gemini-api/docs/pricing
 export const PROVIDER_COST_RATES: Record<AiProviderName, AiProviderCostRates> = {
-  gemini: { inputPer1M: 0.075, outputPer1M: 0.3 },
+  gemini: { inputPer1M: 0.3, outputPer1M: 2.5 },
   openai: { inputPer1M: 0.15, outputPer1M: 0.6 },
   claude: { inputPer1M: 0.25, outputPer1M: 1.25 },
 };

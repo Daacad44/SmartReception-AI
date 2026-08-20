@@ -1,6 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import type { PlanFeatureFlags } from './subscription.types';
 import { DEFAULT_FEATURE_FLAGS } from './subscription.types';
+import { getMonthlyMessageUsage } from './subscription-message-limit.service';
 
 export interface UsageMetric {
   used: number;
@@ -9,6 +10,7 @@ export interface UsageMetric {
 }
 
 export interface BusinessUsageSnapshot {
+  messages: UsageMetric;
   conversations: UsageMetric;
   customers: UsageMetric;
   users: UsageMetric;
@@ -54,6 +56,7 @@ export async function getBusinessUsageSnapshot(businessId: string): Promise<Busi
   };
 
   const [
+    messageUsage,
     conversations,
     customers,
     users,
@@ -64,6 +67,7 @@ export async function getBusinessUsageSnapshot(businessId: string): Promise<Busi
     whatsappNumbers,
     docBytes,
   ] = await Promise.all([
+    getMonthlyMessageUsage(businessId),
     prisma.conversation.count({ where: { businessId } }),
     prisma.customer.count({ where: { businessId, isActive: true } }),
     prisma.businessMember.count({ where: { businessId, isActive: true } }),
@@ -81,6 +85,11 @@ export async function getBusinessUsageSnapshot(businessId: string): Promise<Busi
   const storageMb = Math.ceil((docBytes._sum.fileSize ?? 0) / (1024 * 1024));
 
   return {
+    messages: {
+      used: messageUsage.used,
+      limit: messageUsage.limit,
+      percent: messageUsage.percent,
+    },
     conversations: metric(conversations, limits.conversations),
     customers: metric(customers, limits.customers),
     users: metric(users, limits.users),
