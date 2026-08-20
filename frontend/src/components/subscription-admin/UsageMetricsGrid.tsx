@@ -8,6 +8,7 @@ interface UsageMetric {
 
 interface UsageMetricsGridProps {
   usage: {
+    messages?: UsageMetric;
     conversations: UsageMetric;
     customers: UsageMetric;
     users: UsageMetric;
@@ -21,6 +22,7 @@ interface UsageMetricsGridProps {
 }
 
 const METRICS: Array<{ key: keyof UsageMetricsGridProps['usage']; label: string }> = [
+  { key: 'messages', label: 'AI Messages (this month)' },
   { key: 'conversations', label: 'Conversations' },
   { key: 'customers', label: 'Customers' },
   { key: 'users', label: 'Users' },
@@ -37,6 +39,7 @@ export function UsageMetricsGrid({ usage }: UsageMetricsGridProps) {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {METRICS.map(({ key, label }) => {
         const metric = usage[key];
+        if (!metric) return null;
         return (
           <div
             key={key}
