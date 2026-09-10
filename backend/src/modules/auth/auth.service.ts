@@ -642,7 +642,7 @@ export class AuthService {
       include: { business: true, user: true },
     });
 
-    if (!membership) {
+    if (!membership || !membership.isActive) {
       throw new NotFoundError('Business membership not found');
     }
 

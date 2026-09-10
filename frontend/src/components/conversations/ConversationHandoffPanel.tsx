@@ -197,7 +197,7 @@ export function ConversationHandoffPanel({
           </SelectTrigger>
           <SelectContent>
             {teamMembers?.map((member) => (
-              <SelectItem key={member.id} value={member.id}>
+              <SelectItem key={member.id} value={member.userId || member.id}>
                 {member.name} ({member.role})
               </SelectItem>
             ))}

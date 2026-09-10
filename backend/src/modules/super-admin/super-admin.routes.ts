@@ -38,6 +38,7 @@ router.post('/applications/:id/reject', (req, res, next) =>
 
 router.get('/users', (req, res, next) => superAdminController.users(req, res, next));
 router.post('/users', (req, res, next) => superAdminController.createUser(req, res, next));
+router.get('/users/:id', (req, res, next) => superAdminController.getUser(req, res, next));
 router.patch('/users/:id', (req, res, next) => superAdminController.updateUser(req, res, next));
 router.delete('/users/:id', (req, res, next) => superAdminController.deleteUser(req, res, next));
 router.post('/users/:id/reset-password', (req, res, next) =>

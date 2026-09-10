@@ -122,10 +122,48 @@ export class SuperAdminController {
 
   async users(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page, limit } = paginationSchema.parse(req.query);
-      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-      const result = await superAdminService.listUsers(page, limit, search);
+      const { page, limit, search } = paginationSchema.parse(req.query);
+      const BUSINESS_ROLES = ['OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER', 'RECEPTIONIST', 'STAFF'];
+      const APPROVAL_STATUSES = ['PENDING', 'APPROVED', 'ACTIVE', 'REJECTED'];
+      const role =
+        typeof req.query.role === 'string' && BUSINESS_ROLES.includes(req.query.role)
+          ? req.query.role
+          : undefined;
+      const businessId =
+        typeof req.query.businessId === 'string' && req.query.businessId.length > 0
+          ? req.query.businessId
+          : undefined;
+      const approvalStatus =
+        typeof req.query.approvalStatus === 'string' &&
+        APPROVAL_STATUSES.includes(req.query.approvalStatus)
+          ? req.query.approvalStatus
+          : undefined;
+      const isActive =
+        req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+      const isSuperAdmin =
+        req.query.isSuperAdmin === 'true'
+          ? true
+          : req.query.isSuperAdmin === 'false'
+            ? false
+            : undefined;
+      const result = await superAdminService.listUsers(page, limit, {
+        search,
+        role,
+        businessId,
+        approvalStatus,
+        isActive,
+        isSuperAdmin,
+      });
       res.json({ success: true, data: result.data, meta: result.meta });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await superAdminService.getUser(routeParam(req.params.id));
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

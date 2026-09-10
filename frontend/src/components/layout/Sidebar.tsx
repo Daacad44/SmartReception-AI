@@ -20,6 +20,7 @@ import {
   Crown,
   Upload,
   Radio,
+  UserCog,
   ClipboardCheck,
   Layers,
 } from 'lucide-react';
@@ -57,7 +58,7 @@ const navGroups = [
   {
     heading: 'Organization',
     items: [
-      { to: '/team', icon: UsersRound, label: 'Team', featureKey: 'team' },
+      { to: '/team', icon: UsersRound, label: 'Team', permission: 'team:read' as const, featureKey: 'team' },
       { to: '/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
       { to: '/audit-logs', icon: Shield, label: 'Audit Logs', permission: 'audit:read' as const, featureKey: 'audit-logs' },
     ],
@@ -76,6 +77,8 @@ const navGroups = [
       { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
       { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
       { to: '/admin/applications', icon: ClipboardCheck, label: 'Business Applications', permission: 'platform:admin' as const },
+      { to: '/admin/users', icon: UserCog, label: 'Users', permission: 'platform:admin' as const },
+      { to: '/admin/roles', icon: Shield, label: 'Roles & Permissions', permission: 'platform:admin' as const },
       { to: '/admin/businesses', icon: Building2, label: 'Business Management', permission: 'platform:admin' as const, featureKey: 'business-management' },
       { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions', permission: 'platform:admin' as const, featureKey: 'subscription-management' },
       { to: '/admin/governance', icon: Shield, label: 'Governance', permission: 'platform:admin' as const, featureKey: 'governance-admin' },

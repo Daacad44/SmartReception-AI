@@ -268,8 +268,21 @@ export const twoFactorDisableSchema = z.object({
 });
 
 export const acceptInviteSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(16).max(200),
 });
+
+export const registerFromInviteSchema = z
+  .object({
+    token: z.string().min(16).max(200),
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    password: strongPasswordSchema,
+    confirmPassword: z.string().min(8).max(128),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 export const changePlanSchema = z.object({
   plan: z.enum(['STARTER', 'BUSINESS', 'PROFESSIONAL', 'ENTERPRISE']),
@@ -896,6 +909,7 @@ export type CreateFaqInput = z.infer<typeof createFaqSchema>;
 export type AiConfigInput = z.infer<typeof aiConfigSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
 export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
+export type RegisterFromInviteInput = z.infer<typeof registerFromInviteSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;

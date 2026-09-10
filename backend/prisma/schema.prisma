@@ -707,6 +707,13 @@ enum UserApprovalStatus {
   REJECTED // application declined by Super Admin
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 model User {
   id                   String             @id @default(uuid())
   email                String             @unique
@@ -789,6 +796,7 @@ model User {
   platformFeatureVerifications PlatformFeatureVerificationRequest[] @relation("PlatformFeatureVerificationUser")
   platformFeatureAuditLogs     PlatformFeatureAuditLog[]            @relation("PlatformFeatureAuditUser")
   financialAuditLogs           FinancialAuditLog[]                  @relation("FinancialAuditOperator")
+  teamInvitationsSent          TeamInvitation[]                     @relation("TeamInvitationInviter")
 
   @@index([email])
   @@index([isActive])
@@ -815,20 +823,27 @@ model BusinessMember {
 }
 
 model TeamInvitation {
-  id         String    @id @default(uuid())
-  businessId String
-  email      String
-  role       UserRole  @default(AGENT)
-  token      String    @unique
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  createdAt  DateTime  @default(now())
+  id          String           @id @default(uuid())
+  businessId  String
+  email       String
+  role        UserRole         @default(AGENT)
+  token       String?          @unique
+  tokenHash   String           @unique
+  invitedById String?
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy User?    @relation("TeamInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([email])
   @@index([token])
+  @@index([businessId, email, status])
   @@map("team_invitations")
 }
 

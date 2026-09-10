@@ -161,17 +161,27 @@ interface TeamInvitationEmailData {
   inviterName: string;
   role: string;
   inviteUrl: string;
+  expiresAt?: Date | string;
+}
+
+function formatInvitationExpiry(value?: Date | string): string {
+  if (!value) return '7 days from the time it was sent';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '7 days from the time it was sent';
+  return date.toUTCString();
 }
 
 export function teamInvitationEmail(data: TeamInvitationEmailData): { subject: string; html: string } {
+  const roleLabel = data.role.charAt(0) + data.role.slice(1).toLowerCase();
+  const expiresLabel = formatInvitationExpiry(data.expiresAt);
   const body = `
-    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">You're invited!</h1>
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">You've been invited</h1>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
-      <strong>${data.inviterName}</strong> has invited you to join <strong>${data.businessName}</strong> on ${BRAND.productName} as <strong>${data.role}</strong>.
+      <strong>${data.inviterName}</strong> invited you to join <strong>${data.businessName}</strong> on ${BRAND.productName} as a <strong>${roleLabel}</strong>.
     </p>
     ${renderButton(data.inviteUrl, 'Accept Invitation')}
-    <p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
-      This invitation expires in 7 days.
+    <p style="margin:16px 0 0;font-size:13px;color:#64748B;line-height:1.6;">
+      This invitation expires on: <strong>${expiresLabel}</strong>
     </p>
     ${renderSecurityNotice('If you were not expecting this invitation, you can safely ignore this email.')}
   `;

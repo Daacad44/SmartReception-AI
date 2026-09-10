@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import { parseMutationResponse } from '@/lib/governance';
+import { useAuthStore } from '@/stores/auth.store';
+import type { UserProfile } from '@/lib/types';
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
@@ -584,10 +586,42 @@ export function useDisconnectWhatsApp() {
 }
 
 export function useAcceptInvite() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (token: string) => {
       const response = await api.post('/team/accept-invite', { token });
-      return extractData(response);
+      const data = extractData<InviteAcceptResult>(response);
+      await applyInviteSession(data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useRegisterFromInvite() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      token: string;
+      firstName: string;
+      lastName: string;
+      password: string;
+      confirmPassword: string;
+    }) => {
+      const response = await api.post('/team/invitations/register', input);
+      const data = extractData<InviteAcceptResult>(response);
+      await applyInviteSession(data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -704,6 +738,47 @@ export function useClearKnowledgeBase() {
   });
 }
 
+interface InviteAcceptResult {
+  businessId: string;
+  businessName?: string;
+  role?: string;
+  tokens: { accessToken: string; refreshToken: string };
+}
+
+async function applyInviteSession(result: InviteAcceptResult) {
+  useAuthStore.getState().setTokens(result.tokens.accessToken, result.tokens.refreshToken);
+  const response = await api.get('/auth/profile');
+  const data = extractData<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+    isSuperAdmin?: boolean;
+    businesses?: Array<{ id: string; name: string; role: string; industry?: string; plan?: string }>;
+  }>(response);
+  const businesses = data.businesses ?? [];
+  const currentRole =
+    businesses.find((b) => b.id === result.businessId)?.role ?? businesses[0]?.role ?? result.role ?? 'AGENT';
+  const profile: UserProfile = {
+    id: data.id,
+    email: data.email,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    avatar: data.avatarUrl ?? undefined,
+    role: currentRole,
+    businesses: businesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      industry: b.industry ?? 'OTHER',
+      plan: b.plan ?? 'STARTER',
+      role: b.role,
+    })),
+  };
+  useAuthStore.getState().login(result.tokens.accessToken, result.tokens.refreshToken, profile, data.isSuperAdmin ?? false);
+  useAuthStore.getState().setCurrentBusiness(result.businessId);
+}
+
 export function useInviteTeamMember() {
   const queryClient = useQueryClient();
 
@@ -714,7 +789,8 @@ export function useInviteTeamMember() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team'] });
-      toast.success('Invitation sent');
+      queryClient.invalidateQueries({ queryKey: ['team-invitations'] });
+      toast.success('Invitation sent successfully.');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -750,6 +826,42 @@ export function useRemoveTeamMember() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team'] });
       toast.success('Team member removed');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+}
+
+export function useResendInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await api.post(`/team/invitations/${invitationId}/resend`);
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-invitations'] });
+      toast.success('Invitation resent successfully.');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error) || 'Unable to send invitation. Please try again.');
+    },
+  });
+}
+
+export function useRevokeInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await api.post(`/team/invitations/${invitationId}/revoke`);
+      return extractData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-invitations'] });
+      toast.success('Invitation revoked');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

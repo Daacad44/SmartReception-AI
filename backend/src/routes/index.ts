@@ -54,6 +54,8 @@ import {
 import { requireValidLicense } from '../core/middleware/subscription.middleware';
 import { authenticate } from '../core/middleware/auth.middleware';
 import { requireBusiness } from '../core/middleware/authorize.middleware';
+import { teamController } from '../modules/team/team.controller';
+import { createRateLimiter } from '../core/rate-limit-store';
 
 const router = Router();
 
@@ -78,6 +80,23 @@ router.use('/subscription', subscriptionRoutes);
 
 // Onboarding: auth only — users may not have businessId yet (pre- and mid-onboarding)
 router.use('/onboarding', authenticate, onboardingRoutes);
+
+const invitationLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Too many invitation requests. Please try again later.',
+});
+
+// Invitation accept/register must not require an existing business membership.
+router.get('/team/invitations/preview', invitationLimiter, (req, res, next) =>
+  teamController.previewInvitation(req, res, next)
+);
+router.post('/team/invitations/register', invitationLimiter, (req, res, next) =>
+  teamController.registerFromInvite(req, res, next)
+);
+router.post('/team/accept-invite', authenticate, (req, res, next) =>
+  teamController.acceptInvite(req, res, next)
+);
 
 const licensed = Router();
 licensed.use(authenticate, requireBusiness, requireValidLicense());

@@ -145,6 +145,7 @@ export interface Faq {
 
 export interface TeamMember {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   role: string;
@@ -152,6 +153,20 @@ export interface TeamMember {
   status: 'online' | 'offline' | 'away';
   conversationsHandled: number;
   avgResponseTime: string;
+  joinedAt?: string;
+  isActive?: boolean;
+}
+
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  role: string;
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+  expiresAt: string;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+  invitedBy?: string | null;
 }
 
 export interface Notification {

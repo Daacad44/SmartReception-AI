@@ -1,5 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
-import { UserRole } from '@prisma/client';
+import { InvitationStatus, UserRole } from '@prisma/client';
+import { hashInvitationToken } from './invitation.policy';
 
 export class TeamRepository {
   async findMembers(businessId: string) {
@@ -14,6 +15,7 @@ export class TeamRepository {
             lastName: true,
             avatarUrl: true,
             lastLoginAt: true,
+            isActive: true,
           },
         },
       },
@@ -31,6 +33,12 @@ export class TeamRepository {
   async findMemberByUserId(businessId: string, userId: string) {
     return prisma.businessMember.findUnique({
       where: { businessId_userId: { businessId, userId } },
+    });
+  }
+
+  async countActiveOwners(businessId: string) {
+    return prisma.businessMember.count({
+      where: { businessId, role: 'OWNER', isActive: true },
     });
   }
 
@@ -57,37 +65,86 @@ export class TeamRepository {
     businessId: string;
     email: string;
     role: UserRole;
-    token: string;
+    tokenHash: string;
     expiresAt: Date;
+    invitedById?: string;
   }) {
-    return prisma.teamInvitation.create({ data });
+    return prisma.teamInvitation.create({
+      data: {
+        businessId: data.businessId,
+        email: data.email,
+        role: data.role,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt,
+        invitedById: data.invitedById,
+        status: InvitationStatus.PENDING,
+      },
+    });
   }
 
   async findInvitations(businessId: string) {
     return prisma.teamInvitation.findMany({
-      where: { businessId, acceptedAt: null, expiresAt: { gt: new Date() } },
+      where: { businessId },
+      include: {
+        invitedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 
-  async findInvitationByEmail(businessId: string, email: string) {
+  async findPendingInvitationByEmail(businessId: string, email: string) {
     return prisma.teamInvitation.findFirst({
-      where: { businessId, email, acceptedAt: null, expiresAt: { gt: new Date() } },
+      where: {
+        businessId,
+        email,
+        status: InvitationStatus.PENDING,
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
     });
   }
 
-  async findInvitationByToken(token: string) {
-    return prisma.teamInvitation.findUnique({
-      where: { token },
-      include: { business: { select: { id: true, name: true } } },
+  async findInvitationById(businessId: string, invitationId: string) {
+    return prisma.teamInvitation.findFirst({
+      where: { id: invitationId, businessId },
     });
   }
 
-  async acceptInvitation(id: string) {
+  async findInvitationByPresentedToken(token: string) {
+    const tokenHash = hashInvitationToken(token);
+    return prisma.teamInvitation.findFirst({
+      where: {
+        OR: [{ tokenHash }, { tokenHash: token }, { token }],
+      },
+      include: {
+        business: { select: { id: true, name: true, onboardingCompletedAt: true } },
+        invitedBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+  }
+
+  async updateInvitation(
+    id: string,
+    data: {
+      tokenHash?: string;
+      token?: string | null;
+      expiresAt?: Date;
+      role?: UserRole;
+      status?: InvitationStatus;
+      acceptedAt?: Date | null;
+      revokedAt?: Date | null;
+    }
+  ) {
     return prisma.teamInvitation.update({
       where: { id },
-      data: { acceptedAt: new Date() },
+      data,
     });
+  }
+
+  async deleteInvitation(id: string) {
+    return prisma.teamInvitation.delete({ where: { id } });
   }
 
   async createMember(data: {
@@ -114,18 +171,8 @@ export class TeamRepository {
     });
   }
 
-  async updateInvitation(
-    id: string,
-    data: { token: string; expiresAt: Date; role: UserRole }
-  ) {
-    return prisma.teamInvitation.update({
-      where: { id },
-      data,
-    });
-  }
-
   async findUserByEmail(email: string) {
-    return prisma.user.findUnique({ where: { email } });
+    return prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   }
 }
 

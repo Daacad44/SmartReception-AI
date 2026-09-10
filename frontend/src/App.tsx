@@ -121,6 +121,9 @@ const BusinessApplicationsPage = lazyWithRetry(() =>
 const UserManagementPage = lazyWithRetry(() =>
   import('@/pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
 );
+const RolesPermissionsPage = lazyWithRetry(() =>
+  import('@/pages/RolesPermissionsPage').then((m) => ({ default: m.RolesPermissionsPage }))
+);
 const CampaignsPage = lazyWithRetry(() =>
   import('@/pages/CampaignsPage').then((m) => ({ default: m.CampaignsPage }))
 );
@@ -493,6 +496,14 @@ export default function App() {
                     element={
                       <PermissionRoute permission={PERMISSIONS['platform:admin']}>
                         <UserManagementPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/roles"
+                    element={
+                      <PermissionRoute permission={PERMISSIONS['platform:admin']}>
+                        <RolesPermissionsPage />
                       </PermissionRoute>
                     }
                   />

@@ -218,14 +218,15 @@ export class EmailService {
 
   async sendTeamInvitation(
     email: string,
-    data: { businessName: string; inviterName: string; role: string; token: string }
+    data: { businessName: string; inviterName: string; role: string; token: string; expiresAt?: Date }
   ): Promise<void> {
-    const inviteUrl = `${config.frontendUrl}/accept-invite?token=${data.token}`;
+    const inviteUrl = `${config.frontendUrl}/accept-invite?token=${encodeURIComponent(data.token)}`;
     const { subject, html } = templates.teamInvitationEmail({
       businessName: data.businessName,
       inviterName: data.inviterName,
       role: data.role,
       inviteUrl,
+      expiresAt: data.expiresAt,
     });
     await this.send(email, subject, html);
   }
