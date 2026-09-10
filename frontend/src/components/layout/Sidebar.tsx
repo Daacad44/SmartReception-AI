@@ -24,7 +24,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -207,19 +208,25 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
     >
       <div
         className={cn(
-          'flex items-center border-b border-white/10 py-5',
-          collapsed ? 'justify-center px-2' : 'gap-3 px-6'
+          'flex items-center border-b border-white/10',
+          collapsed ? 'justify-center px-2 py-4' : 'px-4 py-4'
         )}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#090B14]">
-          <LogoMark size={22} />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold leading-tight">SomReception</h1>
-            <p className="text-xs text-white/60">AI Platform</p>
-          </div>
-        )}
+        <Link
+          to="/dashboard"
+          onClick={onNavigate}
+          aria-label={BRAND_NAME}
+          className={cn(
+            'flex items-center justify-center no-underline hover:no-underline',
+            collapsed ? 'h-10 w-10' : 'w-full'
+          )}
+        >
+          {collapsed ? (
+            <BrandLogo variant="icon" decorative className="h-10 w-10" />
+          ) : (
+            <BrandLogo variant="full" decorative className="h-11 w-auto max-w-full" />
+          )}
+        </Link>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4 scrollbar-thin">

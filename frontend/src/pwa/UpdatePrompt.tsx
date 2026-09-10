@@ -3,7 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { toast } from 'sonner';
 import { RefreshCw, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { useOnlineStatus } from './useOnlineStatus';
 
 // Re-check for a new deployment every hour while the app stays open.
@@ -32,7 +32,7 @@ export function UpdatePrompt() {
 
   useEffect(() => {
     if (offlineReady) {
-      toast.success('SmartReception is ready to work offline.', { duration: 4000 });
+      toast.success('SomReception AI is ready to work offline.', { duration: 4000 });
       setOfflineReady(false);
     }
   }, [offlineReady, setOfflineReady]);
@@ -51,13 +51,11 @@ export function UpdatePrompt() {
       {needRefresh && (
         <div className="fixed inset-x-3 bottom-3 z-[70] mx-auto max-w-md animate-in slide-in-from-bottom-4 fade-in duration-500 sm:inset-x-auto sm:right-4">
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-navy p-3 pr-3 text-white shadow-2xl">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#090B14]">
-              <LogoMark size={26} />
-            </div>
+            <BrandLogo variant="icon" decorative className="h-11 w-11 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold leading-tight">Update available</p>
               <p className="truncate text-xs text-white/60">
-                A new version of SmartReception AI is ready.
+                A new version of SomReception AI is ready.
               </p>
             </div>
             <Button

@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { HydrationGate } from '@/components/HydrationGate';
 import { RootRedirect } from '@/components/RootRedirect';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -204,6 +205,7 @@ export default function App() {
                   }
                 />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/verify-email" element={<VerifyOtpPage />} />
                 <Route path="/verify-2fa" element={<TwoFactorLoginPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route path="/check-email" element={<CheckEmailPage />} />
@@ -569,7 +571,7 @@ export default function App() {
                     }
                   />
                 </Route>
-                <Route path="*" element={<RootRedirect />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </BrowserRouter>
             <PwaGlobals />

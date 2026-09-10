@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /**
- * SmartReception AI — custom service worker (Workbox / injectManifest).
+ * SomReception AI — custom service worker (Workbox / injectManifest).
  *
  * Responsibilities:
  *  - Precache the built app shell (self.__WB_MANIFEST is injected at build time).
@@ -141,12 +141,12 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = payload.title || 'SmartReception AI';
+  const title = payload.title || 'SomReception AI';
   const url = payload.url || (payload.data?.url as string | undefined) || '/';
   const options: NotificationOptions = {
     body: payload.body || '',
-    icon: payload.icon || '/icons/pwa-192x192.png',
-    badge: payload.badge || '/icons/favicon-64.png',
+    icon: payload.icon || '/brand/pwa-192.png',
+    badge: payload.badge || '/brand/favicon-64.png',
     tag: payload.tag,
     renotify: payload.renotify ?? Boolean(payload.tag),
     requireInteraction: payload.requireInteraction ?? false,

@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 import { useAuthStore } from '@/stores/auth.store';
 
 const HYDRATION_TIMEOUT_MS = 3000;
@@ -29,8 +31,9 @@ export function HydrationGate({ children }: { children: ReactNode }) {
 
   if (!hasHydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-label="Loading application" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#090B14]">
+        <BrandLogo variant="icon" className="h-16 w-16" />
+        <Loader2 className="h-7 w-7 animate-spin text-[#F59E0B]" aria-label={`Loading ${BRAND_NAME}`} />
       </div>
     );
   }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { Logo } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 import { InstallButton } from '@/pwa';
 import { cn } from '@/lib/utils';
 
@@ -38,9 +39,22 @@ export function LandingHeader() {
         scrolled ? 'border-white/10 bg-[#090B14]/85 backdrop-blur-lg' : 'border-transparent bg-transparent'
       )}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 sm:px-6">
-        <Link to="/" className="no-underline hover:no-underline">
-          <Logo iconSize={38} wordmarkClassName="text-base sm:text-lg" />
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-3 sm:px-6">
+        <Link
+          to="/"
+          aria-label={BRAND_NAME}
+          className="flex min-w-0 shrink-0 items-center no-underline hover:no-underline"
+        >
+          <BrandLogo
+            variant="icon"
+            decorative
+            className="h-9 w-9 min-[380px]:hidden"
+          />
+          <BrandLogo
+            variant="full"
+            decorative
+            className="hidden h-11 w-auto max-w-[min(220px,58vw)] min-[380px]:block sm:h-12 lg:h-[52px] lg:max-w-[248px]"
+          />
         </Link>
 
         <nav className="hidden items-center gap-7 text-[14.5px] font-medium text-slate-300 lg:flex">

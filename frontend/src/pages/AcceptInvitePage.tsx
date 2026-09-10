@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BrandLogo } from '@/components/Logo';
 import { useAcceptInvite } from '@/hooks/useMutations';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
@@ -36,7 +37,10 @@ export function AcceptInvitePage() {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
-          <CardHeader>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex justify-center">
+              <BrandLogo variant="app-icon" className="h-16 w-16" />
+            </div>
             <CardTitle>Invalid Invitation</CardTitle>
             <CardDescription>This invitation link is missing or invalid.</CardDescription>
           </CardHeader>
@@ -48,7 +52,10 @@ export function AcceptInvitePage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex justify-center">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
+          </div>
           <CardTitle>Accepting Invitation</CardTitle>
           <CardDescription>
             {acceptInvite.isPending && 'Joining workspace...'}

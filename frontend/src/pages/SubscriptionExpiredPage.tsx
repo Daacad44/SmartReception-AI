@@ -1,4 +1,4 @@
-import { AlertTriangle, LogOut, Mail, RefreshCw } from 'lucide-react';
+import { LogOut, Mail, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSubscriptionLicense } from '@/components/SubscriptionGate';
 import { useAuthStore } from '@/stores/auth.store';
 import { LoadingState } from '@/components/LoadingState';
+import { BrandLogo } from '@/components/Logo';
 
 function formatDate(iso: string | null) {
   if (!iso) return '—';
@@ -35,8 +36,8 @@ export function SubscriptionExpiredPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6">
       <Card className="w-full max-w-lg border-slate-800 bg-slate-950/80 text-slate-50 shadow-2xl backdrop-blur">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15">
-            <AlertTriangle className="h-8 w-8 text-amber-400" />
+          <div className="mx-auto flex justify-center">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
           </div>
           <div className="space-y-2">
             <Badge variant="outline" className="border-amber-500/40 text-amber-300">

@@ -3,12 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot, Lock, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { Lock, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OtpInput } from '@/components/OtpInput';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_CTA_CLASS } from '@/lib/brand';
 import { useAuth } from '@/hooks/useAuth';
 
 const schema = z
@@ -57,7 +59,7 @@ export function ResetPasswordPage() {
             </div>
             <h2 className="text-xl font-semibold">Password reset!</h2>
             <p className="mt-2 text-sm text-muted-foreground">You can now sign in with your new password.</p>
-            <Button asChild className="mt-6 bg-accent hover:bg-accent/90">
+            <Button asChild className={`mt-6 ${BRAND_CTA_CLASS}`}>
               <Link to="/login">Sign in</Link>
             </Button>
           </CardContent>
@@ -70,8 +72,8 @@ export function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md border-0 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-navy">
-            <Bot className="h-6 w-6 text-white" />
+          <div className="mx-auto mb-5 flex justify-center bg-transparent">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
           </div>
           <CardTitle className="text-2xl">Reset password</CardTitle>
           <CardDescription>
@@ -113,7 +115,7 @@ export function ResetPasswordPage() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-accent hover:bg-accent/90"
+              className={`w-full ${BRAND_CTA_CLASS}`}
               disabled={code.length !== 6 || isResettingPassword}
             >
               {isResettingPassword ? (

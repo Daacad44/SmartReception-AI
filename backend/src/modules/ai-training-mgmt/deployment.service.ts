@@ -9,6 +9,7 @@ import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-sear
 import { sandboxService } from './sandbox.service';
 import { VALIDATION_THRESHOLD } from './ai-knowledge.constants';
 import { config } from '../../config';
+import * as templates from '../../infrastructure/email/templates';
 
 export interface DeploymentReadiness {
   ready: boolean;
@@ -167,20 +168,16 @@ export class DeploymentService {
       }).catch(() => undefined);
 
       if (admin.email) {
-        await emailService.send(
-          admin.email,
-          `AI Deployment Approval — ${request.business.name}`,
-          `<p>A new AI version requires your approval.</p>
-          <ul>
-            <li><strong>Business:</strong> ${request.business.name}</li>
-            <li><strong>Trainer:</strong> ${trainerName}</li>
-            <li><strong>Version:</strong> ${request.version.versionNumber}</li>
-            <li><strong>Knowledge Score:</strong> ${request.knowledgeScore ?? 'N/A'}</li>
-            <li><strong>Confidence Score:</strong> ${request.confidenceScore ?? 'N/A'}</li>
-            <li><strong>AI Readiness:</strong> ${request.readinessScore ?? 'N/A'}</li>
-          </ul>
-          <p><a href="${config.frontendUrl}/admin/ai-deployments">Review in Dashboard</a></p>`
-        );
+        const { subject, html } = templates.aiDeploymentApprovalEmail({
+          businessName: request.business.name,
+          trainerName,
+          versionNumber: request.version.versionNumber,
+          knowledgeScore: request.knowledgeScore,
+          confidenceScore: request.confidenceScore,
+          readinessScore: request.readinessScore,
+          reviewUrl: `${config.frontendUrl}/admin/ai-deployments`,
+        });
+        await emailService.send(admin.email, subject, html);
       }
     }
   }

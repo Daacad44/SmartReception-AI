@@ -1,8 +1,8 @@
 import { BRAND, renderButton, renderEmailLayout, renderSecurityNotice } from './layout';
 
 function renderOtpCard(code: string): string {
-  return `<div style="margin:32px auto;max-width:320px;padding:28px 24px;background:${BRAND.primaryColor};border-radius:16px;text-align:center;">
-    <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94A3B8;">Verification Code</p>
+  return `<div style="margin:32px auto;max-width:320px;padding:28px 24px;background:${BRAND.canvasColor};border-radius:16px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#F59E0B;">Verification Code</p>
     <p style="margin:0;font-size:42px;font-weight:700;letter-spacing:0.35em;color:#ffffff;font-family:'Courier New',monospace;">${code}</p>
   </div>`;
 }
@@ -65,7 +65,7 @@ export function welcomeEmail(data: WelcomeEmailData): { subject: string; html: s
     subject: `Welcome to ${BRAND.productName}`,
     html: renderEmailLayout({
       preheader: `Your ${data.businessName} workspace is ready`,
-      title: 'Welcome to SmartReception AI',
+      title: `Welcome to ${BRAND.productName}`,
       body,
     }),
   };
@@ -310,7 +310,7 @@ export function appointmentMissedEmail(data: { customerName: string }): { subjec
   `;
 
   return {
-    subject: 'Missed Appointment – SmartReception',
+    subject: `Missed Appointment – ${BRAND.productName}`,
     html: renderEmailLayout({
       preheader: 'Your appointment time has passed',
       title: 'Missed Appointment',
@@ -344,7 +344,7 @@ export function appointmentApprovedEmail(data: {
   `;
 
   return {
-    subject: 'Appointment Approved – SmartReception',
+    subject: `Appointment Approved – ${BRAND.productName}`,
     html: renderEmailLayout({
       preheader: `Your appointment on ${data.date} at ${data.time} is approved`,
       title: 'Appointment Approved',
@@ -370,7 +370,7 @@ export function appointmentMissedFollowUpEmail(data: {
   `;
 
   return {
-    subject: 'Book a New Appointment – SmartReception',
+    subject: `Book a New Appointment – ${BRAND.productName}`,
     html: renderEmailLayout({
       preheader: 'Would you like to reschedule your missed appointment?',
       title: 'Missed Appointment Follow-up',
@@ -624,6 +624,83 @@ export function messageUsageAlertEmail(
     html: renderEmailLayout({
       preheader: `${usedStr} / ${limitStr} AI messages used this period`,
       title: heading,
+      body,
+    }),
+  };
+}
+
+interface SubscriptionReminderEmailData {
+  businessName: string;
+  remaining: string;
+}
+
+export function subscriptionReminderEmail(
+  data: SubscriptionReminderEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">Subscription reminder</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Hello ${data.businessName},
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      Your ${BRAND.productName} subscription will expire in:
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:${BRAND.lightBlue};border:1px solid #BFDBFE;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:18px;font-weight:700;color:${BRAND.primaryColor};text-align:center;">
+        ${data.remaining}
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#64748B;line-height:1.6;">
+      Please renew your subscription to avoid service interruption.
+    </p>
+  `;
+
+  return {
+    subject: `${BRAND.productName} — Subscription Reminder`,
+    html: renderEmailLayout({
+      preheader: `Your subscription expires in ${data.remaining}`,
+      title: 'Subscription reminder',
+      body,
+    }),
+  };
+}
+
+interface AiDeploymentApprovalEmailData {
+  businessName: string;
+  trainerName: string;
+  versionNumber: string | number;
+  knowledgeScore?: number | null;
+  confidenceScore?: number | null;
+  readinessScore?: number | null;
+  reviewUrl: string;
+}
+
+export function aiDeploymentApprovalEmail(
+  data: AiDeploymentApprovalEmailData
+): { subject: string; html: string } {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${BRAND.primaryColor};">AI deployment approval required</h1>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.7;">
+      A new AI version requires your approval.
+    </p>
+    <table role="presentation" width="100%" style="margin:16px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+      <tr><td style="padding:16px;font-size:14px;color:#475569;line-height:1.8;">
+        <strong>Business:</strong> ${data.businessName}<br />
+        <strong>Trainer:</strong> ${data.trainerName}<br />
+        <strong>Version:</strong> ${data.versionNumber}<br />
+        <strong>Knowledge Score:</strong> ${data.knowledgeScore ?? 'N/A'}<br />
+        <strong>Confidence Score:</strong> ${data.confidenceScore ?? 'N/A'}<br />
+        <strong>AI Readiness:</strong> ${data.readinessScore ?? 'N/A'}
+      </td></tr>
+    </table>
+    ${renderButton(data.reviewUrl, 'Review in Dashboard')}
+  `;
+
+  return {
+    subject: `AI Deployment Approval — ${data.businessName}`,
+    html: renderEmailLayout({
+      preheader: `${data.trainerName} submitted version ${data.versionNumber} for ${data.businessName}`,
+      title: 'AI deployment approval',
       body,
     }),
   };

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Bot, Loader2, Shield } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OtpInput } from '@/components/OtpInput';
+import { BrandLogo } from '@/components/Logo';
 import { useAuth } from '@/hooks/useAuth';
 
 export function TwoFactorLoginPage() {
@@ -38,8 +39,8 @@ export function TwoFactorLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md border-0 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-navy">
-            <Bot className="h-6 w-6 text-white" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
           </div>
           <CardTitle className="flex items-center justify-center gap-2 text-2xl">
             <Shield className="h-5 w-5 text-accent" />
@@ -68,7 +69,7 @@ export function TwoFactorLoginPage() {
             />
           </div>
           <Button
-            className="w-full bg-accent hover:bg-accent/90"
+            className="w-full bg-[#F59E0B] text-[#0D1B4B] hover:bg-[#F59E0B]/90"
             onClick={handleVerify}
             disabled={code.length < 6 || isVerifyingTwoFactor}
           >

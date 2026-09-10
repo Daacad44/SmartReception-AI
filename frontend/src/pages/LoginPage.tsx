@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Logo, LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_CTA_CLASS, BRAND_NAME } from '@/lib/brand';
 import { InstallButton } from '@/pwa';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -32,7 +33,7 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen">
       <div className="hidden flex-1 flex-col justify-between bg-[#090B14] p-12 text-white lg:flex">
-        <Logo iconSize={40} />
+        <BrandLogo variant="full" className="h-14 w-auto max-w-[280px] bg-transparent" />
         <div>
           <h2 className="mb-4 text-4xl font-bold leading-tight">
             AI-Powered WhatsApp<br />Business Automation
@@ -41,17 +42,17 @@ export function LoginPage() {
             Automate customer conversations, manage appointments, and grow your business with intelligent AI assistance.
           </p>
         </div>
-        <p className="text-sm text-white/40">© 2025 SomReception AI. All rights reserved.</p>
+        <p className="text-sm text-white/40">© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</p>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-8">
         <Card className="w-full max-w-md border-0 shadow-xl">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-[#090B14] lg:hidden">
-              <LogoMark size={32} />
+            <div className="mx-auto mb-4 flex justify-center bg-transparent lg:hidden">
+              <BrandLogo variant="app-icon" className="h-14 w-14" />
             </div>
             <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your SomReception AI account</CardDescription>
+            <CardDescription>Sign in to your {BRAND_NAME} account</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
@@ -80,7 +81,7 @@ export function LoginPage() {
                   <p className="text-xs text-destructive">{errors.password.message}</p>
                 )}
               </div>
-              <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoggingIn}>
+              <Button type="submit" className={`w-full ${BRAND_CTA_CLASS}`} disabled={isLoggingIn}>
                 {isLoggingIn ? 'Signing in...' : 'Sign in'}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

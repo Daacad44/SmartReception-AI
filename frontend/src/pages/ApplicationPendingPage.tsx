@@ -2,7 +2,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Clock, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 
 export function ApplicationPendingPage() {
   const [searchParams] = useSearchParams();
@@ -12,8 +12,8 @@ export function ApplicationPendingPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md border-0 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy">
-            <LogoMark size={30} />
+          <div className="mx-auto mb-5 flex justify-center bg-transparent">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
           </div>
           <CardTitle className="flex items-center justify-center gap-2 text-2xl">
             <Clock className="h-5 w-5 text-accent" />
