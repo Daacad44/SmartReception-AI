@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { Brain, LogOut, Building2 } from 'lucide-react';
+import { LogOut, Building2 } from 'lucide-react';
+import { BrandLogo } from '@/components/Logo';
 import axios from 'axios';
 import { clearTrainerSession, getTrainerToken } from '@/pages/TrainerLoginPage';
 import { Button } from '@/components/ui/button';
@@ -60,8 +61,8 @@ export function TrainerLayout() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Brain className="h-6 w-6 text-accent" />
+          <div className="flex items-center gap-2.5">
+            <BrandLogo variant="icon" decorative className="h-8 w-8" />
             <span className="font-semibold">AI Trainer Portal</span>
           </div>
           <nav className="hidden items-center gap-4 text-sm md:flex">

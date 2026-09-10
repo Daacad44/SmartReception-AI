@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -31,12 +32,9 @@ export function WelcomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-4 py-4 md:px-8">
-        <div className="mx-auto flex max-w-3xl items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#090B14]">
-            <LogoMark size={20} />
-          </div>
-          <span className="font-semibold">SomReception AI</span>
+      <header className="border-b bg-[#090B14] px-4 py-3 md:px-8">
+        <div className="mx-auto flex max-w-3xl items-center">
+          <BrandLogo variant="full" className="h-10 w-auto max-w-[220px]" />
         </div>
       </header>
 
@@ -45,7 +43,7 @@ export function WelcomePage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
             <CheckCircle2 className="h-8 w-8 text-success" />
           </div>
-          <h1 className="text-3xl font-bold">Welcome to SomReception AI</h1>
+          <h1 className="text-3xl font-bold">Welcome to {BRAND_NAME}</h1>
           <p className="mt-2 text-muted-foreground">Your workspace is ready. Here&apos;s how to get started.</p>
         </div>
 

@@ -1,7 +1,8 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bot, Mail, ArrowRight } from 'lucide-react';
+import { Mail, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BrandLogo } from '@/components/Logo';
 
 export function CheckEmailPage() {
   const [searchParams] = useSearchParams();
@@ -26,8 +27,8 @@ export function CheckEmailPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md border-0 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-navy">
-            <Bot className="h-6 w-6 text-white" />
+          <div className="mx-auto mb-5 flex justify-center bg-transparent">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
           </div>
           <CardTitle className="text-2xl">Check your email</CardTitle>
           <CardDescription>
@@ -42,7 +43,7 @@ export function CheckEmailPage() {
           <p className="text-sm text-muted-foreground">
             Enter the 6-digit code from your email to verify your account and continue to business setup.
           </p>
-          <Button asChild className="w-full bg-accent hover:bg-accent/90">
+          <Button asChild className="w-full bg-[#F59E0B] text-[#0D1B4B] hover:bg-[#F59E0B]/90">
             <Link to={`/verify-otp?email=${encodeURIComponent(email)}`}>
               Enter verification code
               <ArrowRight className="ml-2 h-4 w-4" />

@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 import * as templates from './templates';
+import { renderEmailLayout } from './templates/layout';
 
 let resendClient: Resend | null = null;
 
@@ -125,21 +126,14 @@ export class EmailService {
   }
 
   private brandedEmail(heading: string, bodyHtml: string): string {
-    return `
-      <div style="margin:0;padding:24px;background:#0f1424;font-family:Inter,Segoe UI,Arial,sans-serif;">
-        <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <div style="background:#090B14;padding:24px 28px;">
-            <span style="color:#ffffff;font-size:18px;font-weight:800;">Som<span style="color:#FBBF24;">Reception</span> AI</span>
-          </div>
-          <div style="padding:28px;color:#1f2937;">
-            <h1 style="margin:0 0 14px;font-size:20px;color:#0f1424;">${heading}</h1>
-            ${bodyHtml}
-          </div>
-          <div style="padding:18px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;">
-            © ${new Date().getFullYear()} SomReception AI · Enterprise AI Reception Platform
-          </div>
-        </div>
-      </div>`;
+    return renderEmailLayout({
+      title: heading,
+      preheader: heading,
+      body: `
+        <h1 style="margin:0 0 14px;font-size:22px;font-weight:700;color:#0D1B4B;">${heading}</h1>
+        ${bodyHtml}
+      `,
+    });
   }
 
   async sendApplicationReceivedEmail(

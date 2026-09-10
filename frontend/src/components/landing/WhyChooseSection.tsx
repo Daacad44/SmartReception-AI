@@ -1,5 +1,5 @@
 import { Check, X } from 'lucide-react';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { SectionHeading } from './shared';
 
 const TRADITIONAL = [
@@ -51,7 +51,7 @@ export function WhyChooseSection() {
               RECOMMENDED
             </div>
             <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold text-brand-gold">
-              <LogoMark size={20} /> SomReception AI
+              <BrandLogo variant="icon" decorative className="h-5 w-5" /> SomReception AI
             </div>
             <div className="mb-6 text-[22px] font-extrabold text-white">Instant, automated, scalable</div>
             <div className="flex flex-col gap-3.5">

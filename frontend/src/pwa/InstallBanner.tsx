@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { usePwaInstall } from './PwaInstallProvider';
 import { InstallDialog } from './InstallDialog';
 import { isInstallBannerSnoozed, snoozeInstallBanner } from './install-preferences';
@@ -41,15 +41,13 @@ export function InstallBanner() {
     <>
       <div
         role="dialog"
-        aria-label="Install SmartReception AI"
+        aria-label="Install SomReception AI"
         className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md animate-in slide-in-from-bottom-4 fade-in duration-500 sm:inset-x-auto sm:right-4"
       >
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-navy p-3 pr-2 text-white shadow-2xl">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#090B14]">
-            <LogoMark size={26} />
-          </div>
+          <BrandLogo variant="icon" decorative className="h-11 w-11 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-tight">Install SmartReception AI</p>
+            <p className="text-sm font-semibold leading-tight">Install SomReception AI</p>
             <p className="truncate text-xs text-white/60">
               Faster access, offline mode & notifications.
             </p>

@@ -7,7 +7,7 @@ import {
   Settings,
   Sparkles,
 } from 'lucide-react';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 
 const STATS = [
   { label: 'Total Conversations', value: '12,456', delta: '▲ 18.2%' },
@@ -36,9 +36,8 @@ export function DashboardMockup() {
       <div className="relative overflow-hidden rounded-[22px] border border-white/[0.08] bg-gradient-to-b from-[#12192a] to-[#0d131f] shadow-[0_40px_90px_rgba(0,0,0,0.6)]">
         <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[150px_1fr]">
           <div className="hidden border-r border-white/[0.06] bg-white/[0.02] p-3 sm:block">
-            <div className="mb-4 flex items-center gap-1.5">
-              <LogoMark size={22} />
-              <span className="text-[11px] font-bold text-white">SomReception AI</span>
+            <div className="mb-4 flex items-center">
+              <BrandLogo variant="icon" decorative className="h-7 w-7" />
             </div>
             <div className="flex flex-col gap-0.5">
               {NAV.map(({ icon: Icon, label, active, badge }) => (

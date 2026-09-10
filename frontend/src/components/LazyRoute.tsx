@@ -1,6 +1,7 @@
 import { Component, type ReactNode, Suspense } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BrandLogo } from '@/components/Logo';
 
 interface LazyRouteProps {
   children: ReactNode;
@@ -60,8 +61,9 @@ class LazyErrorBoundary extends Component<LazyRouteProps, LazyRouteState> {
 
 function PageLoader() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-accent" aria-label="Loading page" />
+    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
+      <BrandLogo variant="icon" decorative className="h-12 w-12" />
+      <Loader2 className="h-6 w-6 animate-spin text-accent" aria-label="Loading page" />
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { BusinessTypeCombobox } from '@/components/onboarding/BusinessTypeCombobox';
 import type { BusinessTypeOption } from '@/lib/business-types';
 import { toast } from 'sonner';
@@ -249,15 +249,10 @@ export function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-4 py-4 md:px-8">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#090B14]">
-              <LogoMark size={20} />
-            </div>
-            <span className="font-semibold">SomReception AI</span>
-          </div>
-          <span className="text-sm text-muted-foreground">Tallaabo {step + 1} / {STEPS.length}</span>
+      <header className="border-b bg-[#090B14] px-4 py-3 md:px-8">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
+          <BrandLogo variant="full" className="h-10 w-auto max-w-[min(220px,60vw)]" />
+          <span className="text-sm text-white/60">Tallaabo {step + 1} / {STEPS.length}</span>
         </div>
       </header>
 

@@ -6,7 +6,7 @@ import {
   Users,
   BarChart3,
 } from 'lucide-react';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { SectionHeading, GlowOrb } from './shared';
 
 const KPIS = [
@@ -54,9 +54,8 @@ export function DashboardPreview() {
           <div className="relative overflow-hidden rounded-[22px] border border-white/[0.08] bg-gradient-to-b from-[#12192a] to-[#0b111c] shadow-[0_50px_100px_rgba(0,0,0,0.6)]">
             <div className="grid grid-cols-1 md:grid-cols-[210px_1fr]">
               <div className="hidden border-r border-white/[0.06] bg-white/[0.02] p-[22px] md:block">
-                <div className="mb-6 flex items-center gap-2">
-                  <LogoMark size={30} />
-                  <span className="text-[13px] font-bold text-white">SomReception AI</span>
+                <div className="mb-6 flex items-center">
+                  <BrandLogo variant="full" decorative className="h-8 w-auto max-w-[170px]" />
                 </div>
                 <div className="flex flex-col gap-1">
                   {NAV.map(({ icon: Icon, label, active }) => (

@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
-const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
+export const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
+export const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
 const DEFAULT_VERIFY_TOKEN = 'smartreception-verify';
 export const WHATSAPP_WEBHOOK_PATH = '/api/v1/webhooks/whatsapp';
 
@@ -71,6 +71,15 @@ function resolveFrontendUrl(): string {
   return 'http://localhost:5173';
 }
 
+function resolvePublicAssetUrl(path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const frontend = resolveFrontendUrl();
+  const isLocal =
+    frontend.startsWith('http://localhost') || frontend.startsWith('http://127.0.0.1');
+  const base = isLocal ? PRODUCTION_FRONTEND_URL : frontend;
+  return `${base}${normalized}`;
+}
+
 const apiUrl = resolveApiUrl();
 const webhookUrl = resolveWebhookUrl();
 
@@ -78,6 +87,7 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3001', 10),
   frontendUrl: resolveFrontendUrl(),
+  publicAssetUrl: resolvePublicAssetUrl,
   apiUrl,
 
   database: {
@@ -155,8 +165,8 @@ export const config = {
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'SmartReception AI <noreply@botandev.com>',
-    fromName: process.env.EMAIL_FROM_NAME || 'SmartReception AI',
+    from: process.env.EMAIL_FROM || 'SomReception AI <noreply@botandev.com>',
+    fromName: process.env.EMAIL_FROM_NAME || 'SomReception AI',
     fromEmail: process.env.EMAIL_FROM_ADDRESS || 'noreply@botandev.com',
     supportEmail: process.env.EMAIL_SUPPORT || 'support@botandev.com',
   },

@@ -21,7 +21,7 @@ export function Hero() {
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
         <div>
-          <div className="hero-animate mb-6 inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/[0.08] px-3.5 py-[7px] text-[13px] font-semibold text-brand-gold">
+          <div className="hero-animate mb-6 inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/[0.08] px-3.5 py-[7px] text-[13px] font-semibold text-white">
             <span className="h-[7px] w-[7px] rounded-full bg-brand-success shadow-[0_0_8px_#22C55E]" />
             AI Receptionist for Modern Businesses
           </div>

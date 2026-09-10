@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { usePwaInstall } from './PwaInstallProvider';
 
 const FEATURES = [
@@ -52,13 +52,11 @@ export function InstallDialog({ open, onOpenChange, onResolved }: InstallDialogP
       <DialogContent className="max-w-md overflow-hidden p-0">
         <div className="bg-navy px-6 pb-6 pt-7 text-white">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#090B14] shadow-lg">
-              <LogoMark size={34} />
-            </div>
+            <BrandLogo variant="icon" decorative className="h-14 w-14 shrink-0" />
             <div className="min-w-0">
               <DialogHeader className="space-y-1 text-left">
                 <DialogTitle className="text-lg font-bold text-white">
-                  Install SmartReception AI
+                  Install SomReception AI
                 </DialogTitle>
                 <DialogDescription className="text-sm text-white/60">
                   Faster access, offline mode, notifications and a native app experience.
@@ -107,12 +105,12 @@ function IOSInstructions() {
   const steps = [
     { icon: Share, text: 'Tap the Share button in Safari’s toolbar.' },
     { icon: SquarePlus, text: 'Choose “Add to Home Screen”.' },
-    { icon: null, text: 'Tap “Add” — SmartReception installs like a native app.' },
+    { icon: null, text: 'Tap “Add” — SomReception installs like a native app.' },
   ];
   return (
     <div>
       <p className="mb-4 text-sm text-muted-foreground">
-        To install on your iPhone or iPad, add SmartReception to your Home Screen:
+        To install on your iPhone or iPad, add SomReception to your Home Screen:
       </p>
       <ol className="space-y-3">
         {steps.map((step, i) => (

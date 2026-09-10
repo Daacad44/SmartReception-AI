@@ -15,7 +15,7 @@ export function PwaSettingsCard() {
       <CardHeader>
         <CardTitle>Application</CardTitle>
         <CardDescription>
-          Install SmartReception as a native app and control device notifications.
+          Install SomReception AI as a native app and control device notifications.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

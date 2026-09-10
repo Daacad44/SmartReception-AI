@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain } from 'lucide-react';
+import { BrandLogo } from '@/components/Logo';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +55,9 @@ export function TrainerLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Brain className="mx-auto h-10 w-10 text-accent" />
+          <div className="mx-auto mb-2 flex justify-center">
+            <BrandLogo variant="app-icon" className="h-16 w-16" />
+          </div>
           <CardTitle>AI Trainer Portal</CardTitle>
           <CardDescription>Sign in to train and validate business AI models</CardDescription>
         </CardHeader>

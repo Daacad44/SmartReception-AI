@@ -1,7 +1,13 @@
 import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Linkedin, MessageCircle, Mail } from 'lucide-react';
-import { Logo } from '@/components/Logo';
-import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, MAILTO_SUPPORT, WHATSAPP_LINK } from '@/lib/brand';
+import { BrandLogo, BrandTagline } from '@/components/Logo';
+import {
+  BRAND_NAME,
+  CONTACT_EMAIL,
+  CONTACT_PHONE_DISPLAY,
+  MAILTO_SUPPORT,
+  WHATSAPP_LINK,
+} from '@/lib/brand';
 
 const SOCIALS = [
   { icon: Facebook, label: 'Facebook', href: '#' },
@@ -15,9 +21,10 @@ export function LandingFooter() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-12 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
           <div>
-            <Logo className="mb-4" iconSize={34} />
+            <BrandLogo variant="full" className="mb-4 h-12 w-auto max-w-[240px]" />
+            <BrandTagline onDark as="p" className="mb-2 text-sm font-medium" />
             <p className="mb-5 max-w-[280px] text-sm leading-relaxed text-brand-muted">
-              AI Receptionist for modern businesses. Automate conversations, bookings, and follow-ups 24/7.
+              Automate conversations, bookings, and follow-ups 24/7.
             </p>
             <div className="flex gap-2.5">
               {SOCIALS.map(({ icon: Icon, label, href }) => (
@@ -66,7 +73,7 @@ export function LandingFooter() {
         </div>
 
         <p className="mx-auto max-w-6xl border-t border-white/[0.06] pt-6 text-center text-xs text-brand-muted">
-          © {new Date().getFullYear()} SomReception AI. All rights reserved.
+          © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
         </p>
       </div>
     </footer>

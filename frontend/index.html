@@ -2,9 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="icon" href="/favicon.ico?v=20260910" sizes="any" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png?v=20260910" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png?v=20260910" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/brand/favicon-48.png?v=20260910" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png?v=20260910" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/brand/apple-touch-icon-152.png?v=20260910" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/brand/apple-touch-icon-167.png?v=20260910" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png?v=20260910" />
+    <link rel="preload" as="image" href="/brand/somreception-logo.png?v=20260910" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0"
@@ -12,36 +18,34 @@
     <!-- PWA / installability -->
     <meta name="theme-color" content="#090B14" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="application-name" content="SmartReception AI" />
+    <meta name="application-name" content="SomReception AI" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="SmartReception" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-touch-icon-152.png" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/icons/apple-touch-icon-167.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/favicon.svg" color="#FBBF24" />
+    <meta name="apple-mobile-web-app-title" content="SomReception AI" />
     <title>SomReception AI — AI Receptionist for Modern Businesses</title>
     <meta
       name="description"
-      content="SomReception AI automates customer conversations, appointment booking, lead capture, and follow-ups across WhatsApp and beyond — a 24/7 AI receptionist for modern businesses."
+      content="AI Receptionist for Modern Businesses. Automate customer conversations, appointment booking, lead capture, and follow-ups across WhatsApp and beyond."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="SomReception AI" />
     <meta property="og:title" content="SomReception AI — AI Receptionist for Modern Businesses" />
     <meta
       property="og:description"
-      content="Automate customer conversations, appointment booking, lead capture, and follow-ups across WhatsApp and beyond with SomReception AI."
+      content="AI Receptionist for Modern Businesses. 24/7 AI-powered customer reception, WhatsApp automation and appointment booking."
     />
-    <meta property="og:image" content="/og-image.svg" />
+    <meta property="og:image" content="/brand/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SomReception AI — AI Receptionist for Modern Businesses" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="SomReception AI — AI Receptionist for Modern Businesses" />
     <meta
       name="twitter:description"
-      content="Automate customer conversations, appointment booking, lead capture, and follow-ups across WhatsApp and beyond with SomReception AI."
+      content="AI Receptionist for Modern Businesses. 24/7 AI-powered customer reception, WhatsApp automation and appointment booking."
     />
-    <meta name="twitter:image" content="/og-image.svg" />
+    <meta name="twitter:image" content="/brand/og-image.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -54,16 +58,23 @@
       <style>
         #app-loader {
           display: flex;
+          flex-direction: column;
           min-height: 100vh;
           align-items: center;
           justify-content: center;
+          gap: 20px;
           background: #090b14;
         }
+        #app-loader img {
+          width: 72px;
+          height: 72px;
+          object-fit: contain;
+        }
         #app-loader span {
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           border: 3px solid #1f2937;
-          border-top-color: #fbbf24;
+          border-top-color: #f59e0b;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
         }
@@ -72,6 +83,7 @@
         }
       </style>
       <div id="app-loader" aria-label="Loading SomReception AI">
+        <img src="/brand/somreception-icon.png?v=20260910" alt="" width="72" height="72" />
         <span></span>
       </div>
     </div>

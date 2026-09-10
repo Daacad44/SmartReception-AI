@@ -21,6 +21,8 @@ import type { Notification } from '@/lib/entities';
 import { useTheme } from '@/components/ThemeProvider';
 import { getInitials, formatRelativeTime } from '@/lib/utils';
 import { InstallButton } from '@/pwa';
+import { BrandLogo } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 
 const QUICK_LINKS = [
   { label: 'Conversations', path: '/conversations' },
@@ -92,6 +94,13 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
           <Menu className="h-5 w-5" />
         </Button>
       )}
+
+      <BrandLogo
+        variant="icon"
+        className="h-8 w-8 shrink-0 md:hidden"
+        decorative
+      />
+      <span className="sr-only md:hidden">{BRAND_NAME}</span>
 
       {onSidebarToggle && (
         <Button

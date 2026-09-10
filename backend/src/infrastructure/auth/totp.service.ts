@@ -14,7 +14,7 @@ export class TotpService {
     return speakeasy.otpauthURL({
       secret,
       label: email,
-      issuer: 'SmartReception AI',
+      issuer: 'SomReception AI',
       encoding: 'base32',
     });
   }

@@ -1,5 +1,6 @@
 import type { SubscriptionNotification } from '@prisma/client';
 import { emailService } from '../../infrastructure/email/email.service';
+import * as templates from '../../infrastructure/email/templates';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
@@ -12,7 +13,7 @@ function buildReminderMessage(businessName: string, expiresAt: Date | null): str
   const remaining = formatRemainingTime(expiresAt);
   return `Hello ${businessName}
 
-Your SmartReception AI subscription will expire in:
+Your SomReception AI subscription will expire in:
 ${remaining}
 
 Please renew your subscription to avoid service interruption.
@@ -38,11 +39,11 @@ export async function sendSubscriptionReminder(
         await subscriptionRepository.markNotificationFailed(notification.id, 'No business email');
         return;
       }
-      await emailService.send(
-        to,
-        'SmartReception AI — Subscription Reminder',
-        `<pre style="font-family: sans-serif; white-space: pre-wrap;">${message}</pre>`
-      );
+      const { subject, html } = templates.subscriptionReminderEmail({
+        businessName: notification.business.name,
+        remaining: formatRemainingTime(notification.businessSubscription.expiresAt),
+      });
+      await emailService.send(to, subject, html);
     } else if (notification.channel === 'WHATSAPP') {
       const account = await prisma.whatsAppAccount.findFirst({
         where: { businessId: notification.businessId, isActive: true },
