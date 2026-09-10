@@ -11,6 +11,7 @@ import type {
   KnowledgeBase,
   Faq,
   TeamMember,
+  TeamInvitation,
   Notification,
   AnalyticsData,
   BillingData,
@@ -262,6 +263,7 @@ export function transformTeamMember(raw: any): TeamMember {
   const user = raw.user ?? raw;
   return {
     id: raw.id ?? raw.userId,
+    userId: raw.userId ?? user.id,
     name: `${user.firstName} ${user.lastName}`,
     email: user.email ?? '',
     role: raw.role,
@@ -269,6 +271,8 @@ export function transformTeamMember(raw: any): TeamMember {
     status: 'offline',
     conversationsHandled: raw.conversationCount ?? 0,
     avgResponseTime: raw.avgResponseTime ?? '—',
+    joinedAt: raw.joinedAt,
+    isActive: raw.isActive,
   };
 }
 
@@ -724,6 +728,17 @@ export function useTeamMembers() {
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
       return items.map(transformTeamMember);
+    },
+  });
+}
+
+export function useTeamInvitations() {
+  return useAuthQuery<TeamInvitation[]>({
+    queryKey: ['team-invitations'],
+    queryFn: async () => {
+      const response = await api.get('/team/invitations');
+      const data = extractData(response);
+      return Array.isArray(data) ? (data as TeamInvitation[]) : [];
     },
   });
 }

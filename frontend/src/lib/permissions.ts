@@ -118,4 +118,5 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/admin/ai-training': PERMISSIONS['platform:admin'],
   '/admin/ai-analytics': PERMISSIONS['platform:admin'],
   '/admin/users': PERMISSIONS['platform:admin'],
+  '/admin/roles': PERMISSIONS['platform:admin'],
 };

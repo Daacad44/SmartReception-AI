@@ -11,7 +11,8 @@ import { passwordService } from '../../infrastructure/auth/password.service';
 import { authRepository } from '../auth/auth.repository';
 import { tokenService } from '../../infrastructure/auth/token.service';
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
-import type { Industry, SubscriptionPlan, UserRole } from '@prisma/client';
+import type { Industry, Prisma, SubscriptionPlan, UserApprovalStatus, UserRole } from '@prisma/client';
+import { isLastSuperAdminChangeBlocked } from './super-admin.policy';
 
 function slugify(text: string): string {
   return text
@@ -243,17 +244,46 @@ export class SuperAdminService {
     });
   }
 
-  async listUsers(page = 1, limit = 20, search?: string) {
+  async listUsers(
+    page = 1,
+    limit = 20,
+    filters: {
+      search?: string;
+      role?: string;
+      isActive?: boolean;
+      businessId?: string;
+      approvalStatus?: string;
+      isSuperAdmin?: boolean;
+    } = {}
+  ) {
     const skip = (page - 1) * limit;
-    const where = search
-      ? {
-          OR: [
-            { email: { contains: search, mode: 'insensitive' as const } },
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { lastName: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where: Prisma.UserWhereInput = {};
+
+    if (filters.search) {
+      where.OR = [
+        { email: { contains: filters.search, mode: 'insensitive' } },
+        { firstName: { contains: filters.search, mode: 'insensitive' } },
+        { lastName: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+    if (typeof filters.isActive === 'boolean') {
+      where.isActive = filters.isActive;
+    }
+    if (typeof filters.isSuperAdmin === 'boolean') {
+      where.isSuperAdmin = filters.isSuperAdmin;
+    }
+    if (filters.approvalStatus) {
+      where.approvalStatus = filters.approvalStatus as UserApprovalStatus;
+    }
+    if (filters.businessId || filters.role) {
+      where.businessMemberships = {
+        some: {
+          isActive: true,
+          ...(filters.businessId ? { businessId: filters.businessId } : {}),
+          ...(filters.role ? { role: filters.role as UserRole } : {}),
+        },
+      };
+    }
 
     const [data, total] = await Promise.all([
       prisma.user.findMany({
@@ -271,6 +301,7 @@ export class SuperAdminService {
           totpEnabled: true,
           lastLoginAt: true,
           createdAt: true,
+          approvalStatus: true,
           businessMemberships: {
             include: { business: { select: { id: true, name: true, slug: true } } },
           },
@@ -281,18 +312,55 @@ export class SuperAdminService {
     return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async getUser(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        isActive: true,
+        isSuperAdmin: true,
+        totpEnabled: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        approvalStatus: true,
+        approvedAt: true,
+        isEmailVerified: true,
+        businessMemberships: {
+          include: {
+            business: { select: { id: true, name: true, slug: true, isActive: true } },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+    if (!user) throw new NotFoundError('User not found');
+    return user;
+  }
+
   async createUser(input: SuperAdminCreateUserInput, adminUserId: string) {
-    const existing = await prisma.user.findUnique({ where: { email: input.email } });
+    const email = input.email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictError('Email already registered');
+
+    if (input.businessId) {
+      const business = await prisma.business.findUnique({ where: { id: input.businessId }, select: { id: true } });
+      if (!business) throw new NotFoundError('Business not found');
+    }
 
     const passwordHash = await passwordService.hash(input.password);
     const user = await authRepository.createUser({
-      email: input.email,
+      email,
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
       isEmailVerified: true,
       isSuperAdmin: input.isSuperAdmin,
+      approvalStatus: 'ACTIVE',
     });
 
     if (input.businessId && input.role) {
@@ -312,21 +380,47 @@ export class SuperAdminService {
         action: 'CREATE',
         entity: 'User',
         entityId: user.id,
-        newData: { email: input.email, role: input.role },
+        newData: { email, role: input.role, isSuperAdmin: Boolean(input.isSuperAdmin) },
       },
     });
 
-    return user;
+    return this.getUser(user.id);
   }
 
   async updateUser(userId: string, input: SuperAdminUpdateUserInput, adminUserId: string) {
     const existing = await prisma.user.findUnique({ where: { id: userId } });
     if (!existing) throw new NotFoundError('User not found');
 
+    if (input.email && input.email.trim().toLowerCase() !== existing.email) {
+      const taken = await prisma.user.findUnique({ where: { email: input.email.trim().toLowerCase() } });
+      if (taken) throw new ConflictError('Email already registered');
+    }
+
+    if (input.businessId) {
+      const business = await prisma.business.findUnique({ where: { id: input.businessId }, select: { id: true } });
+      if (!business) throw new NotFoundError('Business not found');
+    }
+
+    if (existing.isSuperAdmin && (input.isSuperAdmin === false || input.isActive === false)) {
+      const activeSuperAdminCount = await prisma.user.count({
+        where: { isSuperAdmin: true, isActive: true },
+      });
+      if (
+        isLastSuperAdminChangeBlocked({
+          targetIsSuperAdmin: true,
+          activeSuperAdminCount,
+          nextIsSuperAdmin: input.isSuperAdmin,
+          nextIsActive: input.isActive,
+        })
+      ) {
+        throw new ValidationError('Cannot demote or deactivate the last Super Admin');
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
-        email: input.email,
+        email: input.email?.trim().toLowerCase(),
         firstName: input.firstName,
         lastName: input.lastName,
         isActive: input.isActive,
@@ -354,7 +448,7 @@ export class SuperAdminService {
       },
     });
 
-    return user;
+    return this.getUser(user.id);
   }
 
   async deleteUser(userId: string, adminUserId: string) {

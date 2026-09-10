@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { routeParam } from '../../core/utils';
 import { teamService } from './team.service';
-import { inviteTeamMemberSchema, updateTeamMemberSchema, acceptInviteSchema } from '@smartreception/shared';
+import {
+  inviteTeamMemberSchema,
+  updateTeamMemberSchema,
+  acceptInviteSchema,
+  registerFromInviteSchema,
+} from '@smartreception/shared';
+import { setAuthCookies } from '../../core/auth-cookies';
 
 export class TeamController {
   async listMembers(req: Request, res: Response, next: NextFunction) {
@@ -19,7 +25,8 @@ export class TeamController {
       const invitation = await teamService.inviteMember(
         req.user!.businessId!,
         input,
-        req.user!.userId
+        req.user!.userId,
+        req.user!.role
       );
       res.status(201).json({ success: true, data: invitation });
     } catch (error) {
@@ -66,11 +73,60 @@ export class TeamController {
     }
   }
 
+  async resendInvitation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invitation = await teamService.resendInvitation(
+        req.user!.businessId!,
+        routeParam(req.params.invitationId),
+        req.user!.userId,
+        req.user!.role
+      );
+      res.json({ success: true, data: invitation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async revokeInvitation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invitation = await teamService.revokeInvitation(
+        req.user!.businessId!,
+        routeParam(req.params.invitationId),
+        req.user!.userId
+      );
+      res.json({ success: true, data: invitation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async previewInvitation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = typeof req.query.token === 'string' ? req.query.token : '';
+      const data = await teamService.previewInvitation(token);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async acceptInvite(req: Request, res: Response, next: NextFunction) {
     try {
       const { token } = acceptInviteSchema.parse(req.body);
       const result = await teamService.acceptInvite(token, req.user!.userId);
+      setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async registerFromInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = registerFromInviteSchema.parse(req.body);
+      const result = await teamService.registerFromInvite(input);
+      setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+      res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

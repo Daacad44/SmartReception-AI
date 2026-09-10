@@ -74,7 +74,7 @@ export async function authenticate(
         : Promise.resolve(null),
       prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { isSuperAdmin: true },
+        select: { isSuperAdmin: true, isActive: true },
       }),
       !decoded.businessId
         ? prisma.businessMember.findFirst({
@@ -86,6 +86,10 @@ export async function authenticate(
 
     const resolvedMembership = membership ?? primaryMembership;
     const resolvedBusinessId = decoded.businessId ?? primaryMembership?.businessId;
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedError('Account is disabled');
+    }
 
     if (resolvedBusinessId && resolvedMembership && !resolvedMembership.isActive && !decoded.impersonating) {
       throw new UnauthorizedError('Your account has been deactivated for this business');
