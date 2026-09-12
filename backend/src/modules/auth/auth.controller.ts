@@ -143,7 +143,11 @@ export class AuthController {
     try {
       const { email } = forgotPasswordSchema.parse(req.body);
       await authService.forgotPassword(email);
-      res.json({ success: true, message: 'If the email exists, a reset code has been sent' });
+      res.json({
+        success: true,
+        message: 'If the email exists, a reset code has been sent',
+        data: { message: 'If the email exists, a reset code has been sent' },
+      });
     } catch (error) {
       next(error);
     }
@@ -153,7 +157,11 @@ export class AuthController {
     try {
       const { email, code, password } = resetPasswordSchema.parse(req.body);
       await authService.resetPassword(email, code, password);
-      res.json({ success: true, message: 'Password reset successfully' });
+      res.json({
+        success: true,
+        message: 'Password reset successfully',
+        data: { message: 'Password reset successfully' },
+      });
     } catch (error) {
       next(error);
     }

@@ -20,7 +20,10 @@ export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
     throw new Error(body.error || body.message || 'Request failed');
   }
   if (body.data === undefined) {
-    throw new Error('No data in response');
+    if (body.message !== undefined) {
+      return { message: body.message } as unknown as T;
+    }
+    return body as unknown as T;
   }
   return body.data;
 }

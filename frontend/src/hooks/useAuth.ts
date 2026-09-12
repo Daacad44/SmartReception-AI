@@ -248,7 +248,7 @@ export function useAuth() {
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
       const response = await api.post('/auth/forgot-password', { email });
-      return extractData(response);
+      return extractData<{ message: string }>(response);
     },
     onSuccess: () => {
       toast.success('If the email exists, a reset code has been sent');
@@ -269,7 +269,7 @@ export function useAuth() {
       password: string;
     }) => {
       const response = await api.post('/auth/reset-password', { email, code, password });
-      return extractData(response);
+      return extractData<{ message: string }>(response);
     },
     onSuccess: () => {
       toast.success('Password reset successfully. Please sign in.');
