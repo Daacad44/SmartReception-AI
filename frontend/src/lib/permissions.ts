@@ -96,6 +96,26 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 };
 
+/**
+ * Where to send someone who lacks permission for the page they asked for,
+ * highest priority first. `/dashboard` needs `analytics:read`, which AGENT and
+ * STAFF do not have, so it cannot be used as a blanket fallback.
+ */
+const LANDING_ROUTES: Array<{ path: string; permission: Permission }> = [
+  { path: '/dashboard', permission: PERMISSIONS['analytics:read'] },
+  { path: '/conversations', permission: PERMISSIONS['conversations:read'] },
+  { path: '/customers', permission: PERMISSIONS['customers:read'] },
+  { path: '/appointments', permission: PERMISSIONS['appointments:read'] },
+  { path: '/enterprise-ai-intelligence', permission: PERMISSIONS['knowledge:read'] },
+  { path: '/settings', permission: PERMISSIONS['settings:read'] },
+];
+
+export function resolveLandingRoute(
+  hasPermission: (permission: Permission) => boolean
+): string | null {
+  return LANDING_ROUTES.find((route) => hasPermission(route.permission))?.path ?? null;
+}
+
 export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/dashboard': PERMISSIONS['analytics:read'],
   '/conversations': PERMISSIONS['conversations:read'],

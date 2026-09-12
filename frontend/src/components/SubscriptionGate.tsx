@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
 import api, { extractData } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuthReady } from '@/hooks/useAuthReady';
 import { LoadingState } from '@/components/LoadingState';
 
 export interface LicenseStatus {
@@ -36,13 +37,16 @@ const BLOCKED_STATUSES = new Set(['EXPIRED', 'SUSPENDED', 'CANCELLED', 'PENDING'
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { hasPermission } = usePermissions();
+  const authReady = useAuthReady();
   const isPlatformAdmin = hasPermission('platform:admin');
   // Platform admins bypass the license gate entirely, so don't even fire the
   // business-scoped /billing/license request for them — it only returns a
-  // 401/403 (no business license context) and clutters the console.
-  const { data, isLoading, isError } = useSubscriptionLicense(!isPlatformAdmin);
+  // 401/403 (no business license context) and clutters the console. This gate
+  // also sits above ProtectedRoute, so wait for a token before asking: without
+  // it, every visit to an app route while signed out fires a doomed 401.
+  const { data, isLoading, isError } = useSubscriptionLicense(authReady && !isPlatformAdmin);
 
-  if (isPlatformAdmin) {
+  if (!authReady || isPlatformAdmin) {
     return <>{children}</>;
   }
 

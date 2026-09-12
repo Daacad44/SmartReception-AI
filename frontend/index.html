@@ -87,6 +87,105 @@
         <span></span>
       </div>
     </div>
+    <script>
+      // Boot watchdog. A cached shell (browser heuristic cache, service worker
+      // precache or a proxy) can point at /assets/*-<oldhash>.js that a newer
+      // deploy no longer serves. The entry script then 404s and this splash
+      // spins forever. Recover once per tab by dropping the worker + caches and
+      // re-requesting the shell on a URL the stale cache entry cannot answer.
+      (function () {
+        var RECOVERY_KEY = 'sr-shell-recovery';
+        var BOOT_TIMEOUT_MS = 20000;
+        var done = false;
+
+        function mounted() {
+          return !document.getElementById('app-loader');
+        }
+
+        function giveUp() {
+          var loader = document.getElementById('app-loader');
+          if (!loader) return;
+          loader.innerHTML =
+            '<p style="max-width:22rem;padding:0 1.5rem;text-align:center;font:500 15px/1.5 system-ui,sans-serif;color:#e5e7eb">' +
+            'SomReception AI could not finish loading. Please check your connection and try again.' +
+            '</p><button id="app-loader-retry" style="border:0;border-radius:9999px;background:#f59e0b;padding:10px 22px;font:600 14px system-ui,sans-serif;color:#0b0b0b">Reload</button>';
+          var retry = document.getElementById('app-loader-retry');
+          if (retry) {
+            retry.onclick = function () {
+              sessionStorage.removeItem(RECOVERY_KEY);
+              location.reload();
+            };
+          }
+        }
+
+        function recover() {
+          if (done || mounted()) return;
+          done = true;
+
+          try {
+            if (sessionStorage.getItem(RECOVERY_KEY) === '1') {
+              giveUp();
+              return;
+            }
+            sessionStorage.setItem(RECOVERY_KEY, '1');
+          } catch (e) {
+            giveUp();
+            return;
+          }
+
+          var cleanup = [];
+          if (navigator.serviceWorker) {
+            cleanup.push(
+              navigator.serviceWorker
+                .getRegistrations()
+                .then(function (registrations) {
+                  return Promise.all(
+                    registrations.map(function (registration) {
+                      return registration.unregister();
+                    })
+                  );
+                })
+            );
+          }
+          if (window.caches) {
+            cleanup.push(
+              caches.keys().then(function (keys) {
+                return Promise.all(
+                  keys.map(function (key) {
+                    return caches.delete(key);
+                  })
+                );
+              })
+            );
+          }
+
+          Promise.all(
+            cleanup.map(function (task) {
+              return task.catch(function () {});
+            })
+          ).then(function () {
+            location.replace(location.pathname + '?shell=' + Date.now() + location.hash);
+          });
+        }
+
+        // Fast path: the entry script or stylesheet failed to load.
+        window.addEventListener(
+          'error',
+          function (event) {
+            var target = event.target;
+            if (!target || !target.tagName) return;
+            var url = target.src || target.href || '';
+            if (url.indexOf('/assets/') === -1) return;
+            if (target.tagName !== 'SCRIPT' && target.tagName !== 'LINK') return;
+            recover();
+          },
+          true
+        );
+
+        // Catch-all: anything else that leaves the splash spinning.
+        window.setTimeout(recover, BOOT_TIMEOUT_MS);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
