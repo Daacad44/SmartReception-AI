@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import api, { extractData, getErrorMessage, getErrorCode } from '@/lib/api';
+import api, { extractData, extractMessage, getErrorMessage, getErrorCode } from '@/lib/api';
 import type { LoginCredentials, RegisterData, UserProfile } from '@/lib/types';
 import { useAuthStore } from '@/stores/auth.store';
 import { useAuthReady } from '@/hooks/useAuthReady';
@@ -248,10 +248,10 @@ export function useAuth() {
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
       const response = await api.post('/auth/forgot-password', { email });
-      return extractData(response);
+      return extractMessage(response, 'If the email exists, a reset code has been sent');
     },
-    onSuccess: () => {
-      toast.success('If the email exists, a reset code has been sent');
+    onSuccess: (message) => {
+      toast.success(message);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -269,7 +269,7 @@ export function useAuth() {
       password: string;
     }) => {
       const response = await api.post('/auth/reset-password', { email, code, password });
-      return extractData(response);
+      return extractMessage(response, 'Password reset successfully');
     },
     onSuccess: () => {
       toast.success('Password reset successfully. Please sign in.');
