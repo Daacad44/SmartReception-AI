@@ -25,6 +25,17 @@ export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
   return body.data;
 }
 
+// For endpoints that acknowledge with `{ success, message }` and carry no `data`
+// payload (e.g. forgot-password, reset-password). Using extractData on those
+// would reject a successful response as "No data in response".
+export function extractMessage(response: AxiosResponse<ApiResponse>, fallback: string): string {
+  const body = response.data;
+  if (!body.success) {
+    throw new Error(body.error || body.message || 'Request failed');
+  }
+  return body.message || fallback;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiResponse & {
