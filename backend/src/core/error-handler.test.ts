@@ -13,6 +13,14 @@ afterEach(() => {
   mock.restoreAll();
 });
 
+function logArgs(calls: { arguments: unknown }[]): { message: string; meta: Record<string, unknown> } {
+  const args = (calls[0]?.arguments ?? []) as unknown as unknown[];
+  const message = typeof args[0] === 'string' ? args[0] : '';
+  const meta =
+    args[1] && typeof args[1] === 'object' ? (args[1] as Record<string, unknown>) : {};
+  return { message, meta };
+}
+
 function createTestApp(setup?: (app: Express) => void): Express {
   const app = express();
   app.use(requestIdMiddleware);
@@ -104,7 +112,7 @@ describe('errorHandler', () => {
 
     assert.equal(warn.mock.callCount(), 1);
     assert.equal(error.mock.callCount(), 0);
-    const [message, meta] = warn.mock.calls[0].arguments as [string, Record<string, unknown>];
+    const { message, meta } = logArgs(warn.mock.calls);
     assert.match(message, /\[GET \/customers\/missing\] NotFoundError: Customer not found/);
     assert.equal(meta.statusCode, 404);
     assert.equal(meta.code, 'NOT_FOUND');
@@ -131,7 +139,7 @@ describe('errorHandler', () => {
     });
 
     assert.equal(error.mock.callCount(), 1);
-    const [message, meta] = error.mock.calls[0].arguments as [string, Record<string, unknown>];
+    const { message, meta } = logArgs(error.mock.calls);
     assert.match(message, /\[GET \/boom\] Error: secret failure/);
     assert.equal(meta.statusCode, 500);
     assert.equal(typeof meta.stack, 'string');
@@ -190,7 +198,7 @@ describe('errorHandler', () => {
       assert.equal(body.error, 'Resource already exists');
     });
 
-    const meta = warn.mock.calls[0].arguments[1] as Record<string, unknown>;
+    const { meta } = logArgs(warn.mock.calls);
     assert.equal(meta.mappedFrom, 'P2002');
   });
 
@@ -284,7 +292,7 @@ describe('errorHandler', () => {
       assert.equal(response.status, 401);
     });
 
-    const meta = warn.mock.calls[0].arguments[1] as Record<string, unknown>;
+    const { meta } = logArgs(warn.mock.calls);
     assert.equal(meta.userId, 'user-9');
     assert.equal(meta.businessId, 'biz-2');
   });
