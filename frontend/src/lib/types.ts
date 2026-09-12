@@ -4,6 +4,7 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   error?: string;
   code?: string;
+  requestId?: string;
   meta?: PaginationMeta;
 }
 

@@ -5,7 +5,7 @@ export class AppError extends Error {
     public code?: string
   ) {
     super(message);
-    this.name = 'AppError';
+    this.name = new.target.name;
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -13,6 +13,12 @@ export class AppError extends Error {
 export class NotFoundError extends AppError {
   constructor(message = 'Resource not found') {
     super(404, message, 'NOT_FOUND');
+  }
+}
+
+export class RouteNotFoundError extends AppError {
+  constructor(method: string, path: string) {
+    super(404, `Route ${method} ${path} not found`, 'ROUTE_NOT_FOUND');
   }
 }
 

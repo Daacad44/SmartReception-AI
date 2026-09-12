@@ -14,6 +14,7 @@ export function requestTimingMiddleware(req: Request, res: Response, next: NextF
         path: req.originalUrl,
         status: res.statusCode,
         durationMs: duration,
+        requestId: req.requestId,
         businessId: req.user?.businessId,
         userId: req.user?.userId,
       });

@@ -2,12 +2,14 @@ import { createApp } from './app';
 import { config, validateProductionConfig } from './config';
 import { connectDatabase, disconnectDatabase } from './infrastructure/database/prisma';
 import { logger } from './core/logger';
+import { registerProcessErrorHandlers } from './core/process-error-handlers';
 import { historicalBackfillService } from './modules/ai-analytics/historical-backfill.service';
 import { appointmentWorkflowBuilderService } from './modules/appointment-automation/workflow-builder.service';
 import { featureRegistryService } from './modules/feature-management/feature-registry.service';
 import { wsGateway } from './infrastructure/realtime/ws-gateway.service';
 
 async function startServer(): Promise<void> {
+  registerProcessErrorHandlers();
   validateProductionConfig();
   await connectDatabase();
 
