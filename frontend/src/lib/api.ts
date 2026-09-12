@@ -19,10 +19,15 @@ export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
   if (!body.success) {
     throw new Error(body.error || body.message || 'Request failed');
   }
-  if (body.data === undefined) {
-    throw new Error('No data in response');
+  if (body.data !== undefined) {
+    return body.data;
   }
-  return body.data;
+  // Message-only success envelopes (forgot/reset password, logout, deletes)
+  // must not fail the client — the request already succeeded.
+  if (typeof body.message === 'string') {
+    return { message: body.message } as T;
+  }
+  throw new Error('No data in response');
 }
 
 export function getErrorMessage(error: unknown): string {
