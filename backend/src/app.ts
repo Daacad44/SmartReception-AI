@@ -12,6 +12,7 @@ import { isSupabaseStorageConfigured } from './infrastructure/storage';
 import { createRateLimiter } from './core/rate-limit-store';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { requestTimingMiddleware } from './core/middleware/request-timing.middleware';
+import { requestIdMiddleware } from './core/middleware/request-id.middleware';
 
 const WEBHOOK_RAW_PATHS = [
   '/webhook',
@@ -25,6 +26,7 @@ export function createApp(): express.Application {
   const app = express();
 
   app.set('trust proxy', 1);
+  app.use(requestIdMiddleware);
 
   app.use(
     helmet({

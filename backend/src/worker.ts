@@ -29,6 +29,7 @@ import { scheduleJourneyStep } from './modules/campaigns/campaign-journey.servic
 import { executeEmployeeBroadcastSend } from './modules/employee-comms/employee-broadcasts.service';
 import { sendEmployeeBroadcastBatch } from './modules/employee-comms/employee-broadcast-batch.service';
 import { logger } from './core/logger';
+import { registerProcessErrorHandlers } from './core/process-error-handlers';
 
 async function processAiTrainingJob(job: Job<AiTrainingJobData>): Promise<void> {
   const { executeTrainingPipeline } = await import('./modules/ai-training-mgmt/training-pipeline.service');
@@ -194,6 +195,7 @@ async function processEmployeeBroadcastBatchJob(job: Job<EmployeeBroadcastBatchJ
 }
 
 async function startWorkers(): Promise<void> {
+  registerProcessErrorHandlers();
   await connectDatabase();
 
   const workers = [
