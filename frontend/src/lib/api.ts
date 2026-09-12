@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import { assertApiSuccess, unwrapApiData } from '@/lib/api-response';
 import type { ApiResponse } from '@/lib/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
@@ -15,14 +16,12 @@ export const api = axios.create({
 });
 
 export function extractData<T>(response: AxiosResponse<ApiResponse<T>>): T {
-  const body = response.data;
-  if (!body.success) {
-    throw new Error(body.error || body.message || 'Request failed');
-  }
-  if (body.data === undefined) {
-    throw new Error('No data in response');
-  }
-  return body.data;
+  return unwrapApiData(response.data);
+}
+
+/** Validate message-only success payloads that omit `data` (forgot/reset password). */
+export function assertSuccess(response: AxiosResponse<ApiResponse<unknown>>): void {
+  assertApiSuccess(response.data);
 }
 
 export function getErrorMessage(error: unknown): string {
