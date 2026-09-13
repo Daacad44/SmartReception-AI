@@ -4,6 +4,7 @@ import { workspaceService } from './workspace.service';
 import { trainingEngineService } from './training-engine.service';
 import { trainingSessionLogService } from './training-session-log.service';
 import { versionService } from './version.service';
+import { evaluateLiveReadiness } from './readiness-eval.service';
 
 export class TrainingCenterService {
   async listBusinessCards(page = 1, limit = 50, search?: string) {
@@ -58,7 +59,7 @@ export class TrainingCenterService {
         const bases = await knowledgeService.listBases(b.id);
         const baseId = bases[0]?.id;
 
-        const [documents, chunks, services, faqs, lastJob, lastRetrainJob] = await Promise.all([
+        const [documents, chunks, services, faqs, lastJob, lastRetrainJob, live] = await Promise.all([
           baseId
             ? prisma.knowledgeDocument.findMany({
                 where: { knowledgeBaseId: baseId },
@@ -82,6 +83,7 @@ export class TrainingCenterService {
             orderBy: { completedAt: 'desc' },
             select: { completedAt: true },
           }),
+          evaluateLiveReadiness(b.id),
         ]);
 
         const docCount = documents.length;
@@ -89,11 +91,10 @@ export class TrainingCenterService {
         const productCount = documents.filter(
           (d) => d.category?.toLowerCase().includes('product') || d.type === 'PDF'
         ).length;
-        const indexed = documents.filter((d) => d.status === 'INDEXED').length;
         const embeddingStatus =
-          indexed === docCount && docCount > 0
+          live.embeddingCount === docCount && docCount > 0
             ? 'COMPLETE'
-            : indexed > 0
+            : live.embeddingCount > 0
               ? 'PARTIAL'
               : docCount > 0
                 ? 'PENDING'
@@ -105,7 +106,7 @@ export class TrainingCenterService {
             ? 'IN_PROGRESS'
             : production?.status ?? 'NOT_STARTED';
 
-        const knowledgeHealth = workspace.aiReadinessScore ?? production?.readinessScore ?? 0;
+        const knowledgeHealth = live.scores.readinessScore;
         const estimatedTrainingCost = trainingEngineService.estimateTrainingCost(docCount, chunks);
 
         return {
@@ -119,7 +120,7 @@ export class TrainingCenterService {
           faqs: faqCount,
           products: productCount,
           services,
-          embeddingsCount: chunks,
+          embeddingsCount: live.embeddingCount || chunks,
           knowledgeHealth,
           trainingStatus,
           lastTraining: workspace.lastTrainedAt ?? production?.createdAt ?? null,
@@ -129,7 +130,7 @@ export class TrainingCenterService {
           knowledgeVersion: production?.versionNumber ?? null,
           aiVersion: production?.embeddingVersion ?? 'gemini-embedding-001',
           estimatedTrainingCost,
-          trainingHealthScore: workspace.aiReadinessScore ?? production?.readinessScore ?? null,
+          trainingHealthScore: live.scores.readinessScore,
           productionVersionId: production?.id ?? null,
           sandboxVersionId: workspace.sandboxVersionId ?? b.aiTrainingWorkspace?.sandboxVersion?.id ?? null,
           lastJob,

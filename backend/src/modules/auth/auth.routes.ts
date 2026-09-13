@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authController } from './auth.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { createRateLimiter } from '../../core/rate-limit-store';
+import { loginRateLimitMiddleware } from '../../core/login-rate-limit';
 
 const router = Router();
 
@@ -11,18 +12,10 @@ const authLimiter = createRateLimiter({
   message: 'Too many requests, please try again later'
 });
 
-// Dedicated brute-force limiter for the login endpoint. Strict on purpose:
-// the raised global limiter must NOT be relied on for login protection.
-const loginLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: 'Too many login attempts, please try again later'
-});
-
 router.post('/register', authLimiter, (req, res, next) => authController.register(req, res, next));
 router.get('/check-email', authLimiter, (req, res, next) => authController.checkEmail(req, res, next));
-// Login has a dedicated brute-force limiter (30 attempts / 15 min / IP).
-router.post('/login', loginLimiter, (req, res, next) => authController.login(req, res, next));
+// Login brute-force limiter: 10 attempts / 15 minutes keyed by IP, account, and combo.
+router.post('/login', loginRateLimitMiddleware, (req, res, next) => authController.login(req, res, next));
 router.post('/verify-2fa', authLimiter, (req, res, next) => authController.verifyTwoFactor(req, res, next));
 router.post('/verify-otp', authLimiter, (req, res, next) => authController.verifyOtp(req, res, next));
 router.post('/resend-otp', authLimiter, (req, res, next) => authController.resendOtp(req, res, next));

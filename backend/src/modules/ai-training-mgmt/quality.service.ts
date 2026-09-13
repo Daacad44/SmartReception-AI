@@ -33,37 +33,78 @@ export interface QualityScores {
   knowledgeFreshness: number;
 }
 
+/** Actual BusinessProfile columns used for completeness — must match Prisma. */
 const PROFILE_FIELDS = [
   'businessName',
-  'description',
+  'businessDescription',
+  'companyOverview',
+  'aboutUs',
   'mission',
   'vision',
-  'products',
-  'services',
-  'pricing',
   'workingHours',
   'languages',
-  'supportPolicy',
-  'refundPolicy',
-  'cancellationPolicy',
-  'faqs',
-  'contactEmail',
-  'contactPhone',
-  'website',
   'brandTone',
+  'email',
+  'phone',
+  'website',
+  'address',
+  'targetAudience',
+  'whyChooseUs',
+  'callToAction',
 ] as const;
+
+export interface ReadinessGap {
+  code: string;
+  message: string;
+}
+
+function isProfileFieldFilled(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as object).length > 0;
+  return String(value).trim() !== '';
+}
+
+function parseEmbeddingPayload(raw: string | null): {
+  chunkCount: number;
+  vectorCount: number;
+  vectorSearchEnabled: boolean;
+} {
+  if (!raw) {
+    return { chunkCount: 0, vectorCount: 0, vectorSearchEnabled: false };
+  }
+  try {
+    const parsed = JSON.parse(raw) as {
+      chunkCount?: number;
+      chunks?: Array<{ embedding?: number[] | null }>;
+      vectorSearchEnabled?: boolean;
+    };
+    const chunks = Array.isArray(parsed.chunks) ? parsed.chunks : [];
+    const vectorCount = chunks.filter(
+      (chunk) => Array.isArray(chunk.embedding) && chunk.embedding.length > 0
+    ).length;
+    return {
+      chunkCount: parsed.chunkCount ?? chunks.length,
+      vectorCount,
+      vectorSearchEnabled: parsed.vectorSearchEnabled === true || vectorCount > 0,
+    };
+  } catch {
+    return { chunkCount: 0, vectorCount: 0, vectorSearchEnabled: false };
+  }
+}
+
+export function documentHasVectors(embedding: string | null): boolean {
+  return parseEmbeddingPayload(embedding).vectorCount > 0;
+}
 
 export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScores {
   const profile = snapshot.profile;
   const docs = snapshot.documents;
   const indexed = docs.filter((d) => d.status === 'INDEXED');
-  const withEmbeddings = docs.filter((d) => d.embedding);
+  const withEmbeddings = docs.filter((d) => documentHasVectors(d.embedding));
 
   const profileFilled = profile
-    ? PROFILE_FIELDS.filter((f) => {
-        const val = profile[f as keyof typeof profile];
-        return val !== null && val !== undefined && String(val).trim() !== '';
-      }).length
+    ? PROFILE_FIELDS.filter((f) => isProfileFieldFilled(profile[f as keyof typeof profile])).length
     : 0;
   const knowledgeCompleteness = profile
     ? Math.round((profileFilled / PROFILE_FIELDS.length) * 100)
@@ -115,6 +156,48 @@ export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScore
   };
 }
 
+export function describeReadinessGaps(
+  snapshot: TrainingSnapshot,
+  scores: QualityScores
+): ReadinessGap[] {
+  const gaps: ReadinessGap[] = [];
+  const missingProfile = PROFILE_FIELDS.filter(
+    (field) => !isProfileFieldFilled(snapshot.profile?.[field as keyof typeof snapshot.profile])
+  );
+  if (scores.knowledgeCompleteness < 70) {
+    gaps.push({
+      code: 'INCOMPLETE_PROFILE',
+      message: `Business profile is ${scores.knowledgeCompleteness}% complete (${missingProfile.length} fields empty).`,
+    });
+  }
+  if (snapshot.faqCount === 0 && !snapshot.documents.some((d) => d.type === 'FAQ')) {
+    gaps.push({
+      code: 'MISSING_FAQS',
+      message: 'No FAQs are indexed. Add FAQs to raise answer coverage.',
+    });
+  }
+  if (snapshot.indexedCount === 0) {
+    gaps.push({
+      code: 'NO_INDEXED_DOCUMENTS',
+      message: 'No knowledge documents have finished indexing.',
+    });
+  }
+  const missingVectors = snapshot.documents.filter((d) => !documentHasVectors(d.embedding));
+  if (missingVectors.length > 0) {
+    gaps.push({
+      code: 'MISSING_EMBEDDINGS',
+      message: `${missingVectors.length} document(s) have no usable vector embeddings.`,
+    });
+  }
+  return gaps;
+}
+
+export function readinessStatus(score: number): 'healthy' | 'degraded' | 'critical' {
+  if (score >= 70) return 'healthy';
+  if (score >= 40) return 'degraded';
+  return 'critical';
+}
+
 export function buildSnapshotDocument(doc: {
   id: string;
   title: string;
@@ -125,14 +208,6 @@ export function buildSnapshotDocument(doc: {
   answer: string | null;
   embedding: string | null;
 }): TrainingSnapshotDocument {
-  let chunkCount = 0;
-  if (doc.embedding) {
-    try {
-      const parsed = JSON.parse(doc.embedding) as { chunkCount?: number; chunks?: unknown[] };
-      chunkCount = parsed.chunkCount ?? parsed.chunks?.length ?? 0;
-    } catch {
-      chunkCount = 0;
-    }
-  }
-  return { ...doc, chunkCount };
+  const parsed = parseEmbeddingPayload(doc.embedding);
+  return { ...doc, chunkCount: parsed.chunkCount };
 }

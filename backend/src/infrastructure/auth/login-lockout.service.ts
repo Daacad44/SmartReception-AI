@@ -1,57 +1,37 @@
 import { config } from '../../config';
-import { ForbiddenError } from '../../core/errors';
+import { RateLimitError } from '../../core/errors';
 import { logger } from '../../core/logger';
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
-
-interface AttemptRecord {
-  count: number;
-  lockedUntil?: number;
-}
-
-const memoryStore = new Map<string, AttemptRecord>();
-
-function getKey(email: string, ip?: string): string {
-  return `${email.toLowerCase()}:${ip ?? 'unknown'}`;
-}
+import {
+  LOGIN_RATE_LIMIT_MAX,
+  LOGIN_RATE_LIMIT_WINDOW_MS,
+  LOGIN_RATE_LIMIT_MESSAGE,
+  assertLoginRateLimit,
+} from '../../core/login-rate-limit';
 
 export function assertLoginAllowed(email: string, ip?: string): void {
-  const key = getKey(email, ip);
-  const record = memoryStore.get(key);
-  if (!record?.lockedUntil) return;
-
-  if (Date.now() < record.lockedUntil) {
-    const minutes = Math.ceil((record.lockedUntil - Date.now()) / 60000);
-    throw new ForbiddenError(
-      `Too many failed login attempts. Try again in ${minutes} minute(s).`
-    );
-  }
-
-  memoryStore.delete(key);
+  assertLoginRateLimit(email, ip);
 }
 
 export function recordFailedLogin(email: string, ip?: string): void {
-  const key = getKey(email, ip);
-  const record = memoryStore.get(key) ?? { count: 0 };
-  record.count += 1;
-
-  if (record.count >= MAX_ATTEMPTS) {
-    record.lockedUntil = Date.now() + LOCKOUT_MS;
-    logger.warn(`Login lockout triggered for ${email} from ${ip ?? 'unknown'}`);
-  }
-
-  memoryStore.set(key, record);
+  logger.warn('Failed login attempt', {
+    ip: ip ?? 'unknown',
+    hasEmail: Boolean(email),
+  });
 }
 
-export function clearLoginAttempts(email: string, ip?: string): void {
-  memoryStore.delete(getKey(email, ip));
+export function clearLoginAttempts(_email: string, _ip?: string): void {
+  // Sliding window limiter; successful login does not reset the window.
 }
 
 export function getLoginLockoutConfig() {
   return {
-    maxAttempts: MAX_ATTEMPTS,
-    lockoutMinutes: LOCKOUT_MS / 60000,
+    maxAttempts: LOGIN_RATE_LIMIT_MAX,
+    lockoutMinutes: LOGIN_RATE_LIMIT_WINDOW_MS / 60000,
     redisBacked: Boolean(config.redis.url),
+    message: LOGIN_RATE_LIMIT_MESSAGE,
   };
 }
+
+// Re-export so callers that previously threw ForbiddenError still type-check
+// if they catch RateLimitError from assertLoginAllowed.
+export { RateLimitError };

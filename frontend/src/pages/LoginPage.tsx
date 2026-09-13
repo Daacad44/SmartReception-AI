@@ -20,7 +20,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-  const { login, isLoggingIn } = useAuth();
+  const { login, isLoggingIn, loginError } = useAuth();
   const {
     register,
     handleSubmit,
@@ -55,6 +55,14 @@ export function LoginPage() {
             <CardDescription>Sign in to your {BRAND_NAME} account</CardDescription>
           </CardHeader>
           <CardContent>
+            {loginError && (
+              <div
+                role="alert"
+                className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {loginError}
+              </div>
+            )}
             <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

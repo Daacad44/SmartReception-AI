@@ -318,6 +318,7 @@ export function useAuth() {
     resetPassword: resetPasswordMutation.mutate,
     logout,
     isLoggingIn: loginMutation.isPending,
+    loginError: loginMutation.error ? getErrorMessage(loginMutation.error) : null,
     isVerifyingTwoFactor: verifyTwoFactorMutation.isPending,
     isRegistering: registerMutation.isPending,
     isVerifyingOtp: verifyOtpMutation.isPending,

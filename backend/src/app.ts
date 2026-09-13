@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import { getCorsOptions } from './core/cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { config, logWhatsAppConfig } from './config';
@@ -46,32 +47,14 @@ export function createApp(): express.Application {
             }
           : false,
       hsts: config.env === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+      // This process is a public API consumed by https://somreception.com.
+      // Helmet's default CORP `same-origin` blocks credentialed cross-origin
+      // fetches in some browsers (Firefox reports it as a CORS failure).
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginEmbedderPolicy: false,
     })
   );
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        const allowed = [
-          config.frontendUrl,
-          'https://somreception.botandev.com',
-          'https://api.somreception.botandev.com',
-        ];
-        if (process.env.VERCEL_URL) {
-          allowed.push(`https://${process.env.VERCEL_URL}`);
-        }
-        if (
-          !origin ||
-          allowed.includes(origin) ||
-          origin.endsWith('.vercel.app')
-        ) {
-          callback(null, true);
-        } else {
-          callback(null, config.env !== 'production');
-        }
-      },
-      credentials: true,
-    })
-  );
+  app.use(cors(getCorsOptions()));
   app.use(compression());
   app.use(cookieParser());
 
@@ -101,7 +84,9 @@ export function createApp(): express.Application {
       // Generous global ceiling so normal dashboard/polling usage never 429s.
       // Sensitive endpoints (auth, login) enforce their own strict limiters.
       max: config.env === 'production' ? 2000 : 5000,
-      skip: (req) => WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
+      skip: (req) =>
+        req.method === 'OPTIONS' ||
+        WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
     })
   );
 

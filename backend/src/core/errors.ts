@@ -23,8 +23,17 @@ export class RouteNotFoundError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
-    super(401, message, 'UNAUTHORIZED');
+  constructor(message = 'Unauthorized', code = 'UNAUTHORIZED') {
+    super(401, message, code);
+  }
+}
+
+export class RateLimitError extends AppError {
+  constructor(
+    message = 'Too many login attempts. Please try again later.',
+    public retryAfterSec = 60
+  ) {
+    super(429, message, 'RATE_LIMITED');
   }
 }
 

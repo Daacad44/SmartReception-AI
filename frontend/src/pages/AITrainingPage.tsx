@@ -57,7 +57,11 @@ interface AiTrainingOverview {
     confidenceScore?: number;
     sandboxVersion?: { id: string; versionNumber: number };
   };
-  aiHealth?: { status: string; readinessScore: number };
+  aiHealth?: {
+    status: string;
+    readinessScore: number;
+    gaps?: Array<{ code: string; message: string }>;
+  };
   insights?: Array<{ id: string; title: string; description: string; severity: string }>;
   analytics?: {
     conversations: { aiResolutionRate: number; humanHandoverRate: number };
@@ -410,6 +414,13 @@ export function AITrainingPage() {
                     <Badge variant="outline" className="mt-1">
                       {data?.aiHealth?.status ?? 'unknown'}
                     </Badge>
+                    {data?.aiHealth?.gaps && data.aiHealth.gaps.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                        {data.aiHealth.gaps.map((gap) => (
+                          <li key={gap.code}>{gap.message}</li>
+                        ))}
+                      </ul>
+                    )}
                   </CardContent>
                 </Card>
                 <Card>

@@ -22,16 +22,36 @@ export function createRateLimiter(options: {
   windowMs: number;
   max: number;
   message?: string;
+  code?: string;
   skip?: (req: import('express').Request) => boolean;
 }) {
   const redis = getRedisClient();
+  const messageText = options.message ?? 'Too many requests, please try again later';
+  const body = {
+    success: false as const,
+    error: messageText,
+    message: messageText,
+    code: options.code ?? 'RATE_LIMITED',
+  };
+  const skip = (req: import('express').Request) =>
+    req.method === 'OPTIONS' || Boolean(options.skip?.(req));
   const base = {
     windowMs: options.windowMs,
     max: options.max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: options.message ?? 'Too many requests, please try again later' },
-    skip: options.skip,
+    standardHeaders: true as const,
+    legacyHeaders: false as const,
+    message: body,
+    skip,
+    handler: (_req: import('express').Request, res: import('express').Response) => {
+      const reset = res.getHeader('RateLimit-Reset');
+      const resetSec =
+        typeof reset === 'string' || typeof reset === 'number' ? Number(reset) : NaN;
+      const retryAfter = Number.isFinite(resetSec)
+        ? Math.max(1, Math.ceil(resetSec - Date.now() / 1000))
+        : Math.ceil(options.windowMs / 1000);
+      res.setHeader('Retry-After', String(retryAfter));
+      res.status(429).json(body);
+    },
   };
 
   if (redis) {

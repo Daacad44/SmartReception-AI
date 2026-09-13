@@ -5,6 +5,7 @@ import {
   AppError,
   ConflictError,
   NotFoundError,
+  RateLimitError,
   RouteNotFoundError,
   ValidationError,
   WhatsAppDeliveryError,
@@ -25,6 +26,7 @@ const NOISY_ROUTE_PATTERNS = [
 type ErrorBody = {
   success: false;
   error: string;
+  message: string;
   code: string;
   requestId?: string;
   details?: unknown;
@@ -78,6 +80,7 @@ function normalizeError(err: Error): {
   logName: string;
   original: Error;
   mappedFrom?: string;
+  retryAfterSec?: number;
 } {
   if (err instanceof ZodError) {
     const firstIssue = err.errors[0];
@@ -128,6 +131,7 @@ function normalizeError(err: Error): {
         err instanceof WhatsAppDeliveryError && err.details ? err.details : undefined,
       logName: err.name,
       original: err,
+      retryAfterSec: err instanceof RateLimitError ? err.retryAfterSec : undefined,
     };
   }
 
@@ -180,9 +184,13 @@ function logResolvedError(
 }
 
 function sendError(req: Request, res: Response, resolved: ReturnType<typeof normalizeError>): void {
+  if (resolved.retryAfterSec && !res.headersSent) {
+    res.setHeader('Retry-After', String(resolved.retryAfterSec));
+  }
   const body: ErrorBody = {
     success: false,
     error: resolved.message,
+    message: resolved.message,
     code: resolved.code,
     requestId: req.requestId,
   };

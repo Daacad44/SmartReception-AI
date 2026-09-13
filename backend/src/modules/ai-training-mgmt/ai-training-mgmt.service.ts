@@ -8,7 +8,7 @@ import { versionService } from './version.service';
 import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
-import { sandboxService } from './sandbox.service';
+import { evaluateLiveReadiness } from './readiness-eval.service';
 
 export class AiTrainingMgmtService {
   async getDashboard(businessId: string) {
@@ -71,6 +71,7 @@ export class AiTrainingMgmtService {
     const processingCount = documents.filter((d) =>
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
     ).length;
+    const live = await evaluateLiveReadiness(businessId);
 
     return {
       workspace: {
@@ -78,11 +79,11 @@ export class AiTrainingMgmtService {
         productionVersion: workspace.productionVersion,
         sandboxVersion: workspace.sandboxVersion,
         lastTrainedAt: workspace.lastTrainedAt,
-        aiReadinessScore: workspace.aiReadinessScore,
-        knowledgeScore: workspace.knowledgeScore,
-        confidenceScore: workspace.confidenceScore,
-        embeddingCount: workspace.embeddingCount,
-        documentCount: workspace.documentCount,
+        aiReadinessScore: live.scores.readinessScore,
+        knowledgeScore: live.scores.knowledgeScore,
+        confidenceScore: live.scores.confidenceScore,
+        embeddingCount: live.embeddingCount,
+        documentCount: live.documentCount,
       },
       capabilities,
       businessProfile: profile,
@@ -94,7 +95,7 @@ export class AiTrainingMgmtService {
         indexed: indexedCount,
         processing: processingCount,
         failed: documents.filter((d) => d.status === 'FAILED').length,
-        embeddings: workspace.embeddingCount,
+        embeddings: live.embeddingCount,
         lastUpdated: documents[0]?.updatedAt ?? profile.updatedAt,
       },
       trainingQueue: jobs.filter((j) => ['QUEUED', 'RUNNING'].includes(j.status)),
@@ -109,10 +110,19 @@ export class AiTrainingMgmtService {
       auditLogs,
       pendingGovernance,
       aiHealth: {
-        status: (workspace.aiReadinessScore ?? 0) >= 70 ? 'healthy' : (workspace.aiReadinessScore ?? 0) >= 40 ? 'degraded' : 'critical',
-        readinessScore: workspace.aiReadinessScore ?? 0,
+        status: live.status,
+        readinessScore: live.scores.readinessScore,
         hasProduction: Boolean(workspace.productionVersionId),
         hasSandbox: Boolean(workspace.sandboxVersionId),
+        gaps: live.gaps,
+        factors: {
+          knowledgeCompleteness: live.scores.knowledgeCompleteness,
+          knowledgeCoverage: live.scores.knowledgeCoverage,
+          embeddingQuality: live.scores.embeddingQuality,
+          faqCount: live.faqCount,
+          indexedCount: live.indexedCount,
+          embeddingCount: live.embeddingCount,
+        },
       },
     };
   }

@@ -189,9 +189,9 @@ export function EmployeeCommunicationPage() {
     enabled: Boolean(selectedConversation),
   });
 
-  const employees = employeesData ?? [];
-  const broadcasts = broadcastsData ?? [];
-  const inbox = inboxData ?? [];
+  const employees = Array.isArray(employeesData) ? employeesData : [];
+  const broadcasts = Array.isArray(broadcastsData) ? broadcastsData : [];
+  const inbox = Array.isArray(inboxData) ? inboxData : [];
   const allSelected = employees.length > 0 && selectedIds.size === employees.length;
 
   const toggleSelectAll = () => {
@@ -379,11 +379,11 @@ export function EmployeeCommunicationPage() {
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Groups</CardTitle></CardHeader>
             <CardContent><p className="text-2xl font-bold">{analytics.totals.groups}</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Messages Sent</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{analytics.totals.sent}</p></CardContent></Card>
+            <CardContent><p className="text-2xl font-bold">{analytics.totals.sent ?? 0}</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Delivery Rate</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{analytics.deliveryRate}%</p></CardContent></Card>
+            <CardContent><p className="text-2xl font-bold">{analytics.deliveryRate ?? 0}%</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Response Rate</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{analytics.responseRate}%</p></CardContent></Card>
+            <CardContent><p className="text-2xl font-bold">{analytics.responseRate ?? 0}%</p></CardContent></Card>
         </div>
       )}
 

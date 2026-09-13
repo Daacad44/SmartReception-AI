@@ -95,6 +95,8 @@ services:
     restart: unless-stopped
     ports:
       - "5173:80"
+    environment:
+      API_UPSTREAM: http://backend:3001
     depends_on:
       - backend
 

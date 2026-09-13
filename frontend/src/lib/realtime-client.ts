@@ -167,7 +167,7 @@ export class RealtimeClient {
  * (default `/api/v1`), the URL is built from `window.location`.
  */
 export function resolveRealtimeUrl(): string {
-  const apiUrl = import.meta.env.VITE_API_URL ?? '/api/v1';
+  const apiUrl = resolveApiBaseForRealtime();
   const suffix = '/realtime';
   if (apiUrl.startsWith('http://') || apiUrl.startsWith('https://')) {
     return apiUrl.replace(/^http/, 'ws') + suffix;
@@ -175,4 +175,14 @@ export function resolveRealtimeUrl(): string {
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const base = apiUrl.startsWith('/') ? apiUrl : `/${apiUrl}`;
   return `${scheme}://${window.location.host}${base}${suffix}`;
+}
+
+function resolveApiBaseForRealtime(): string {
+  const configured = import.meta.env.VITE_API_URL ?? '/api/v1';
+  if (typeof window === 'undefined') return configured;
+  const host = window.location.hostname;
+  if (host === 'somreception.com' || host === 'www.somreception.com') {
+    return '/api/v1';
+  }
+  return configured;
 }

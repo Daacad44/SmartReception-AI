@@ -202,8 +202,10 @@ export class KnowledgeService {
       answer: input.answer,
       category: input.category,
       content: `Q: ${input.question}\nA: ${input.answer}`,
-      status: 'INDEXED',
+      status: 'UPLOADED',
     });
+
+    scheduleDocumentProcessing(document.id, base.id, businessId);
 
     await prisma.auditLog.create({
       data: {

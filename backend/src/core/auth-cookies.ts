@@ -22,8 +22,9 @@ export function setAuthCookies(res: Response, accessToken: string, refreshToken:
 }
 
 export function clearAuthCookies(res: Response): void {
-  res.clearCookie(ACCESS_COOKIE, { path: '/' });
-  res.clearCookie(REFRESH_COOKIE, { path: '/' });
+  const base = cookieOptions(0);
+  res.clearCookie(ACCESS_COOKIE, base);
+  res.clearCookie(REFRESH_COOKIE, base);
 }
 
 export function getAccessTokenFromCookies(cookies: Record<string, string | undefined>): string | undefined {

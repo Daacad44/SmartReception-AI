@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import type { QualityScores, TrainingSnapshot } from './quality.service';
+import { documentHasVectors } from './quality.service';
 
 export class InsightsService {
   async generateInsights(
@@ -46,7 +47,7 @@ export class InsightsService {
     }
 
     const outdatedDocs = snapshot.documents.filter(
-      (d) => d.status !== 'INDEXED' || !d.embedding
+      (d) => d.status !== 'INDEXED' || !documentHasVectors(d.embedding)
     );
     if (outdatedDocs.length > 0) {
       insights.push({

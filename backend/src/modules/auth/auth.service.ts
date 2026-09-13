@@ -80,13 +80,13 @@ export class AuthService {
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
       recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
       recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
     clearLoginAttempts(input.email, ipAddress);

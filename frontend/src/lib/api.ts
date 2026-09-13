@@ -2,8 +2,25 @@ import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestCo
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 const API_TIMEOUT_MS = 15_000;
+
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+  if (typeof window === 'undefined') {
+    return configured;
+  }
+  const host = window.location.hostname;
+  // Production dashboard is served from Coolify nginx. Public DNS for
+  // api.somreception.botandev.com currently aliases a deleted Vercel
+  // deployment (OPTIONS 404 / CORS Missing Allow Origin). Same-origin
+  // /api/v1 is proxied to the real backend by nginx.
+  if (host === 'somreception.com' || host === 'www.somreception.com') {
+    return '/api/v1';
+  }
+  return configured;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -41,6 +58,19 @@ export function getErrorMessage(error: unknown): string {
     const data = error.response?.data as ApiResponse & {
       details?: Array<{ field?: string; message?: string }>;
     };
+    if (error.response?.status === 429) {
+      const base =
+        data?.message ||
+        data?.error ||
+        'Too many login attempts. Please try again later.';
+      const retryAfter = error.response.headers?.['retry-after'];
+      const seconds = retryAfter != null ? Number(retryAfter) : NaN;
+      if (Number.isFinite(seconds) && seconds > 0) {
+        const minutes = Math.max(1, Math.ceil(seconds / 60));
+        return `${base} Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+      }
+      return base;
+    }
     if (data?.details?.length) {
       return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
     }

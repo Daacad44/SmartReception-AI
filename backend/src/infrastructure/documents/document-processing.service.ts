@@ -6,6 +6,7 @@ import { extractDocumentText } from '../../modules/knowledge/document-processor'
 import { generateEmbeddings, extractKnowledge } from '../ai/gemini.service';
 import { invalidateKnowledgeCache } from '../ai/knowledge-search.service';
 import { indexDocumentChunks } from '../ai/rag/chunk-indexer.service';
+import { documentHasVectors } from '../../modules/ai-training-mgmt/quality.service';
 import { logger } from '../../core/logger';
 import { notifyKnowledge } from '../notifications/notification-helper';
 
@@ -54,7 +55,7 @@ export async function processDocumentById(documentId: string, businessId: string
     throw new Error('Document not found');
   }
 
-  if (document.status === 'INDEXED') {
+  if (document.status === 'INDEXED' && documentHasVectors(document.embedding)) {
     return;
   }
 
@@ -86,6 +87,10 @@ export async function processDocumentById(documentId: string, businessId: string
 
     const chunks = chunkText(indexableText.slice(0, 50000));
     const embeddings = await generateEmbeddings(chunks);
+    const vectorCount = embeddings.filter((e) => Array.isArray(e) && e.length > 0).length;
+    if (vectorCount === 0) {
+      throw new Error('Embedding generation returned no vectors');
+    }
     const indexedChunks = chunks.map((text, index) => ({
       text,
       embedding: embeddings[index] ?? null,
@@ -98,7 +103,7 @@ export async function processDocumentById(documentId: string, businessId: string
         embedding: JSON.stringify({
           chunks: indexedChunks,
           chunkCount: chunks.length,
-          vectorSearchEnabled: embeddings.some((e) => e !== null),
+          vectorSearchEnabled: true,
         }),
         processingError: null,
       },
