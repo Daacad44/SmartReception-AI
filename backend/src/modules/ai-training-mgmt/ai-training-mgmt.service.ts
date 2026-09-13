@@ -9,6 +9,7 @@ import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { sandboxService } from './sandbox.service';
+import { calculateQualityScores, buildSnapshotDocument } from './quality.service';
 
 export class AiTrainingMgmtService {
   async getDashboard(businessId: string) {
@@ -61,6 +62,10 @@ export class AiTrainingMgmtService {
             status: true,
             fileSize: true,
             updatedAt: true,
+            content: true,
+            question: true,
+            answer: true,
+            embedding: true,
           },
           orderBy: { updatedAt: 'desc' },
         })
@@ -72,15 +77,36 @@ export class AiTrainingMgmtService {
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
     ).length;
 
+    const computedScores =
+      workspace.aiReadinessScore != null
+        ? {
+            readinessScore: workspace.aiReadinessScore,
+            knowledgeScore: workspace.knowledgeScore ?? 0,
+            confidenceScore: workspace.confidenceScore ?? 0,
+          }
+        : calculateQualityScores({
+            profile,
+            documents: documents.map(buildSnapshotDocument),
+            faqCount: faqs.length,
+            indexedCount,
+            embeddingCount: workspace.embeddingCount ?? 0,
+            totalChunks: workspace.embeddingCount ?? 0,
+            capturedAt: new Date().toISOString(),
+          });
+
+    const aiReadinessScore = computedScores.readinessScore;
+    const knowledgeScore = computedScores.knowledgeScore;
+    const confidenceScore = computedScores.confidenceScore;
+
     return {
       workspace: {
         id: workspace.id,
         productionVersion: workspace.productionVersion,
         sandboxVersion: workspace.sandboxVersion,
         lastTrainedAt: workspace.lastTrainedAt,
-        aiReadinessScore: workspace.aiReadinessScore,
-        knowledgeScore: workspace.knowledgeScore,
-        confidenceScore: workspace.confidenceScore,
+        aiReadinessScore,
+        knowledgeScore,
+        confidenceScore,
         embeddingCount: workspace.embeddingCount,
         documentCount: workspace.documentCount,
       },
@@ -109,8 +135,8 @@ export class AiTrainingMgmtService {
       auditLogs,
       pendingGovernance,
       aiHealth: {
-        status: (workspace.aiReadinessScore ?? 0) >= 70 ? 'healthy' : (workspace.aiReadinessScore ?? 0) >= 40 ? 'degraded' : 'critical',
-        readinessScore: workspace.aiReadinessScore ?? 0,
+        status: (aiReadinessScore ?? 0) >= 70 ? 'healthy' : (aiReadinessScore ?? 0) >= 40 ? 'degraded' : 'critical',
+        readinessScore: aiReadinessScore ?? 0,
         hasProduction: Boolean(workspace.productionVersionId),
         hasSandbox: Boolean(workspace.sandboxVersionId),
       },
