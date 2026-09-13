@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { businessProfileService } from '../business-profile/business-profile.service';
 import { knowledgeService } from '../knowledge/knowledge.service';
@@ -71,6 +72,20 @@ export class AiTrainingMgmtService {
     const processingCount = documents.filter((d) =>
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
     ).length;
+    const failedCount = documents.filter((d) => d.status === 'FAILED').length;
+    const [liveEmbeddingCount, liveChunkCount] = await Promise.all([
+      prisma.knowledgeChunk.count({
+        where: {
+          businessId,
+          isActive: true,
+          status: 'ACTIVE',
+          NOT: { embedding: { equals: Prisma.DbNull } },
+        },
+      }),
+      prisma.knowledgeChunk.count({
+        where: { businessId, isActive: true, status: 'ACTIVE' },
+      }),
+    ]);
 
     return {
       workspace: {
@@ -81,7 +96,7 @@ export class AiTrainingMgmtService {
         aiReadinessScore: workspace.aiReadinessScore,
         knowledgeScore: workspace.knowledgeScore,
         confidenceScore: workspace.confidenceScore,
-        embeddingCount: workspace.embeddingCount,
+        embeddingCount: liveEmbeddingCount || workspace.embeddingCount,
         documentCount: workspace.documentCount,
       },
       capabilities,
@@ -93,8 +108,9 @@ export class AiTrainingMgmtService {
         totalDocuments: documents.length,
         indexed: indexedCount,
         processing: processingCount,
-        failed: documents.filter((d) => d.status === 'FAILED').length,
-        embeddings: workspace.embeddingCount,
+        failed: failedCount,
+        embeddings: liveEmbeddingCount || workspace.embeddingCount,
+        chunks: liveChunkCount,
         lastUpdated: documents[0]?.updatedAt ?? profile.updatedAt,
       },
       trainingQueue: jobs.filter((j) => ['QUEUED', 'RUNNING'].includes(j.status)),

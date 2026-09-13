@@ -91,10 +91,15 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api/v1
     container_name: smartreception-frontend
     restart: unless-stopped
     ports:
       - "5173:80"
+    environment:
+      BACKEND_UPSTREAM: http://backend:3001
+      SR_API_URL: /api/v1
     depends_on:
       - backend
 

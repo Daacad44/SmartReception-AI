@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
 import { SandboxChat } from '@/components/ai-training/SandboxChat';
 import { toast } from 'sonner';
+import { resolveApiBaseUrl } from '@/lib/api-base';
 
 interface TrainerContext {
   businessId: string;
@@ -16,7 +17,7 @@ interface TrainerContext {
 function useTrainerApi() {
   const { businessId, token } = useOutletContext<TrainerContext>();
   const client = axios.create({
-    baseURL: import.meta.env.VITE_API_URL ?? '/api',
+    baseURL: resolveApiBaseUrl(),
     headers: {
       Authorization: `Bearer ${token}`,
       'X-Business-Id': businessId,

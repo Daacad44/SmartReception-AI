@@ -5,6 +5,7 @@ import { BrandLogo } from '@/components/Logo';
 import axios from 'axios';
 import { clearTrainerSession, getTrainerToken } from '@/pages/TrainerLoginPage';
 import { Button } from '@/components/ui/button';
+import { resolveApiBaseUrl } from '@/lib/api-base';
 import {
   Select,
   SelectContent,
@@ -32,7 +33,7 @@ export function TrainerLayout() {
     if (!token) return;
 
     const client = axios.create({
-      baseURL: import.meta.env.VITE_API_URL ?? '/api',
+      baseURL: resolveApiBaseUrl(),
       headers: {
         Authorization: `Bearer ${token}`,
         ...(businessId ? { 'X-Business-Id': businessId } : {}),

@@ -10,6 +10,7 @@ import { logger } from './core/logger';
 import { prisma } from './infrastructure/database/prisma';
 import { isSupabaseStorageConfigured } from './infrastructure/storage';
 import { createRateLimiter } from './core/rate-limit-store';
+import { createCorsOptions, getAllowedOrigins } from './core/cors';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { requestTimingMiddleware } from './core/middleware/request-timing.middleware';
 import { requestIdMiddleware } from './core/middleware/request-id.middleware';
@@ -46,32 +47,16 @@ export function createApp(): express.Application {
             }
           : false,
       hsts: config.env === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+      // API is consumed cross-origin from somreception.com. Helmet's default
+      // same-origin CORP would block credentialed browser reads.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     })
   );
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        const allowed = [
-          config.frontendUrl,
-          'https://somreception.botandev.com',
-          'https://api.somreception.botandev.com',
-        ];
-        if (process.env.VERCEL_URL) {
-          allowed.push(`https://${process.env.VERCEL_URL}`);
-        }
-        if (
-          !origin ||
-          allowed.includes(origin) ||
-          origin.endsWith('.vercel.app')
-        ) {
-          callback(null, true);
-        } else {
-          callback(null, config.env !== 'production');
-        }
-      },
-      credentials: true,
-    })
-  );
+  app.use(cors(createCorsOptions()));
+  // Explicit preflight handler so OPTIONS never falls through to the 404 router
+  // when an origin is allowed. cors() already short-circuits allowed origins;
+  // this covers any route Express would otherwise miss.
+  app.options('*', cors(createCorsOptions()));
   app.use(compression());
   app.use(cookieParser());
 
@@ -101,7 +86,10 @@ export function createApp(): express.Application {
       // Generous global ceiling so normal dashboard/polling usage never 429s.
       // Sensitive endpoints (auth, login) enforce their own strict limiters.
       max: config.env === 'production' ? 2000 : 5000,
-      skip: (req) => WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
+      prefix: 'rl:global:',
+      skip: (req) =>
+        req.method === 'OPTIONS' ||
+        WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
     })
   );
 
@@ -155,7 +143,10 @@ export function createApp(): express.Application {
   app.use(errorHandler);
 
   logWhatsAppConfig();
-  logger.info('Express app configured', { webhookUrl: config.whatsapp.webhookUrl });
+  logger.info('Express app configured', {
+    webhookUrl: config.whatsapp.webhookUrl,
+    corsOrigins: getAllowedOrigins(),
+  });
 
   return app;
 }

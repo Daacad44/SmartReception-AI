@@ -10,6 +10,7 @@ export interface TrainingSnapshotDocument {
   answer: string | null;
   embedding: string | null;
   chunkCount: number;
+  embeddedChunkCount?: number;
 }
 
 export interface TrainingSnapshot {
@@ -35,29 +36,32 @@ export interface QualityScores {
 
 const PROFILE_FIELDS = [
   'businessName',
-  'description',
+  'businessDescription',
+  'companyOverview',
+  'aboutUs',
   'mission',
   'vision',
-  'products',
-  'services',
-  'pricing',
   'workingHours',
   'languages',
-  'supportPolicy',
-  'refundPolicy',
-  'cancellationPolicy',
-  'faqs',
-  'contactEmail',
-  'contactPhone',
-  'website',
   'brandTone',
+  'email',
+  'supportEmail',
+  'phone',
+  'whatsapp',
+  'website',
+  'address',
+  'city',
+  'whyChooseUs',
+  'companyIntroduction',
 ] as const;
 
 export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScores {
   const profile = snapshot.profile;
   const docs = snapshot.documents;
   const indexed = docs.filter((d) => d.status === 'INDEXED');
-  const withEmbeddings = docs.filter((d) => d.embedding);
+  const withEmbeddings = docs.filter(
+    (d) => d.embedding || (d.embeddedChunkCount ?? 0) > 0 || d.chunkCount > 0
+  );
 
   const profileFilled = profile
     ? PROFILE_FIELDS.filter((f) => {
@@ -77,7 +81,11 @@ export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScore
   );
 
   const embeddingQuality =
-    docs.length > 0 ? Math.round((withEmbeddings.length / docs.length) * 100) : 0;
+    docs.length > 0
+      ? Math.round((withEmbeddings.length / docs.length) * 100)
+      : snapshot.embeddingCount > 0
+        ? 100
+        : 0;
 
   const daysSinceCapture = 0;
   const knowledgeFreshness = Math.max(0, 100 - daysSinceCapture * 2);
@@ -124,9 +132,11 @@ export function buildSnapshotDocument(doc: {
   question: string | null;
   answer: string | null;
   embedding: string | null;
+  chunkCount?: number;
+  embeddedChunkCount?: number;
 }): TrainingSnapshotDocument {
-  let chunkCount = 0;
-  if (doc.embedding) {
+  let chunkCount = doc.chunkCount ?? 0;
+  if (!chunkCount && doc.embedding) {
     try {
       const parsed = JSON.parse(doc.embedding) as { chunkCount?: number; chunks?: unknown[] };
       chunkCount = parsed.chunkCount ?? parsed.chunks?.length ?? 0;
@@ -134,5 +144,9 @@ export function buildSnapshotDocument(doc: {
       chunkCount = 0;
     }
   }
-  return { ...doc, chunkCount };
+  return {
+    ...doc,
+    chunkCount,
+    embeddedChunkCount: doc.embeddedChunkCount ?? (doc.embedding ? chunkCount : 0),
+  };
 }

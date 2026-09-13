@@ -75,21 +75,21 @@ export class AuthService {
   }
 
   async login(input: LoginInput, ipAddress?: string) {
-    assertLoginAllowed(input.email, ipAddress);
+    await assertLoginAllowed(input.email, ipAddress);
 
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
-      recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      await recordFailedLogin(input.email, ipAddress);
+      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
-      recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      await recordFailedLogin(input.email, ipAddress);
+      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
-    clearLoginAttempts(input.email, ipAddress);
+    await clearLoginAttempts(input.email, ipAddress);
 
     // Business application / approval gate.
     if (user.approvalStatus === 'PENDING') {

@@ -1,8 +1,9 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
+import { resolveApiBaseUrl } from '@/lib/api-base';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const API_BASE_URL = resolveApiBaseUrl();
 const API_TIMEOUT_MS = 15_000;
 
 export const api = axios.create({
@@ -43,6 +44,20 @@ export function getErrorMessage(error: unknown): string {
     };
     if (data?.details?.length) {
       return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
+    }
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers?.['retry-after'];
+      const base =
+        data?.message || data?.error || 'Too many login attempts. Please try again later.';
+      const seconds = Number(retryAfter);
+      if (Number.isFinite(seconds) && seconds > 0) {
+        const minutes = Math.max(1, Math.ceil(seconds / 60));
+        return `${base} Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+      }
+      return base;
+    }
+    if (!error.response) {
+      return 'Unable to reach the server. Please try again.';
     }
     return data?.error || data?.message || error.message;
   }

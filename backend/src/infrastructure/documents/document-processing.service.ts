@@ -1,4 +1,4 @@
-import { DocumentStatus, DocumentType } from '@prisma/client';
+import { DocumentStatus, DocumentType, Prisma } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { storageService } from '../storage';
 import { getDocumentQueue } from '../queue/queues';
@@ -55,7 +55,22 @@ export async function processDocumentById(documentId: string, businessId: string
   }
 
   if (document.status === 'INDEXED') {
-    return;
+    const embeddedChunks = await prisma.knowledgeChunk.count({
+      where: {
+        documentId,
+        isActive: true,
+        status: 'ACTIVE',
+        NOT: { embedding: { equals: Prisma.DbNull } },
+      },
+    });
+    if (embeddedChunks > 0 && document.embedding) {
+      return;
+    }
+    logger.warn('Reprocessing INDEXED document missing embeddings or chunks', {
+      documentId,
+      embeddedChunks,
+      hasDocumentEmbedding: Boolean(document.embedding),
+    });
   }
 
   await prisma.knowledgeDocument.update({

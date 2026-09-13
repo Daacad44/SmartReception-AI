@@ -23,8 +23,8 @@ export class RouteNotFoundError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
-    super(401, message, 'UNAUTHORIZED');
+  constructor(message = 'Unauthorized', code = 'UNAUTHORIZED') {
+    super(401, message, code);
   }
 }
 
@@ -85,6 +85,15 @@ export class ApplicationRejectedError extends AppError {
     message = 'Your business application was declined. Please contact SmartReception support.'
   ) {
     super(403, message, 'APPLICATION_REJECTED');
+  }
+}
+
+export class TooManyRequestsError extends AppError {
+  constructor(
+    message = 'Too many login attempts. Please try again later.',
+    public retryAfterSeconds?: number
+  ) {
+    super(429, message, 'RATE_LIMITED');
   }
 }
 

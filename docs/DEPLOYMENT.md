@@ -145,8 +145,31 @@ JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-FRONTEND_URL=https://app.smartreception.ai
+FRONTEND_URL=https://somreception.com
 ```
+
+### Coolify production domains (current)
+
+- Frontend: `https://somreception.com` → `72.62.95.235` (nginx)
+- API process: hosted on the same Coolify host and correctly routed when the
+  request `Host` is `api.somreception.botandev.com`
+- Public DNS for `api.somreception.botandev.com` currently points at Vercel
+  (`*.vercel-dns-017.com`). Requests that follow public DNS receive
+  `DEPLOYMENT_NOT_FOUND` (HTTP 404, no CORS headers). That is why the browser
+  shows **CORS Missing Allow Origin** and OPTIONS 404.
+
+Until DNS for `api.somreception.botandev.com` is an A record to the Coolify
+host (`72.62.95.235`), deploy the frontend with same-origin API routing:
+
+```
+VITE_API_URL=/api/v1
+SR_API_URL=/api/v1
+BACKEND_UPSTREAM=http://backend:3001
+FRONTEND_URL=https://somreception.com
+```
+
+The frontend nginx container proxies `/api/` and `/health` to the backend
+service so the browser never needs the broken Vercel DNS name.
 
 ---
 

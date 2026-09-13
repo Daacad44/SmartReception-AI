@@ -14,6 +14,8 @@
  * backend and matches what `useRealtime.ts` needs to invalidate React Query.
  */
 
+import { resolveApiBaseUrl } from '@/lib/api-base';
+
 export type ConversationUpdatePayload = { conversationId: string; type: string };
 
 export type BusinessUpdatePayload = {
@@ -167,7 +169,7 @@ export class RealtimeClient {
  * (default `/api/v1`), the URL is built from `window.location`.
  */
 export function resolveRealtimeUrl(): string {
-  const apiUrl = import.meta.env.VITE_API_URL ?? '/api/v1';
+  const apiUrl = resolveApiBaseUrl();
   const suffix = '/realtime';
   if (apiUrl.startsWith('http://') || apiUrl.startsWith('https://')) {
     return apiUrl.replace(/^http/, 'ws') + suffix;

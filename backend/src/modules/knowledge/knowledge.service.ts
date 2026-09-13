@@ -215,6 +215,11 @@ export class KnowledgeService {
       },
     });
 
+    const { scheduleDocumentProcessing } = await import(
+      '../../infrastructure/documents/document-processing.service'
+    );
+    scheduleDocumentProcessing(document.id, base.id, businessId);
+
     return document;
   }
 

@@ -1,4 +1,4 @@
-import type { AiTrainingJobType, Prisma } from '@prisma/client';
+import { Prisma, type AiTrainingJobType } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { businessProfileService } from '../business-profile/business-profile.service';
 import { knowledgeService } from '../knowledge/knowledge.service';
@@ -46,7 +46,7 @@ async function loadDocuments(
   baseId: string,
   documentIds?: string[]
 ) {
-  return prisma.knowledgeDocument.findMany({
+  const documents = await prisma.knowledgeDocument.findMany({
     where: {
       knowledgeBaseId: baseId,
       ...(documentIds?.length ? { id: { in: documentIds } } : {}),
@@ -62,8 +62,25 @@ async function loadDocuments(
       embedding: true,
       category: true,
       updatedAt: true,
+      _count: {
+        select: {
+          chunks: {
+            where: { isActive: true, status: 'ACTIVE' },
+          },
+        },
+      },
+      chunks: {
+        where: { isActive: true, status: 'ACTIVE', NOT: { embedding: { equals: Prisma.DbNull } } },
+        select: { id: true },
+      },
     },
   });
+
+  return documents.map((doc) => ({
+    ...doc,
+    chunkCount: doc._count.chunks,
+    embeddedChunkCount: doc.chunks.length,
+  }));
 }
 
 export async function executeTrainingPipeline(ctx: PipelineContext): Promise<string | null> {
@@ -207,7 +224,9 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
 
     const toProcess =
       jobType === 'FULL_TRAIN' || jobType === 'RETRAIN'
-        ? documents.filter((d) => d.status !== 'INDEXED')
+        ? documents.filter(
+            (d) => d.status !== 'INDEXED' || !d.embedding || (d.embeddedChunkCount ?? 0) === 0
+          )
         : documents.filter((d) => d.status !== 'INDEXED' || targetDocumentIds?.includes(d.id));
 
     for (let i = 0; i < toProcess.length; i++) {
@@ -227,7 +246,10 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     const snapshotDocs = documents.map(buildSnapshotDocument);
     const faqCount = documents.filter((d) => d.type === 'FAQ').length;
     const indexedCount = documents.filter((d) => d.status === 'INDEXED').length;
-    const embeddingCount = documents.filter((d) => d.embedding).length;
+    const embeddingCount = documents.reduce(
+      (sum, d) => sum + (d.embeddedChunkCount || (d.embedding ? 1 : 0)),
+      0
+    );
     const totalChunks = snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0);
     const productCount = documents.filter((d) => d.category?.toLowerCase().includes('product')).length;
     const serviceCount = await prisma.service.count({ where: { businessId } });
