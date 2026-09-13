@@ -7,16 +7,24 @@ const router = Router();
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 100,   // kii hore 20
-  message: 'Too many requests, please try again later'
+  max: 100,
+  message: 'Too many requests, please try again later',
+  code: 'RATE_LIMITED',
 });
 
-// Dedicated brute-force limiter for the login endpoint. Strict on purpose:
-// the raised global limiter must NOT be relied on for login protection.
+// Dedicated brute-force rate limiter for the login endpoint:
+// Requirement: Maximum 10 attempts per 15 minutes.
+// Multi-vector strategy: Rate limit key combines normalized client IP and normalized email.
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: 'Too many login attempts, please try again later'
+  max: 10,
+  message: 'Too many login attempts, please try again later',
+  code: 'RATE_LIMITED',
+  keyGenerator: (req) => {
+    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown-ip';
+    const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : 'anonymous';
+    return `login:${rawIp}:${email}`;
+  },
 });
 
 router.post('/register', authLimiter, (req, res, next) => authController.register(req, res, next));

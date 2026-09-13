@@ -146,9 +146,11 @@ export function EmployeeCommunicationPage() {
 
   const { data: employeesData, isLoading: employeesLoading } = useQuery({
     queryKey: ['employees', search],
-    queryFn: async () => extractData<Employee[]>(
-      await api.get('/employee-comms/employees', { params: { search, limit: 100 } })
-    ),
+    queryFn: async () => {
+      const response = await api.get('/employee-comms/employees', { params: { search, limit: 100 } });
+      const data = extractData<Employee[] | { data: Employee[] }>(response);
+      return Array.isArray(data) ? data : (data?.data ?? []);
+    },
   });
 
   const { data: groups } = useQuery({
@@ -164,9 +166,11 @@ export function EmployeeCommunicationPage() {
 
   const { data: broadcastsData, isLoading: broadcastsLoading } = useQuery({
     queryKey: ['employee-broadcasts'],
-    queryFn: async () => extractData<Broadcast[]>(
-      await api.get('/employee-comms/broadcasts', { params: { limit: 50 } })
-    ),
+    queryFn: async () => {
+      const response = await api.get('/employee-comms/broadcasts', { params: { limit: 50 } });
+      const data = extractData<Broadcast[] | { data: Broadcast[] }>(response);
+      return Array.isArray(data) ? data : (data?.data ?? []);
+    },
   });
 
   const { data: templates } = useQuery({

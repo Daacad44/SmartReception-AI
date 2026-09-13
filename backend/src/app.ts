@@ -53,6 +53,7 @@ export function createApp(): express.Application {
       origin: (origin, callback) => {
         const allowed = [
           config.frontendUrl,
+          'https://somreception.com',
           'https://somreception.botandev.com',
           'https://api.somreception.botandev.com',
         ];
@@ -70,6 +71,9 @@ export function createApp(): express.Application {
         }
       },
       credentials: true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Business-Id', 'X-Request-Id'],
+      exposedHeaders: ['Retry-After', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset'],
     })
   );
   app.use(compression());
