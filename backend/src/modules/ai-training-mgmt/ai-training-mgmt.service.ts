@@ -9,6 +9,11 @@ import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { sandboxService } from './sandbox.service';
+import {
+  buildSnapshotDocument,
+  calculateQualityScores,
+  describeReadiness,
+} from './quality.service';
 
 export class AiTrainingMgmtService {
   async getDashboard(businessId: string) {
@@ -61,6 +66,10 @@ export class AiTrainingMgmtService {
             status: true,
             fileSize: true,
             updatedAt: true,
+            content: true,
+            question: true,
+            answer: true,
+            embedding: true,
           },
           orderBy: { updatedAt: 'desc' },
         })
@@ -72,29 +81,60 @@ export class AiTrainingMgmtService {
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
     ).length;
 
+    const snapshotDocs = documents.map((doc) =>
+      buildSnapshotDocument({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        status: doc.status,
+        content: doc.content,
+        question: doc.question,
+        answer: doc.answer,
+        embedding: doc.embedding,
+      })
+    );
+    const liveScores = calculateQualityScores({
+      profile,
+      documents: snapshotDocs,
+      faqCount: faqs.length,
+      indexedCount,
+      embeddingCount: snapshotDocs.filter((d) => d.embedding && d.chunkCount > 0).length,
+      totalChunks: snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0),
+      capturedAt: new Date().toISOString(),
+    });
+    const readinessBreakdown = describeReadiness(liveScores, {
+      profile,
+      documents: snapshotDocs,
+      faqCount: faqs.length,
+      indexedCount,
+      embeddingCount: liveScores.embeddingQuality,
+      totalChunks: snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0),
+      capturedAt: new Date().toISOString(),
+    });
+
     return {
       workspace: {
         id: workspace.id,
         productionVersion: workspace.productionVersion,
         sandboxVersion: workspace.sandboxVersion,
         lastTrainedAt: workspace.lastTrainedAt,
-        aiReadinessScore: workspace.aiReadinessScore,
-        knowledgeScore: workspace.knowledgeScore,
-        confidenceScore: workspace.confidenceScore,
-        embeddingCount: workspace.embeddingCount,
-        documentCount: workspace.documentCount,
+        aiReadinessScore: liveScores.readinessScore,
+        knowledgeScore: liveScores.knowledgeScore,
+        confidenceScore: liveScores.confidenceScore,
+        embeddingCount: snapshotDocs.filter((d) => d.chunkCount > 0).length,
+        documentCount: documents.length,
       },
       capabilities,
       businessProfile: profile,
       knowledgeBase: bases[0] ?? null,
-      documents,
+      documents: documents.map(({ embedding: _embedding, content: _content, ...doc }) => doc),
       faqs,
       syncStatus: {
         totalDocuments: documents.length,
         indexed: indexedCount,
         processing: processingCount,
         failed: documents.filter((d) => d.status === 'FAILED').length,
-        embeddings: workspace.embeddingCount,
+        embeddings: snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0),
         lastUpdated: documents[0]?.updatedAt ?? profile.updatedAt,
       },
       trainingQueue: jobs.filter((j) => ['QUEUED', 'RUNNING'].includes(j.status)),
@@ -109,11 +149,12 @@ export class AiTrainingMgmtService {
       auditLogs,
       pendingGovernance,
       aiHealth: {
-        status: (workspace.aiReadinessScore ?? 0) >= 70 ? 'healthy' : (workspace.aiReadinessScore ?? 0) >= 40 ? 'degraded' : 'critical',
-        readinessScore: workspace.aiReadinessScore ?? 0,
+        status: readinessBreakdown.status,
+        readinessScore: liveScores.readinessScore,
         hasProduction: Boolean(workspace.productionVersionId),
         hasSandbox: Boolean(workspace.sandboxVersionId),
       },
+      readinessBreakdown,
     };
   }
 

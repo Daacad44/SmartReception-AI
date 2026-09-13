@@ -5,7 +5,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { ZodError } from 'zod';
 import { errorHandler, notFoundHandler } from './error-handler';
 import { extractAppFrame } from './error-stack.util';
-import { NotFoundError, UnauthorizedError } from './errors';
+import { NotFoundError, TooManyRequestsError, UnauthorizedError } from './errors';
 import { logger } from './logger';
 import { requestIdMiddleware, resolveRequestId } from './middleware/request-id.middleware';
 
@@ -295,5 +295,26 @@ describe('errorHandler', () => {
     const { meta } = logArgs(warn.mock.calls);
     assert.equal(meta.userId, 'user-9');
     assert.equal(meta.businessId, 'biz-2');
+  });
+
+  it('returns RATE_LIMITED JSON with message and Retry-After', async () => {
+    const warn = mock.method(logger, 'warn', () => logger);
+    const app = createTestApp((instance) => {
+      instance.post('/login', (_req, _res) => {
+        throw new TooManyRequestsError('Too many login attempts. Please try again later.', 42);
+      });
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/login`, { method: 'POST' });
+      const body = (await response.json()) as Record<string, unknown>;
+      assert.equal(response.status, 429);
+      assert.equal(body.code, 'RATE_LIMITED');
+      assert.equal(body.message, 'Too many login attempts. Please try again later.');
+      assert.equal(body.error, 'Too many login attempts. Please try again later.');
+      assert.equal(response.headers.get('retry-after'), '42');
+    });
+
+    assert.equal(warn.mock.callCount(), 1);
   });
 });

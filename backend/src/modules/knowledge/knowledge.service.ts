@@ -8,6 +8,7 @@ import { DocumentType } from '@prisma/client';
 import { notifyKnowledge } from '../../infrastructure/notifications/notification-helper';
 import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
 import { invalidateBusinessTenantCache } from '../../infrastructure/ai/business-tenant-cache.service';
+import { hasUsableDocumentEmbedding } from '../../infrastructure/ai/embedding-utils';
 
 const MIME_TO_TYPE: Record<string, DocumentType> = {
   'application/pdf': 'PDF',
@@ -143,7 +144,7 @@ export class KnowledgeService {
       throw new NotFoundError('Document not found');
     }
 
-    if (document.status === 'INDEXED') {
+    if (document.status === 'INDEXED' && hasUsableDocumentEmbedding(document.embedding)) {
       return document;
     }
 
@@ -202,8 +203,10 @@ export class KnowledgeService {
       answer: input.answer,
       category: input.category,
       content: `Q: ${input.question}\nA: ${input.answer}`,
-      status: 'INDEXED',
+      status: 'UPLOADED',
     });
+
+    scheduleDocumentProcessing(document.id, base.id, businessId);
 
     await prisma.auditLog.create({
       data: {

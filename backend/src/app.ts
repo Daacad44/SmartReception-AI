@@ -1,10 +1,10 @@
 import express from 'express';
 import helmet from 'helmet';
-import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { config, logWhatsAppConfig } from './config';
 import { errorHandler, notFoundHandler } from './core/error-handler';
+import { corsMiddleware, optionsFallback } from './core/cors';
 import routes from './routes';
 import { logger } from './core/logger';
 import { prisma } from './infrastructure/database/prisma';
@@ -48,30 +48,8 @@ export function createApp(): express.Application {
       hsts: config.env === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
     })
   );
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        const allowed = [
-          config.frontendUrl,
-          'https://somreception.botandev.com',
-          'https://api.somreception.botandev.com',
-        ];
-        if (process.env.VERCEL_URL) {
-          allowed.push(`https://${process.env.VERCEL_URL}`);
-        }
-        if (
-          !origin ||
-          allowed.includes(origin) ||
-          origin.endsWith('.vercel.app')
-        ) {
-          callback(null, true);
-        } else {
-          callback(null, config.env !== 'production');
-        }
-      },
-      credentials: true,
-    })
-  );
+  app.use(corsMiddleware);
+  app.options('*', optionsFallback);
   app.use(compression());
   app.use(cookieParser());
 
@@ -101,7 +79,9 @@ export function createApp(): express.Application {
       // Generous global ceiling so normal dashboard/polling usage never 429s.
       // Sensitive endpoints (auth, login) enforce their own strict limiters.
       max: config.env === 'production' ? 2000 : 5000,
-      skip: (req) => WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
+      skip: (req) =>
+        req.method === 'OPTIONS' ||
+        WEBHOOK_RAW_PATHS.some((path) => req.path === path || req.path.endsWith('/webhook')),
     })
   );
 

@@ -2,7 +2,15 @@ import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestCo
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+function resolveApiBaseUrl(): string {
+  const runtime = typeof window !== 'undefined' ? window.__SR_RUNTIME__?.apiUrl?.trim() : '';
+  if (runtime) {
+    return runtime.replace(/\/$/, '');
+  }
+  return (import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1').replace(/\/$/, '');
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const API_TIMEOUT_MS = 15_000;
 
 export const api = axios.create({
@@ -42,9 +50,12 @@ export function getErrorMessage(error: unknown): string {
       details?: Array<{ field?: string; message?: string }>;
     };
     if (data?.details?.length) {
-      return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
+      return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.message || data.error || error.message;
     }
-    return data?.error || data?.message || error.message;
+    if (!error.response) {
+      return 'Unable to reach the server. Please try again.';
+    }
+    return data?.message || data?.error || error.message;
   }
   if (error instanceof Error) {
     return error.message;
@@ -55,6 +66,16 @@ export function getErrorMessage(error: unknown): string {
 export function isNetworkOrTimeoutError(error: unknown): boolean {
   if (!axios.isAxiosError(error)) return false;
   return !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout');
+}
+
+export function getRetryAfterSeconds(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error)) return undefined;
+  const header = error.response?.headers?.['retry-after'];
+  if (typeof header === 'string' && header.trim()) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds);
+  }
+  return undefined;
 }
 
 export function getErrorCode(error: unknown): string | undefined {

@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { BrandLogo } from '@/components/Logo';
 import { BRAND_CTA_CLASS, BRAND_NAME } from '@/lib/brand';
 import { InstallButton } from '@/pwa';
 import { useAuth } from '@/hooks/useAuth';
+import { getErrorMessage } from '@/lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -20,7 +21,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-  const { login, isLoggingIn } = useAuth();
+  const { login, isLoggingIn, loginError, loginRetryAfterSeconds } = useAuth();
   const {
     register,
     handleSubmit,
@@ -55,6 +56,22 @@ export function LoginPage() {
             <CardDescription>Sign in to your {BRAND_NAME} account</CardDescription>
           </CardHeader>
           <CardContent>
+            {loginError ? (
+              <div
+                role="alert"
+                className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p>{getErrorMessage(loginError)}</p>
+                  {loginRetryAfterSeconds ? (
+                    <p className="mt-1 text-xs text-destructive/80">
+                      Try again in {Math.ceil(loginRetryAfterSeconds / 60)} minute(s).
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

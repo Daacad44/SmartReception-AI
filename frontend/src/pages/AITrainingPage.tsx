@@ -58,6 +58,11 @@ interface AiTrainingOverview {
     sandboxVersion?: { id: string; versionNumber: number };
   };
   aiHealth?: { status: string; readinessScore: number };
+  readinessBreakdown?: {
+    status: string;
+    readinessScore: number;
+    checks: Array<{ id: string; label: string; passed: boolean; value: number; detail: string }>;
+  };
   insights?: Array<{ id: string; title: string; description: string; severity: string }>;
   analytics?: {
     conversations: { aiResolutionRate: number; humanHandoverRate: number };
@@ -406,7 +411,7 @@ export function AITrainingPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-3xl font-bold">{data?.workspace?.aiReadinessScore ?? 0}%</p>
+                    <p className="text-3xl font-bold">{data?.aiHealth?.readinessScore ?? data?.workspace?.aiReadinessScore ?? 0}%</p>
                     <Badge variant="outline" className="mt-1">
                       {data?.aiHealth?.status ?? 'unknown'}
                     </Badge>
@@ -457,6 +462,45 @@ export function AITrainingPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {data?.readinessBreakdown?.checks?.length ? (
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle>Why this score</CardTitle>
+                    <CardDescription>
+                      Readiness is computed from live profile, documents, embeddings, and FAQs — not a fixed percentage.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {data.readinessBreakdown.checks.map((check) => (
+                      <div key={check.id} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
+                        <div>
+                          <p className="text-sm font-medium">{check.label}</p>
+                          <p className="text-xs text-muted-foreground">{check.detail}</p>
+                        </div>
+                        <Badge variant={check.passed ? 'outline' : 'secondary'}>
+                          {check.passed ? 'ok' : 'needs work'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {data?.insights?.length ? (
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle>Open gaps</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {data.insights.slice(0, 4).map((insight) => (
+                      <p key={insight.id} className="text-sm text-muted-foreground">
+                        {insight.title}: {insight.description}
+                      </p>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : null}
 
               <Card className="mt-4">
                 <CardHeader>

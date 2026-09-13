@@ -11,3 +11,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  __SR_RUNTIME__?: { apiUrl?: string };
+}

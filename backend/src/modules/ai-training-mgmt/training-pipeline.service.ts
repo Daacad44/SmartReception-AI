@@ -4,6 +4,7 @@ import { businessProfileService } from '../business-profile/business-profile.ser
 import { knowledgeService } from '../knowledge/knowledge.service';
 import { processDocumentById } from '../../infrastructure/documents/document-processing.service';
 import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
+import { hasUsableDocumentEmbedding } from '../../infrastructure/ai/embedding-utils';
 import { workspaceService } from './workspace.service';
 import {
   buildSnapshotDocument,
@@ -207,8 +208,13 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
 
     const toProcess =
       jobType === 'FULL_TRAIN' || jobType === 'RETRAIN'
-        ? documents.filter((d) => d.status !== 'INDEXED')
-        : documents.filter((d) => d.status !== 'INDEXED' || targetDocumentIds?.includes(d.id));
+        ? documents.filter((d) => d.status !== 'INDEXED' || !hasUsableDocumentEmbedding(d.embedding))
+        : documents.filter(
+            (d) =>
+              d.status !== 'INDEXED' ||
+              !hasUsableDocumentEmbedding(d.embedding) ||
+              targetDocumentIds?.includes(d.id)
+          );
 
     for (let i = 0; i < toProcess.length; i++) {
       await updateJobProgress(
@@ -227,7 +233,7 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     const snapshotDocs = documents.map(buildSnapshotDocument);
     const faqCount = documents.filter((d) => d.type === 'FAQ').length;
     const indexedCount = documents.filter((d) => d.status === 'INDEXED').length;
-    const embeddingCount = documents.filter((d) => d.embedding).length;
+    const embeddingCount = documents.filter((d) => hasUsableDocumentEmbedding(d.embedding)).length;
     const totalChunks = snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0);
     const productCount = documents.filter((d) => d.category?.toLowerCase().includes('product')).length;
     const serviceCount = await prisma.service.count({ where: { businessId } });

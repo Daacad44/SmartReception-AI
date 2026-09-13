@@ -16,8 +16,11 @@ All secrets must be set in `.env` (local) or your hosting provider (Vercel, Rail
 | `JWT_SECRET` | Backend | Access token signing secret |
 | `JWT_REFRESH_SECRET` | Backend | Refresh token signing secret |
 | `RESEND_API_KEY` | Backend | OTP and team invite emails |
-| `FRONTEND_URL` | Backend | CORS + email links |
-| `VITE_API_URL` | Frontend | API base path (e.g. `/api/v1`) |
+| `FRONTEND_URL` | Backend | CORS + email links. Production: `https://somreception.com` |
+| `CORS_ALLOWED_ORIGINS` | Backend | Optional comma-separated extra frontend origins |
+| `VITE_API_URL` | Frontend | API base path (e.g. `/api/v1` same-origin, or full API URL) |
+| `BACKEND_UPSTREAM` | Frontend nginx | Internal API URL the SPA proxies to (default `http://backend:3001`) |
+| `PUBLIC_API_URL` | Frontend nginx | Runtime API base written to `runtime-config.js` (default `/api/v1`) |
 
 ## Supabase (storage + realtime)
 

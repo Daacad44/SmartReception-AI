@@ -1,51 +1,121 @@
 import { config } from '../../config';
-import { ForbiddenError } from '../../core/errors';
+import { TooManyRequestsError } from '../../core/errors';
 import { logger } from '../../core/logger';
+import { LOGIN_RATE_LIMIT_MAX, LOGIN_RATE_LIMIT_WINDOW_MS } from '../../core/rate-limit-store';
 
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
+const MAX_ATTEMPTS = LOGIN_RATE_LIMIT_MAX;
+const LOCKOUT_MS = LOGIN_RATE_LIMIT_WINDOW_MS;
 
 interface AttemptRecord {
   count: number;
-  lockedUntil?: number;
+  firstAttemptAt: number;
 }
 
 const memoryStore = new Map<string, AttemptRecord>();
 
-function getKey(email: string, ip?: string): string {
-  return `${email.toLowerCase()}:${ip ?? 'unknown'}`;
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
-export function assertLoginAllowed(email: string, ip?: string): void {
-  const key = getKey(email, ip);
-  const record = memoryStore.get(key);
-  if (!record?.lockedUntil) return;
+function emailKey(email: string): string {
+  return `login_fail:email:${normalizeEmail(email)}`;
+}
 
-  if (Date.now() < record.lockedUntil) {
-    const minutes = Math.ceil((record.lockedUntil - Date.now()) / 60000);
-    throw new ForbiddenError(
-      `Too many failed login attempts. Try again in ${minutes} minute(s).`
+function ipKey(ip?: string): string {
+  return `login_fail:ip:${ip || 'unknown'}`;
+}
+
+async function readRecord(key: string): Promise<AttemptRecord | undefined> {
+  if (config.redis.url) {
+    try {
+      const { getRedis } = await import('../cache/redis');
+      const raw = await getRedis().get(key);
+      if (!raw) return undefined;
+      return JSON.parse(raw) as AttemptRecord;
+    } catch (error) {
+      logger.warn('Login lockout Redis read failed; using memory fallback', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return memoryStore.get(key);
+}
+
+async function writeRecord(key: string, record: AttemptRecord): Promise<void> {
+  memoryStore.set(key, record);
+  if (!config.redis.url) return;
+  try {
+    const { getRedis } = await import('../cache/redis');
+    const ttlSeconds = Math.max(1, Math.ceil((record.firstAttemptAt + LOCKOUT_MS - Date.now()) / 1000));
+    await getRedis().set(key, JSON.stringify(record), 'EX', ttlSeconds);
+  } catch (error) {
+    logger.warn('Login lockout Redis write failed; memory fallback in use', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function deleteRecord(key: string): Promise<void> {
+  memoryStore.delete(key);
+  if (!config.redis.url) return;
+  try {
+    const { getRedis } = await import('../cache/redis');
+    await getRedis().del(key);
+  } catch {
+    // ignore
+  }
+}
+
+function remainingSeconds(record: AttemptRecord): number {
+  return Math.max(1, Math.ceil((record.firstAttemptAt + LOCKOUT_MS - Date.now()) / 1000));
+}
+
+function isWindowExpired(record: AttemptRecord): boolean {
+  return Date.now() >= record.firstAttemptAt + LOCKOUT_MS;
+}
+
+async function assertKeyAllowed(key: string): Promise<void> {
+  const record = await readRecord(key);
+  if (!record) return;
+  if (isWindowExpired(record)) {
+    await deleteRecord(key);
+    return;
+  }
+  if (record.count >= MAX_ATTEMPTS) {
+    throw new TooManyRequestsError(
+      'Too many login attempts. Please try again later.',
+      remainingSeconds(record)
     );
   }
-
-  memoryStore.delete(key);
 }
 
-export function recordFailedLogin(email: string, ip?: string): void {
-  const key = getKey(email, ip);
-  const record = memoryStore.get(key) ?? { count: 0 };
-  record.count += 1;
+export async function assertLoginAllowed(email: string, ip?: string): Promise<void> {
+  await assertKeyAllowed(emailKey(email));
+  await assertKeyAllowed(ipKey(ip));
+}
+
+async function incrementKey(key: string): Promise<void> {
+  const existing = await readRecord(key);
+  const record: AttemptRecord =
+    !existing || isWindowExpired(existing)
+      ? { count: 1, firstAttemptAt: Date.now() }
+      : { count: existing.count + 1, firstAttemptAt: existing.firstAttemptAt };
 
   if (record.count >= MAX_ATTEMPTS) {
-    record.lockedUntil = Date.now() + LOCKOUT_MS;
-    logger.warn(`Login lockout triggered for ${email} from ${ip ?? 'unknown'}`);
+    logger.warn('Login lockout window reached', { keyType: key.startsWith('login_fail:email:') ? 'email' : 'ip' });
   }
 
-  memoryStore.set(key, record);
+  await writeRecord(key, record);
 }
 
-export function clearLoginAttempts(email: string, ip?: string): void {
-  memoryStore.delete(getKey(email, ip));
+export async function recordFailedLogin(email: string, ip?: string): Promise<void> {
+  await incrementKey(emailKey(email));
+  await incrementKey(ipKey(ip));
+}
+
+export async function clearLoginAttempts(email: string, ip?: string): Promise<void> {
+  await deleteRecord(emailKey(email));
+  await deleteRecord(ipKey(ip));
 }
 
 export function getLoginLockoutConfig() {

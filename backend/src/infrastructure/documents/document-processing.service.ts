@@ -6,6 +6,7 @@ import { extractDocumentText } from '../../modules/knowledge/document-processor'
 import { generateEmbeddings, extractKnowledge } from '../ai/gemini.service';
 import { invalidateKnowledgeCache } from '../ai/knowledge-search.service';
 import { indexDocumentChunks } from '../ai/rag/chunk-indexer.service';
+import { hasUsableDocumentEmbedding } from '../ai/embedding-utils';
 import { logger } from '../../core/logger';
 import { notifyKnowledge } from '../notifications/notification-helper';
 
@@ -54,7 +55,7 @@ export async function processDocumentById(documentId: string, businessId: string
     throw new Error('Document not found');
   }
 
-  if (document.status === 'INDEXED') {
+  if (document.status === 'INDEXED' && hasUsableDocumentEmbedding(document.embedding)) {
     return;
   }
 
@@ -91,18 +92,23 @@ export async function processDocumentById(documentId: string, businessId: string
       embedding: embeddings[index] ?? null,
     }));
 
+    const vectorSearchEnabled = embeddings.some((e) => e !== null);
     await prisma.knowledgeDocument.update({
       where: { id: documentId },
       data: {
-        status: 'INDEXED',
+        status: vectorSearchEnabled ? 'INDEXED' : 'FAILED',
         embedding: JSON.stringify({
           chunks: indexedChunks,
           chunkCount: chunks.length,
-          vectorSearchEnabled: embeddings.some((e) => e !== null),
+          vectorSearchEnabled,
         }),
-        processingError: null,
+        processingError: vectorSearchEnabled ? null : 'Embedding generation failed',
       },
     });
+
+    if (!vectorSearchEnabled) {
+      throw new Error('Embedding generation failed');
+    }
 
     logger.info(`Document ${documentId} indexed with ${chunks.length} chunks`);
     invalidateKnowledgeCache(businessId);

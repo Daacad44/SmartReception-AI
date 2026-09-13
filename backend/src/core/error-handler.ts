@@ -6,6 +6,7 @@ import {
   ConflictError,
   NotFoundError,
   RouteNotFoundError,
+  TooManyRequestsError,
   ValidationError,
   WhatsAppDeliveryError,
 } from './errors';
@@ -25,6 +26,7 @@ const NOISY_ROUTE_PATTERNS = [
 type ErrorBody = {
   success: false;
   error: string;
+  message: string;
   code: string;
   requestId?: string;
   details?: unknown;
@@ -183,6 +185,7 @@ function sendError(req: Request, res: Response, resolved: ReturnType<typeof norm
   const body: ErrorBody = {
     success: false,
     error: resolved.message,
+    message: resolved.message,
     code: resolved.code,
     requestId: req.requestId,
   };
@@ -191,6 +194,9 @@ function sendError(req: Request, res: Response, resolved: ReturnType<typeof norm
   }
   if (config.env !== 'production' && resolved.statusCode >= 500) {
     body.stack = resolved.original.stack;
+  }
+  if (resolved.original instanceof TooManyRequestsError) {
+    res.setHeader('Retry-After', String(resolved.original.retryAfterSeconds));
   }
   res.status(resolved.statusCode).json(body);
 }
