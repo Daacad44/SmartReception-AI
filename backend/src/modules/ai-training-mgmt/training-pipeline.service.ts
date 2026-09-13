@@ -230,7 +230,10 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     const embeddingCount = documents.filter((d) => d.embedding).length;
     const totalChunks = snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0);
     const productCount = documents.filter((d) => d.category?.toLowerCase().includes('product')).length;
-    const serviceCount = await prisma.service.count({ where: { businessId } });
+    const [serviceCount, pricedServiceCount] = await Promise.all([
+      prisma.service.count({ where: { businessId, isActive: true } }),
+      prisma.service.count({ where: { businessId, isActive: true, price: { not: null } } }),
+    ]);
 
     const snapshot: TrainingSnapshot = {
       profile,
@@ -239,6 +242,9 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       indexedCount,
       embeddingCount,
       totalChunks,
+      productCount,
+      serviceCount,
+      hasPricing: pricedServiceCount > 0,
       capturedAt: new Date().toISOString(),
     };
 

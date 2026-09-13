@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import api, { extractData, extractMessage, getErrorMessage, getErrorCode } from '@/lib/api';
+import api, { extractData, extractMessage, getErrorMessage, getErrorCode, getRetryAfterSeconds } from '@/lib/api';
 import type { LoginCredentials, RegisterData, UserProfile } from '@/lib/types';
 import { useAuthStore } from '@/stores/auth.store';
 import { useAuthReady } from '@/hooks/useAuthReady';
@@ -318,6 +318,8 @@ export function useAuth() {
     resetPassword: resetPasswordMutation.mutate,
     logout,
     isLoggingIn: loginMutation.isPending,
+    loginError: loginMutation.error ? getErrorMessage(loginMutation.error) : null,
+    loginRetryAfter: getRetryAfterSeconds(loginMutation.error),
     isVerifyingTwoFactor: verifyTwoFactorMutation.isPending,
     isRegistering: registerMutation.isPending,
     isVerifyingOtp: verifyOtpMutation.isPending,

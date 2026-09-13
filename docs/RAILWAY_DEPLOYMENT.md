@@ -97,7 +97,8 @@ SUPABASE_SERVICE_ROLE_KEY=<same as Vercel>
 
 ### `api` only (not needed by the worker)
 ```
-FRONTEND_URL=<Vercel production domain, e.g. https://somreception.botandev.com>
+FRONTEND_URL=<production frontend origin, e.g. https://somreception.com>
+CORS_ORIGINS=
 WHATSAPP_VERIFY_TOKEN=<same as Vercel — Meta's webhook re-verification must match>
 WHATSAPP_ACCESS_TOKEN=<same as Vercel>
 WHATSAPP_PHONE_NUMBER_ID=<same as Vercel>

@@ -1,8 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,8 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-  const { login, isLoggingIn } = useAuth();
+  const { login, isLoggingIn, loginError, loginRetryAfter } = useAuth();
+  const [retrySeconds, setRetrySeconds] = useState<number | null>(null);
   const {
     register,
     handleSubmit,
@@ -29,6 +31,18 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  useEffect(() => {
+    if (loginRetryAfter == null || loginRetryAfter <= 0) {
+      setRetrySeconds(null);
+      return;
+    }
+    setRetrySeconds(loginRetryAfter);
+    const timer = window.setInterval(() => {
+      setRetrySeconds((current) => (current && current > 1 ? current - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [loginRetryAfter, loginError]);
 
   return (
     <div className="flex min-h-screen">
@@ -55,6 +69,20 @@ export function LoginPage() {
             <CardDescription>Sign in to your {BRAND_NAME} account</CardDescription>
           </CardHeader>
           <CardContent>
+            {loginError && (
+              <div
+                role="alert"
+                className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p>{loginError}</p>
+                  {retrySeconds != null && retrySeconds > 0 && (
+                    <p className="mt-1 text-xs">Try again in {retrySeconds} seconds.</p>
+                  )}
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSubmit((data) => login(data))} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

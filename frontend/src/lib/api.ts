@@ -2,7 +2,15 @@ import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestCo
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  return import.meta.env.PROD ? '/api/v1' : 'http://localhost:3001/api/v1';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const API_TIMEOUT_MS = 15_000;
 
 export const api = axios.create({
@@ -38,11 +46,18 @@ export function extractMessage(response: AxiosResponse<ApiResponse>, fallback: s
 
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
+    if (error.response?.status === 429) {
+      const data = error.response.data as ApiResponse | undefined;
+      return data?.message || data?.error || 'Too many login attempts. Please try again later.';
+    }
     const data = error.response?.data as ApiResponse & {
       details?: Array<{ field?: string; message?: string }>;
     };
     if (data?.details?.length) {
       return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
+    }
+    if (!error.response && (error.message === 'Network Error' || error.code === 'ERR_NETWORK')) {
+      return 'Unable to reach the server. Please try again later.';
     }
     return data?.error || data?.message || error.message;
   }
@@ -50,6 +65,13 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'An unexpected error occurred';
+}
+
+export function getRetryAfterSeconds(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error) || error.response?.status !== 429) return undefined;
+  const header = error.response.headers?.['retry-after'] ?? error.response.headers?.['Retry-After'];
+  const parsed = Number.parseInt(String(header ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 export function isNetworkOrTimeoutError(error: unknown): boolean {

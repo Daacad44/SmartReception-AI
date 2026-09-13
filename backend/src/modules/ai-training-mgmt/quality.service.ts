@@ -10,6 +10,7 @@ export interface TrainingSnapshotDocument {
   answer: string | null;
   embedding: string | null;
   chunkCount: number;
+  category?: string | null;
 }
 
 export interface TrainingSnapshot {
@@ -19,6 +20,9 @@ export interface TrainingSnapshot {
   indexedCount: number;
   embeddingCount: number;
   totalChunks: number;
+  productCount?: number;
+  serviceCount?: number;
+  hasPricing?: boolean;
   capturedAt: string;
 }
 
@@ -33,40 +37,76 @@ export interface QualityScores {
   knowledgeFreshness: number;
 }
 
-const PROFILE_FIELDS = [
-  'businessName',
-  'description',
-  'mission',
-  'vision',
-  'products',
-  'services',
-  'pricing',
-  'workingHours',
-  'languages',
-  'supportPolicy',
-  'refundPolicy',
-  'cancellationPolicy',
-  'faqs',
-  'contactEmail',
-  'contactPhone',
-  'website',
-  'brandTone',
-] as const;
+function filled(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as object).length > 0;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
+  return String(value).trim() !== '';
+}
+
+function profileDescription(profile: Partial<BusinessProfile>): unknown {
+  return (
+    profile.businessDescription ||
+    profile.companyOverview ||
+    profile.aboutUs ||
+    profile.companySummary ||
+    profile.companyIntroduction ||
+    profile.shortIntroduction ||
+    profile.longIntroduction
+  );
+}
+
+/**
+ * Completeness checks mapped to real BusinessProfile columns and related
+ * knowledge (FAQs, services, product docs). Phantom fields such as
+ * `description` / `contactEmail` are resolved via aliases so a filled
+ * profile is not scored as empty.
+ */
+export function profileCompletenessHits(snapshot: TrainingSnapshot): number {
+  const profile = snapshot.profile;
+  if (!profile) return 0;
+
+  const hasFaqs = snapshot.faqCount > 0 || snapshot.documents.some((d) => d.type === 'FAQ');
+  const productCount =
+    snapshot.productCount ??
+    snapshot.documents.filter((d) => d.category?.toLowerCase().includes('product')).length;
+  const serviceCount = snapshot.serviceCount ?? 0;
+  const hasPricing = snapshot.hasPricing ?? false;
+  const checks = [
+    filled(profile.businessName),
+    filled(profileDescription(profile)),
+    filled(profile.mission),
+    filled(profile.vision),
+    productCount > 0,
+    serviceCount > 0,
+    hasPricing,
+    filled(profile.workingHours),
+    filled(profile.languages),
+    filled(profile.targetAudience),
+    filled(profile.whyChooseUs),
+    filled(profile.address) || filled(profile.city),
+    hasFaqs,
+    filled(profile.email) || filled(profile.supportEmail),
+    filled(profile.phone) || filled(profile.whatsapp),
+    filled(profile.website),
+    filled(profile.brandTone),
+  ];
+
+  return checks.filter(Boolean).length;
+}
+
+export const PROFILE_COMPLETENESS_TOTAL = 17;
 
 export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScores {
-  const profile = snapshot.profile;
   const docs = snapshot.documents;
   const indexed = docs.filter((d) => d.status === 'INDEXED');
   const withEmbeddings = docs.filter((d) => d.embedding);
 
-  const profileFilled = profile
-    ? PROFILE_FIELDS.filter((f) => {
-        const val = profile[f as keyof typeof profile];
-        return val !== null && val !== undefined && String(val).trim() !== '';
-      }).length
-    : 0;
-  const knowledgeCompleteness = profile
-    ? Math.round((profileFilled / PROFILE_FIELDS.length) * 100)
+  const profileFilled = profileCompletenessHits(snapshot);
+  const knowledgeCompleteness = snapshot.profile
+    ? Math.round((profileFilled / PROFILE_COMPLETENESS_TOTAL) * 100)
     : 0;
 
   const hasFaqs = snapshot.faqCount > 0 || docs.some((d) => d.type === 'FAQ');
@@ -115,6 +155,12 @@ export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScore
   };
 }
 
+export function readinessStatus(score: number): 'healthy' | 'degraded' | 'critical' {
+  if (score >= 70) return 'healthy';
+  if (score >= 40) return 'degraded';
+  return 'critical';
+}
+
 export function buildSnapshotDocument(doc: {
   id: string;
   title: string;
@@ -124,6 +170,7 @@ export function buildSnapshotDocument(doc: {
   question: string | null;
   answer: string | null;
   embedding: string | null;
+  category?: string | null;
 }): TrainingSnapshotDocument {
   let chunkCount = 0;
   if (doc.embedding) {

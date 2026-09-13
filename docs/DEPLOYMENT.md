@@ -145,8 +145,21 @@ JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-FRONTEND_URL=https://app.smartreception.ai
+FRONTEND_URL=https://somreception.com
 ```
+
+### Coolify (current production frontend)
+
+`https://somreception.com` is served by nginx. For login to work without depending
+on the separate API hostname:
+
+1. Build the frontend with `VITE_API_URL=/api/v1` (do **not** bake
+   `https://api.somreception.botandev.com/api/v1` into the SPA).
+2. Set the frontend container env `API_UPSTREAM` to the internal backend URL
+   (Compose default: `http://backend:3001`; Coolify: the API service's internal URL).
+3. Set backend `FRONTEND_URL=https://somreception.com`.
+4. Point `api.somreception.botandev.com` at the live backend (Railway/Coolify),
+   not a deleted Vercel deployment.
 
 ---
 

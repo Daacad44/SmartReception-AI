@@ -105,6 +105,7 @@ describe('errorHandler', () => {
       assert.equal(response.headers.get('x-request-id'), 'test-req-1');
       assert.equal(body.success, false);
       assert.equal(body.error, 'Customer not found');
+      assert.equal(body.message, 'Customer not found');
       assert.equal(body.code, 'NOT_FOUND');
       assert.equal(body.requestId, 'test-req-1');
       assert.equal('stack' in body, false);

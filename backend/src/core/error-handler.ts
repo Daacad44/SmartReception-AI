@@ -25,6 +25,7 @@ const NOISY_ROUTE_PATTERNS = [
 type ErrorBody = {
   success: false;
   error: string;
+  message: string;
   code: string;
   requestId?: string;
   details?: unknown;
@@ -183,6 +184,7 @@ function sendError(req: Request, res: Response, resolved: ReturnType<typeof norm
   const body: ErrorBody = {
     success: false,
     error: resolved.message,
+    message: resolved.message,
     code: resolved.code,
     requestId: req.requestId,
   };
@@ -213,5 +215,11 @@ export function errorHandler(
 }
 
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
+  if (req.method === 'OPTIONS') {
+    logger.warn('OPTIONS request reached not-found handler', {
+      requestId: req.requestId,
+      path: requestPath(req),
+    });
+  }
   next(new RouteNotFoundError(req.method, requestPath(req)));
 }

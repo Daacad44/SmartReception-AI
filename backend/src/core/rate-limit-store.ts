@@ -1,4 +1,8 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, {
+  type Options,
+  type RateLimitRequestHandler,
+  type ValueDeterminingMiddleware,
+} from 'express-rate-limit';
 import { RedisStore, type RedisReply } from 'rate-limit-redis';
 import Redis from 'ioredis';
 import { config } from '../config';
@@ -23,15 +27,20 @@ export function createRateLimiter(options: {
   max: number;
   message?: string;
   skip?: (req: import('express').Request) => boolean;
-}) {
+  keyGenerator?: ValueDeterminingMiddleware<string>;
+  handler?: Options['handler'];
+}): RateLimitRequestHandler {
   const redis = getRedisClient();
-  const base = {
+  const defaultMessage = options.message ?? 'Too many requests, please try again later';
+  const base: Partial<Options> = {
     windowMs: options.windowMs,
     max: options.max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, error: options.message ?? 'Too many requests, please try again later' },
+    message: { success: false, error: defaultMessage, message: defaultMessage, code: 'RATE_LIMITED' },
     skip: options.skip,
+    keyGenerator: options.keyGenerator,
+    handler: options.handler,
   };
 
   if (redis) {

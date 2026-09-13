@@ -28,6 +28,18 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class InvalidCredentialsError extends AppError {
+  constructor(message = 'Invalid email or password') {
+    super(401, message, 'INVALID_CREDENTIALS');
+  }
+}
+
+export class RateLimitedError extends AppError {
+  constructor(message = 'Too many login attempts. Please try again later.') {
+    super(429, message, 'RATE_LIMITED');
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = 'Forbidden') {
     super(403, message, 'FORBIDDEN');

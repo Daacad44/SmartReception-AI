@@ -9,6 +9,11 @@ import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
 import { sandboxService } from './sandbox.service';
+import {
+  buildSnapshotDocument,
+  calculateQualityScores,
+  readinessStatus,
+} from './quality.service';
 
 export class AiTrainingMgmtService {
   async getDashboard(businessId: string) {
@@ -61,6 +66,11 @@ export class AiTrainingMgmtService {
             status: true,
             fileSize: true,
             updatedAt: true,
+            content: true,
+            question: true,
+            answer: true,
+            embedding: true,
+            category: true,
           },
           orderBy: { updatedAt: 'desc' },
         })
@@ -71,6 +81,25 @@ export class AiTrainingMgmtService {
     const processingCount = documents.filter((d) =>
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
     ).length;
+    const snapshotDocs = documents.map(buildSnapshotDocument);
+    const embeddingCount = documents.filter((d) => d.embedding).length;
+    const [liveChunkCount, liveServiceCount, livePricedServiceCount] = await Promise.all([
+      prisma.knowledgeChunk.count({ where: { businessId, isActive: true } }),
+      prisma.service.count({ where: { businessId, isActive: true } }),
+      prisma.service.count({ where: { businessId, isActive: true, price: { not: null } } }),
+    ]);
+    const liveScores = calculateQualityScores({
+      profile,
+      documents: snapshotDocs,
+      faqCount: faqs.length || documents.filter((d) => d.type === 'FAQ').length,
+      indexedCount,
+      embeddingCount,
+      totalChunks: liveChunkCount || snapshotDocs.reduce((sum, d) => sum + d.chunkCount, 0),
+      productCount: documents.filter((d) => d.category?.toLowerCase().includes('product')).length,
+      serviceCount: liveServiceCount,
+      hasPricing: livePricedServiceCount > 0,
+      capturedAt: new Date().toISOString(),
+    });
 
     return {
       workspace: {
@@ -78,23 +107,30 @@ export class AiTrainingMgmtService {
         productionVersion: workspace.productionVersion,
         sandboxVersion: workspace.sandboxVersion,
         lastTrainedAt: workspace.lastTrainedAt,
-        aiReadinessScore: workspace.aiReadinessScore,
-        knowledgeScore: workspace.knowledgeScore,
-        confidenceScore: workspace.confidenceScore,
-        embeddingCount: workspace.embeddingCount,
-        documentCount: workspace.documentCount,
+        aiReadinessScore: liveScores.readinessScore,
+        knowledgeScore: liveScores.knowledgeScore,
+        confidenceScore: liveScores.confidenceScore,
+        embeddingCount,
+        documentCount: documents.length,
       },
       capabilities,
       businessProfile: profile,
       knowledgeBase: bases[0] ?? null,
-      documents,
+      documents: documents.map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        status: doc.status,
+        fileSize: doc.fileSize,
+        updatedAt: doc.updatedAt,
+      })),
       faqs,
       syncStatus: {
         totalDocuments: documents.length,
         indexed: indexedCount,
         processing: processingCount,
         failed: documents.filter((d) => d.status === 'FAILED').length,
-        embeddings: workspace.embeddingCount,
+        embeddings: embeddingCount,
         lastUpdated: documents[0]?.updatedAt ?? profile.updatedAt,
       },
       trainingQueue: jobs.filter((j) => ['QUEUED', 'RUNNING'].includes(j.status)),
@@ -109,8 +145,8 @@ export class AiTrainingMgmtService {
       auditLogs,
       pendingGovernance,
       aiHealth: {
-        status: (workspace.aiReadinessScore ?? 0) >= 70 ? 'healthy' : (workspace.aiReadinessScore ?? 0) >= 40 ? 'degraded' : 'critical',
-        readinessScore: workspace.aiReadinessScore ?? 0,
+        status: readinessStatus(liveScores.readinessScore),
+        readinessScore: liveScores.readinessScore,
         hasProduction: Boolean(workspace.productionVersionId),
         hasSandbox: Boolean(workspace.sandboxVersionId),
       },

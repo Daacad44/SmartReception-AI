@@ -1,11 +1,13 @@
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
 server {
     listen 80;
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;
-
-    # Docker/Coolify production uses nginx.conf.template (API reverse proxy).
-    # This file remains the static SPA config for local nginx without a backend sidecar.
 
     # NOTE: Do NOT declare a bare `types { }` block here. In nginx a `types`
     # block at server/location scope *replaces* the inherited MIME map
@@ -17,6 +19,31 @@ server {
 
     gzip on;
     gzip_types text/plain text/css application/json application/javascript application/manifest+json text/xml application/xml image/svg+xml;
+
+    # Same-origin API proxy. Browser calls /api/v1/* on this host; nginx
+    # forwards to the Express backend so login does not depend on a separate
+    # API domain (and avoids CORS preflight entirely for the SPA).
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    location = /health {
+        proxy_pass ${API_UPSTREAM}/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     # Service worker: never cache, so new deployments are picked up immediately.
     location = /sw.js {

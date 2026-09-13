@@ -16,7 +16,7 @@ interface TrainerContext {
 function useTrainerApi() {
   const { businessId, token } = useOutletContext<TrainerContext>();
   const client = axios.create({
-    baseURL: import.meta.env.VITE_API_URL ?? '/api',
+    baseURL: import.meta.env.VITE_API_URL || '/api/v1',
     headers: {
       Authorization: `Bearer ${token}`,
       'X-Business-Id': businessId,

@@ -16,8 +16,10 @@ All secrets must be set in `.env` (local) or your hosting provider (Vercel, Rail
 | `JWT_SECRET` | Backend | Access token signing secret |
 | `JWT_REFRESH_SECRET` | Backend | Refresh token signing secret |
 | `RESEND_API_KEY` | Backend | OTP and team invite emails |
-| `FRONTEND_URL` | Backend | CORS + email links |
-| `VITE_API_URL` | Frontend | API base path (e.g. `/api/v1`) |
+| `FRONTEND_URL` | Backend | CORS + email links. Production default: `https://somreception.com` |
+| `CORS_ORIGINS` | Backend | Optional comma-separated extra allowed origins |
+| `VITE_API_URL` | Frontend | API base path. Production Docker/Coolify: `/api/v1` (nginx proxies to the backend) |
+| `API_UPSTREAM` | Frontend container | Internal backend origin for nginx (`http://backend:3001` or the Coolify API service URL) |
 
 ## Supabase (storage + realtime)
 

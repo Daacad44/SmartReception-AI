@@ -32,7 +32,7 @@ export function TrainerLayout() {
     if (!token) return;
 
     const client = axios.create({
-      baseURL: import.meta.env.VITE_API_URL ?? '/api',
+      baseURL: import.meta.env.VITE_API_URL || '/api/v1',
       headers: {
         Authorization: `Bearer ${token}`,
         ...(businessId ? { 'X-Business-Id': businessId } : {}),

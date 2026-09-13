@@ -6,6 +6,7 @@ import { otpService } from '../../infrastructure/auth/otp.service';
 import {
   ConflictError,
   UnauthorizedError,
+  InvalidCredentialsError,
   NotFoundError,
   EmailNotVerifiedError,
   ValidationError,
@@ -23,7 +24,6 @@ function approvalCodeExpiry(): Date {
 }
 import { prisma } from '../../infrastructure/database/prisma';
 import {
-  assertLoginAllowed,
   recordFailedLogin,
   clearLoginAttempts,
 } from '../../infrastructure/auth/login-lockout.service';
@@ -75,18 +75,16 @@ export class AuthService {
   }
 
   async login(input: LoginInput, ipAddress?: string) {
-    assertLoginAllowed(input.email, ipAddress);
-
     const user = await authRepository.findUserByEmail(input.email);
     if (!user || !user.isActive) {
       recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      throw new InvalidCredentialsError();
     }
 
     const valid = await passwordService.compare(input.password, user.passwordHash);
     if (!valid) {
       recordFailedLogin(input.email, ipAddress);
-      throw new UnauthorizedError('Invalid credentials');
+      throw new InvalidCredentialsError();
     }
 
     clearLoginAttempts(input.email, ipAddress);
