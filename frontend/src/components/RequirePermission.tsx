@@ -13,10 +13,11 @@ export function RequirePermission({
   children,
   fallback = '/dashboard',
 }: RequirePermissionProps) {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
 
   if (!hasPermission(permission)) {
-    return <Navigate to={fallback} replace />;
+    const targetFallback = isSuperAdmin ? '/super-admin' : fallback;
+    return <Navigate to={targetFallback} replace />;
   }
 
   return <>{children}</>;

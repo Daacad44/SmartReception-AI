@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, isInitialLoading } from '@/hooks/useAuthQuery';
+import { useAuthStore } from '@/stores/auth.store';
 import api, { extractData } from '@/lib/api';
 import type {
   Conversation,
@@ -447,14 +448,16 @@ export function useConversationActivity(conversationId: string | null) {
 }
 
 export function useConversationSummary() {
+  const currentBusinessId = useAuthStore((s) => s.currentBusinessId);
   return useAuthQuery<{ unreadTotal: number; aiHandlingCount: number; humanNeededCount: number }>({
-    queryKey: ['conversations', 'summary'],
+    queryKey: ['conversations', 'summary', currentBusinessId],
     queryFn: async () => {
       const response = await api.get('/conversations/summary', {
         timeout: CONVERSATIONS_TIMEOUT,
       });
       return extractData(response);
     },
+    enabled: Boolean(currentBusinessId),
     staleTime: 10_000,
     refetchInterval: conversationPollInterval,
   });
@@ -538,8 +541,9 @@ export function useSegments() {
 }
 
 export function useAppointments(params?: { status?: string; customerId?: string }) {
+  const currentBusinessId = useAuthStore((s) => s.currentBusinessId);
   return useAuthQuery<Appointment[]>({
-    queryKey: ['appointments', params],
+    queryKey: ['appointments', currentBusinessId, params],
     queryFn: async () => {
       const response = await api.get('/appointments', {
         params: { limit: 100, ...params },
@@ -548,6 +552,7 @@ export function useAppointments(params?: { status?: string; customerId?: string 
       const items = Array.isArray(data) ? data : [];
       return items.map(transformAppointment);
     },
+    enabled: Boolean(currentBusinessId),
   });
 }
 
@@ -744,14 +749,16 @@ export function useTeamInvitations() {
 }
 
 export function useNotifications() {
+  const currentBusinessId = useAuthStore((s) => s.currentBusinessId);
   return useAuthQuery<Notification[]>({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', currentBusinessId],
     queryFn: async () => {
       const response = await api.get('/notifications');
       const data = extractData(response);
       const items = Array.isArray(data) ? data : [];
       return items.map(transformNotification);
     },
+    enabled: Boolean(currentBusinessId),
   });
 }
 
@@ -790,12 +797,14 @@ export function useAnalytics() {
 }
 
 export function useBilling() {
+  const currentBusinessId = useAuthStore((s) => s.currentBusinessId);
   return useAuthQuery<BillingData>({
-    queryKey: ['billing'],
+    queryKey: ['billing', currentBusinessId],
     queryFn: async () => {
       const response = await api.get('/billing');
       return extractData(response);
     },
+    enabled: Boolean(currentBusinessId),
   });
 }
 

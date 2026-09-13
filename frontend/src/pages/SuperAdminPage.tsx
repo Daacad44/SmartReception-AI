@@ -31,6 +31,10 @@ export function SuperAdminPage() {
     },
   });
 
+  const businessList = Array.isArray(businesses)
+    ? businesses
+    : ((businesses as unknown as { data?: Array<Record<string, unknown>> })?.data ?? []);
+
   if (isLoading) return <LoadingState rows={6} />;
 
   const cards = [
@@ -67,12 +71,16 @@ export function SuperAdminPage() {
             <CardTitle className="text-base">Subscription Plans</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {stats?.planBreakdown?.map((p) => (
-              <div key={p.plan} className="flex items-center justify-between rounded-lg border p-3">
-                <span className="font-medium">{p.plan}</span>
-                <Badge variant="secondary">{p.count}</Badge>
-              </div>
-            ))}
+            {!stats?.planBreakdown?.length ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">No subscription data</p>
+            ) : (
+              stats.planBreakdown.map((p) => (
+                <div key={p.plan} className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="font-medium">{p.plan}</span>
+                  <Badge variant="secondary">{p.count}</Badge>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -81,17 +89,21 @@ export function SuperAdminPage() {
             <CardTitle className="text-base">Recent Businesses</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {businesses?.map((b) => (
-              <div key={String(b.id)} className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <p className="font-medium">{String(b.name)}</p>
-                  <p className="text-xs text-muted-foreground">{String(b.slug)}</p>
+            {businessList.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">No businesses registered yet</p>
+            ) : (
+              businessList.map((b) => (
+                <div key={String(b.id)} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-medium">{String(b.name ?? 'Unnamed')}</p>
+                    <p className="text-xs text-muted-foreground">{String(b.slug ?? '')}</p>
+                  </div>
+                  <Badge variant={b.isActive ? 'default' : 'secondary'}>
+                    {b.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
                 </div>
-                <Badge variant={b.isActive ? 'default' : 'secondary'}>
-                  {b.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

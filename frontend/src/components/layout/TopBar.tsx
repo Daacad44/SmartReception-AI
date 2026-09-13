@@ -23,6 +23,7 @@ import { getInitials, formatRelativeTime } from '@/lib/utils';
 import { InstallButton } from '@/pwa';
 import { BrandLogo } from '@/components/Logo';
 import { BRAND_NAME } from '@/lib/brand';
+import { useAuthStore } from '@/stores/auth.store';
 
 const QUICK_LINKS = [
   { label: 'Conversations', path: '/conversations' },
@@ -41,6 +42,7 @@ interface TopBarProps {
 export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBarProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const { businesses, currentBusiness, switchBusiness } = useBusiness();
   const { data: notifications } = useNotifications();
   const markRead = useMarkNotificationRead();
@@ -50,7 +52,18 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
   const unreadNotifications = notifications?.filter((n) => !n.read).length ?? 0;
   const displayName = user ? `${user.firstName} ${user.lastName}` : 'User';
 
-  const filteredLinks = QUICK_LINKS.filter((item) =>
+  const quickLinks = isSuperAdmin
+    ? [
+        { label: 'Super Admin Dashboard', path: '/super-admin' },
+        { label: 'AI Training Management', path: '/admin/enterprise-ai-intelligence' },
+        { label: 'Business Intelligence', path: '/admin/business-intelligence' },
+        { label: 'Business Management', path: '/admin/businesses' },
+        { label: 'Users', path: '/admin/users' },
+        { label: 'Subscriptions', path: '/admin/subscriptions' },
+      ]
+    : QUICK_LINKS;
+
+  const filteredLinks = quickLinks.filter((item) =>
     item.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -218,7 +231,7 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
             <Button variant="outline" className="hidden gap-2 sm:flex">
               <Building2 className="h-4 w-4 shrink-0" />
               <span className="max-w-[120px] truncate text-sm lg:max-w-[140px]">
-                {currentBusiness?.name ?? 'Select Business'}
+                {currentBusiness?.name ?? (isSuperAdmin ? 'Platform Admin' : 'Select Business')}
               </span>
               <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
             </Button>
@@ -226,19 +239,23 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
           <DropdownMenuContent align="end" sideOffset={8} className="w-56">
             <DropdownMenuLabel>Switch Business</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {businesses.map((biz) => (
-              <DropdownMenuItem
-                key={biz.id}
-                onClick={() => switchBusiness(biz.id)}
-                className={currentBusiness?.id === biz.id ? 'bg-accent/10' : ''}
-              >
-                <Building2 className="mr-2 h-4 w-4" />
-                <div>
-                  <p className="text-sm">{biz.name}</p>
-                  <p className="text-xs text-muted-foreground">{biz.plan}</p>
-                </div>
-              </DropdownMenuItem>
-            ))}
+            {businesses.length === 0 ? (
+              <p className="px-2 py-1.5 text-xs text-muted-foreground">No businesses associated</p>
+            ) : (
+              businesses.map((biz) => (
+                <DropdownMenuItem
+                  key={biz.id}
+                  onClick={() => switchBusiness(biz.id)}
+                  className={currentBusiness?.id === biz.id ? 'bg-accent/10' : ''}
+                >
+                  <Building2 className="mr-2 h-4 w-4" />
+                  <div>
+                    <p className="text-sm">{biz.name}</p>
+                    <p className="text-xs text-muted-foreground">{biz.plan}</p>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -252,7 +269,7 @@ export function TopBar({ onMenuClick, sidebarCollapsed, onSidebarToggle }: TopBa
               </Avatar>
               <div className="hidden text-left md:block">
                 <p className="text-sm font-medium leading-none">{displayName}</p>
-                <p className="text-xs text-muted-foreground">{user?.role}</p>
+                <p className="text-xs text-muted-foreground">{isSuperAdmin ? 'Super Admin' : (user?.role ?? 'User')}</p>
               </div>
               <ChevronDown className="hidden h-4 w-4 opacity-50 md:block" />
             </Button>

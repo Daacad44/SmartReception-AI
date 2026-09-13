@@ -28,9 +28,10 @@ export const PERMISSIONS = {
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
-export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'AGENT' | 'VIEWER' | 'RECEPTIONIST' | 'STAFF';
+export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'AGENT' | 'VIEWER' | 'RECEPTIONIST' | 'STAFF' | 'SUPER_ADMIN';
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  SUPER_ADMIN: Object.values(PERMISSIONS),
   OWNER: Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS['platform:admin']),
   ADMIN: Object.values(PERMISSIONS).filter(
     (p) => !p.startsWith('billing:write') && p !== PERMISSIONS['platform:admin']

@@ -105,11 +105,11 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   const { data: summary } = useConversationSummary();
   const { data: appointments } = useAppointments();
   const { data: billing } = useBilling();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
   const { isFeatureEnabled } = usePlatformFeatures();
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const open = new Set<string>([DEFAULT_OPEN_GROUP]);
+    const open = new Set<string>([isSuperAdmin ? 'Super Admin' : DEFAULT_OPEN_GROUP]);
     const activeGroup = navGroups.find((group) =>
       group.items.some((item) => isRouteMatch(pathname, item.to))
     );
@@ -142,6 +142,10 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   };
 
   const isItemVisible = (item: NavItem) => {
+    if (isSuperAdmin) {
+      if ('permission' in item && item.permission === 'platform:admin') return true;
+      if (item.to.startsWith('/admin') || item.to === '/super-admin') return true;
+    }
     const permission =
       'permission' in item && item.permission
         ? PERMISSIONS[item.permission]
@@ -216,7 +220,7 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
         )}
       >
         <Link
-          to="/dashboard"
+          to={isSuperAdmin ? '/super-admin' : '/dashboard'}
           onClick={onNavigate}
           aria-label={BRAND_NAME}
           className={cn(
@@ -275,7 +279,7 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
         })}
       </nav>
 
-      {hasPermission('billing:read') && !collapsed && (
+      {hasPermission('billing:read') && !isSuperAdmin && !collapsed && (
         <div className="border-t border-white/10 p-4">
           <div className="rounded-lg bg-white/5 p-4">
             <div className="mb-2 flex items-center gap-2">

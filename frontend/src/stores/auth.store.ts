@@ -42,7 +42,11 @@ export const useAuthStore = create<AuthState>()(
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken, isAuthenticated: true }),
 
-      setUser: (user) => set({ user }),
+      setUser: (user) =>
+        set((state) => ({
+          user,
+          isSuperAdmin: state.isSuperAdmin || user.role === 'SUPER_ADMIN',
+        })),
 
       setBusinesses: (businesses) =>
         set({
@@ -52,11 +56,15 @@ export const useAuthStore = create<AuthState>()(
 
       setCurrentBusiness: (businessId) => set({ currentBusinessId: businessId }),
 
-      login: (accessToken, refreshToken, user, isSuperAdmin = false) =>
-        set({
+      login: (accessToken, refreshToken, user, isSuperAdmin = false) => {
+        const superAdminFlag = isSuperAdmin || user.role === 'SUPER_ADMIN';
+        return set({
           accessToken,
           refreshToken,
-          user,
+          user: {
+            ...user,
+            role: superAdminFlag ? 'SUPER_ADMIN' : user.role,
+          },
           businesses: (user.businesses ?? []).map((b) => ({
             id: b.id,
             name: b.name,
@@ -66,9 +74,10 @@ export const useAuthStore = create<AuthState>()(
           })),
           currentBusinessId: user.businesses?.[0]?.id ?? null,
           isAuthenticated: true,
-          isSuperAdmin,
+          isSuperAdmin: superAdminFlag,
           hasHydrated: true,
-        }),
+        });
+      },
 
       logout: () => {
         set({

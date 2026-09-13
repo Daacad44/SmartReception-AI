@@ -173,9 +173,10 @@ const queryClient = new QueryClient({
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
 
   if (isAuthenticated && accessToken) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;

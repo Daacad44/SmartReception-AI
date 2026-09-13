@@ -7,15 +7,15 @@ export function usePermissions() {
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
 
   const currentBusiness = businesses.find((b) => b.id === currentBusinessId) ?? businesses[0];
-  const role = (currentBusiness?.role ?? 'VIEWER') as Role;
-  let permissions = [...(ROLE_PERMISSIONS[role] ?? [])];
+  const role = (isSuperAdmin ? 'SUPER_ADMIN' : (currentBusiness?.role ?? 'VIEWER')) as Role;
+  let permissions = isSuperAdmin
+    ? (Object.values(PERMISSIONS) as Permission[])
+    : [...(ROLE_PERMISSIONS[role] ?? [])];
 
-  if (isSuperAdmin && !permissions.includes(PERMISSIONS['platform:admin'])) {
-    permissions = [...permissions, PERMISSIONS['platform:admin']];
-  }
-
-  const hasPermission = (permission: Permission) => permissions.includes(permission);
-  const hasAnyPermission = (...perms: Permission[]) => perms.some((p) => hasPermission(p));
+  const hasPermission = (permission: Permission) =>
+    isSuperAdmin || permissions.includes(permission);
+  const hasAnyPermission = (...perms: Permission[]) =>
+    isSuperAdmin || perms.some((p) => hasPermission(p));
 
   return { role, permissions, hasPermission, hasAnyPermission, isSuperAdmin };
 }

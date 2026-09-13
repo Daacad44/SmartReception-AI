@@ -43,7 +43,7 @@ function completeAuthLogin(
 
 function mapLoginToProfile(data: LoginResponse): UserProfile {
   const businesses = data.businesses ?? [];
-  const primaryRole = businesses[0]?.role ?? 'AGENT';
+  const primaryRole = data.isSuperAdmin ? 'SUPER_ADMIN' : (businesses[0]?.role ?? 'AGENT');
   return {
     id: data.user.id,
     email: data.user.email,
@@ -63,7 +63,7 @@ function mapLoginToProfile(data: LoginResponse): UserProfile {
 
 function mapProfileToUserProfile(data: ProfileResponse): UserProfile {
   const businesses = data.businesses ?? [];
-  const primaryRole = businesses[0]?.role ?? 'AGENT';
+  const primaryRole = data.isSuperAdmin ? 'SUPER_ADMIN' : (businesses[0]?.role ?? 'AGENT');
   return {
     id: data.id,
     email: data.email,
@@ -138,12 +138,12 @@ export function useAuth() {
       toast.success('Welcome back!');
       const redirect = searchParams.get('redirect');
       const destination =
-        data.isSuperAdmin && !(data.businesses?.length)
-          ? '/super-admin'
-          : data.requiresOnboarding
-            ? '/onboarding'
-            : redirect && redirect.startsWith('/')
-              ? redirect
+        redirect && redirect.startsWith('/') && redirect !== '/login'
+          ? redirect
+          : data.isSuperAdmin
+            ? '/super-admin'
+            : data.requiresOnboarding
+              ? '/onboarding'
               : '/dashboard';
       navigate(destination);
     },
@@ -170,12 +170,15 @@ export function useAuth() {
     onSuccess: (data) => {
       completeAuthLogin(data, login);
       toast.success('Welcome back!');
+      const redirect = searchParams.get('redirect');
       const destination =
-        data.isSuperAdmin && !(data.businesses?.length)
-          ? '/super-admin'
-          : data.requiresOnboarding
-            ? '/onboarding'
-            : '/dashboard';
+        redirect && redirect.startsWith('/') && redirect !== '/login'
+          ? redirect
+          : data.isSuperAdmin
+            ? '/super-admin'
+            : data.requiresOnboarding
+              ? '/onboarding'
+              : '/dashboard';
       navigate(destination);
     },
     onError: (error) => {
@@ -297,7 +300,15 @@ export function useAuth() {
     queryFn: async () => {
       const response = await api.get('/auth/profile');
       const data = extractData<ProfileResponse>(response);
-      return mapProfileToUserProfile(data);
+      const userProfile = mapProfileToUserProfile(data);
+      const store = useAuthStore.getState();
+      if (data.isSuperAdmin !== undefined && store.isSuperAdmin !== data.isSuperAdmin) {
+        useAuthStore.setState({ isSuperAdmin: Boolean(data.isSuperAdmin) });
+      }
+      if (userProfile && (!store.user || store.user.role !== userProfile.role)) {
+        store.setUser(userProfile);
+      }
+      return userProfile;
     },
     enabled: authReady,
   });
