@@ -38,11 +38,19 @@ export function extractMessage(response: AxiosResponse<ApiResponse>, fallback: s
 
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
+    if (error.response?.status === 429) {
+      const data = error.response?.data as ApiResponse | undefined;
+      return (
+        data?.error ||
+        data?.message ||
+        'Too many login attempts, please try again later'
+      );
+    }
     const data = error.response?.data as ApiResponse & {
       details?: Array<{ field?: string; message?: string }>;
     };
     if (data?.details?.length) {
-      return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || error.message;
+      return data.details.map((d) => d.message).filter(Boolean).join(' · ') || data.error || data.message || error.message;
     }
     return data?.error || data?.message || error.message;
   }

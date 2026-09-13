@@ -22,6 +22,8 @@ export function createRateLimiter(options: {
   windowMs: number;
   max: number;
   message?: string;
+  code?: string;
+  keyGenerator?: (req: import('express').Request) => string;
   skip?: (req: import('express').Request) => boolean;
 }) {
   const redis = getRedisClient();
@@ -30,13 +32,24 @@ export function createRateLimiter(options: {
     max: options.max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, error: options.message ?? 'Too many requests, please try again later' },
+    message: {
+      success: false,
+      error: options.message ?? 'Too many requests, please try again later',
+      code: options.code ?? 'RATE_LIMITED',
+    },
+    keyGenerator: options.keyGenerator,
     skip: options.skip,
   };
 
   if (redis) {
     return rateLimit({
       ...base,
+      message: {
+        success: false,
+        error: options.message ?? 'Too many requests, please try again later',
+        message: options.message ?? 'Too many requests, please try again later',
+        code: options.code ?? 'RATE_LIMITED',
+      },
       store: new RedisStore({
         sendCommand: async (command: string, ...args: string[]) => {
           const result = await redis.call(command, ...args);
@@ -46,5 +59,13 @@ export function createRateLimiter(options: {
     });
   }
 
-  return rateLimit(base);
+  return rateLimit({
+    ...base,
+    message: {
+      success: false,
+      error: options.message ?? 'Too many requests, please try again later',
+      message: options.message ?? 'Too many requests, please try again later',
+      code: options.code ?? 'RATE_LIMITED',
+    },
+  });
 }

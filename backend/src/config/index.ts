@@ -2,7 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const PRODUCTION_API_URL = 'https://api.somreception.botandev.com';
-export const PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
+export const PRODUCTION_FRONTEND_URL = 'https://somreception.com';
+export const LEGACY_PRODUCTION_FRONTEND_URL = 'https://somreception.botandev.com';
 const DEFAULT_VERIFY_TOKEN = 'smartreception-verify';
 export const WHATSAPP_WEBHOOK_PATH = '/api/v1/webhooks/whatsapp';
 
