@@ -67,7 +67,23 @@ registerRoute(
   })
 );
 
-// API reads — network-first so data is fresh online, cached copy served offline.
+// Dashboard / billing reads — never race a 6s timeout against a slow query
+// and then serve stale JSON that can crash the UI. Wait for the network;
+// only fall back to cache when the request actually fails (true offline).
+registerRoute(
+  ({ url, request }) =>
+    request.method === 'GET' &&
+    (url.pathname.includes('/api/v1/analytics') || url.pathname.includes('/api/v1/billing')),
+  new NetworkFirst({
+    cacheName: 'api-cache-realtime',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 }),
+    ],
+  })
+);
+
+// Other API reads — network-first so data is fresh online, cached copy served offline.
 // Works cross-origin (api.somreception.com) and same-origin (dev proxy /api).
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.pathname.includes('/api/v1/'),
@@ -104,8 +120,12 @@ setCatchHandler(async ({ request }) => {
 // ---------------------------------------------------------------------------
 // Update lifecycle
 // ---------------------------------------------------------------------------
-// registerType is 'prompt': a new SW installs and *waits*. We only activate it
-// when the user accepts the "Update available" prompt, which posts SKIP_WAITING.
+// registerType is 'autoUpdate': activate the new worker immediately so
+// installed PWAs pick up a deploy on the next launch without a manual prompt.
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();

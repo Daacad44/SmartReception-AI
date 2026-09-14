@@ -34,6 +34,8 @@ import { formatNumber, formatPercent, formatCurrency, getInitials, formatRelativ
 import { ErrorState } from '@/components/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuerySection } from '@/components/QuerySection';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
+import { hasChartData } from '@/lib/dashboard-data';
 
 function KpiCard({
   title,
@@ -82,10 +84,6 @@ const statusColors: Record<string, string> = {
   ai_handling: 'bg-primary/10 text-primary',
 };
 
-function hasChartData<T>(data: T[] | undefined, key: keyof T): boolean {
-  return Boolean(data?.length && data.some((item) => Number(item[key]) > 0));
-}
-
 export function DashboardPage() {
   const {
     data: bundle,
@@ -115,6 +113,7 @@ export function DashboardPage() {
   const aiHandlingCount = bundle?.conversationSummary?.aiHandlingCount ?? 0;
   const humanNeededCount = bundle?.conversationSummary?.humanNeededCount ?? 0;
   const handoff = bundle?.handoffMetrics;
+  const topEmployees = handoff?.topEmployees ?? [];
   const maxBookings = topServices?.[0]?.bookingCount ?? 1;
 
   if (isError && !bundle) {
@@ -163,19 +162,23 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {bundleLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
-        ) : (
-          <>
-            <KpiCard title="Total Conversations" value={stats?.totalConversations ?? 0} growth={stats?.conversationGrowth ?? 0} icon={MessageSquare} />
-            <KpiCard title="Active Customers" value={stats?.activeCustomers ?? 0} growth={stats?.customerGrowth ?? 0} icon={Users} />
-            <KpiCard title="Appointments Today" value={stats?.appointmentsToday ?? 0} growth={stats?.appointmentGrowth ?? 0} icon={Calendar} />
-            <KpiCard title="AI Resolution Rate" value={stats?.aiResolutionRate ?? 0} growth={stats?.aiGrowth ?? 0} icon={Bot} format="percent" />
-          </>
-        )}
-      </div>
+      <SectionErrorBoundary label="dashboard metrics">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {bundleLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          ) : (
+            <>
+              <KpiCard title="Total Conversations" value={stats?.totalConversations ?? 0} growth={stats?.conversationGrowth ?? 0} icon={MessageSquare} />
+              <KpiCard title="Active Customers" value={stats?.activeCustomers ?? 0} growth={stats?.customerGrowth ?? 0} icon={Users} />
+              <KpiCard title="Appointments Today" value={stats?.appointmentsToday ?? 0} growth={stats?.appointmentGrowth ?? 0} icon={Calendar} />
+              <KpiCard title="AI Resolution Rate" value={stats?.aiResolutionRate ?? 0} growth={stats?.aiGrowth ?? 0} icon={Bot} format="percent" />
+            </>
+          )}
+        </div>
+      </SectionErrorBoundary>
 
+      <SectionErrorBoundary label="dashboard charts">
+      <div className="space-y-6">
       {handoff && (
         <Card>
           <CardHeader>
@@ -208,9 +211,9 @@ export function DashboardPage() {
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground mb-2">Top Employees</p>
-                {handoff.topEmployees.length ? (
+                {topEmployees.length ? (
                   <ul className="space-y-1 text-sm">
-                    {handoff.topEmployees.map((employee) => (
+                    {topEmployees.map((employee) => (
                       <li key={employee.userId ?? employee.name} className="flex justify-between">
                         <span>{employee.name}</span>
                         <span className="text-muted-foreground">{employee.handledCount}</span>
@@ -489,8 +492,8 @@ export function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">{conv.customerName}</p>
-                      <Badge className={`text-[10px] ${statusColors[conv.status]}`}>
-                        {conv.status.replace('_', ' ')}
+                      <Badge className={`text-[10px] ${statusColors[conv.status] ?? ''}`}>
+                        {(conv.status ?? '').replace('_', ' ')}
                       </Badge>
                     </div>
                     <p className="line-clamp-2 text-sm text-muted-foreground break-words">
@@ -509,6 +512,8 @@ export function DashboardPage() {
           </QuerySection>
         </CardContent>
       </Card>
+      </div>
+      </SectionErrorBoundary>
     </div>
   );
 }

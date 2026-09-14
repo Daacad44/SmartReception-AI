@@ -10,8 +10,9 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'prompt',
-      // We register + surface the update prompt ourselves via useRegisterSW.
+      registerType: 'autoUpdate',
+      // We register ourselves via useRegisterSW; autoUpdate skip-waits so
+      // installed clients activate a new worker without a manual prompt.
       injectRegister: false,
       includeAssets: [
         'favicon.ico',

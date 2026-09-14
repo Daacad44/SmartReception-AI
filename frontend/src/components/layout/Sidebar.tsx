@@ -34,6 +34,7 @@ import { useConversationSummary, useBilling, useAppointments } from '@/hooks/use
 import { usePermissions } from '@/hooks/usePermissions';
 import { usePlatformFeatures } from '@/hooks/usePlatformFeatures';
 import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
+import { normalizeUsageMetric } from '@/lib/dashboard-data';
 
 const navGroups = [
   {
@@ -104,7 +105,7 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   const { pathname } = useLocation();
   const { data: summary } = useConversationSummary();
   const { data: appointments } = useAppointments();
-  const { data: billing } = useBilling();
+  const { data: billing, isPending: billingPending, isError: billingError } = useBilling();
   const { hasPermission } = usePermissions();
   const { isFeatureEnabled } = usePlatformFeatures();
 
@@ -127,14 +128,22 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   };
 
   const unreadCount = summary?.unreadTotal ?? 0;
-  const upcomingAppointments =
-    appointments?.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length ?? 0;
+  const upcomingAppointments = Array.isArray(appointments)
+    ? appointments.filter((a) => a.status !== 'cancelled' && a.status !== 'completed').length
+    : 0;
 
-  const conversationUsage = billing?.usage?.conversations;
+  const conversationUsage = normalizeUsageMetric(billing?.usage?.conversations);
   const usagePercent =
     conversationUsage && conversationUsage.limit > 0
       ? Math.round((conversationUsage.used / conversationUsage.limit) * 100)
       : 0;
+  const usageLabel = conversationUsage
+    ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
+    : billingError
+      ? 'Usage unavailable'
+      : billingPending
+        ? 'Loading usage...'
+        : null;
 
   const badges: Record<string, number> = {
     conversations: unreadCount,
@@ -283,9 +292,7 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
               <span className="text-xs font-semibold">{billing?.plan ?? 'Starter'} Plan</span>
             </div>
             <p className="mb-3 text-[11px] text-white/50">
-              {conversationUsage
-                ? `${conversationUsage.used.toLocaleString()} / ${conversationUsage.limit.toLocaleString()} conversations`
-                : 'Loading usage...'}
+              {usageLabel ?? 'Usage unavailable'}
             </p>
             <Progress value={usagePercent} className="mb-3 h-1.5 bg-white/10" />
             <Link

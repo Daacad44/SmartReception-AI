@@ -1,12 +1,16 @@
 import { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface SectionErrorBoundaryProps {
   /** Changing this value clears the error state (e.g. the active section key). */
   resetKey?: string;
   /** Human label for the failing area, shown in the fallback. */
   label?: string;
+  /** Compact fallback for chrome (sidebar / top bar) instead of a tall card. */
+  compact?: boolean;
+  className?: string;
   children: ReactNode;
 }
 
@@ -16,9 +20,8 @@ interface SectionErrorBoundaryState {
 }
 
 /**
- * Isolates a single workspace section. A render error in one section shows a
- * localized retry card instead of blanking the entire page, so the header and
- * navigation stay usable and other sections keep working.
+ * Isolates a widget or section. A render error shows a localized retry card
+ * instead of blanking the entire page, so the rest of the shell stays usable.
  */
 export class SectionErrorBoundary extends Component<
   SectionErrorBoundaryProps,
@@ -26,13 +29,17 @@ export class SectionErrorBoundary extends Component<
 > {
   state: SectionErrorBoundaryState = { hasError: false };
 
-  static getDerivedStateFromError(error: Error): SectionErrorBoundaryState {
-    return { hasError: true, message: error.message };
+  static getDerivedStateFromError(error: unknown): SectionErrorBoundaryState {
+    const message = error instanceof Error ? error.message : String(error);
+    return { hasError: true, message };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // Surface the real error for diagnostics — never silently swallow it.
-    console.error(`[AI Workspace] section "${this.props.label ?? 'unknown'}" failed:`, error, info.componentStack);
+    console.error(
+      `[Section] "${this.props.label ?? 'unknown'}" failed:`,
+      error,
+      info.componentStack
+    );
   }
 
   componentDidUpdate(prev: SectionErrorBoundaryProps) {
@@ -45,12 +52,34 @@ export class SectionErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      if (this.props.compact) {
+        return (
+          <div
+            className={cn(
+              'flex items-center justify-center gap-2 px-3 py-2 text-center',
+              this.props.className
+            )}
+          >
+            <p className="text-xs text-muted-foreground">Couldn&apos;t load this</p>
+            <Button variant="outline" size="sm" onClick={this.retry} className="h-7 gap-1 px-2 text-xs">
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </Button>
+          </div>
+        );
+      }
+
       return (
-        <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
+        <div
+          className={cn(
+            'flex min-h-[160px] flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center',
+            this.props.className
+          )}
+        >
           <AlertTriangle className="h-8 w-8 text-destructive/70" />
           <div>
             <p className="text-sm font-medium">
-              This section could not be displayed{this.props.label ? ` (${this.props.label})` : ''}.
+              Couldn&apos;t load this{this.props.label ? ` (${this.props.label})` : ''}.
             </p>
             {import.meta.env.DEV && this.state.message && (
               <p className="mt-1 max-w-md text-xs text-destructive">{this.state.message}</p>

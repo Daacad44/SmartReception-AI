@@ -31,6 +31,22 @@ export interface DashboardStats {
   aiGrowth: number;
 }
 
+export interface HandoffEmployee {
+  userId: string | null;
+  name: string;
+  handledCount: number;
+}
+
+export interface HandoffMetrics {
+  aiResolved: number;
+  humanResolved: number;
+  transferred: number;
+  pendingHumanRequests: number;
+  customerSatisfaction: number;
+  aiSatisfaction: number;
+  topEmployees: HandoffEmployee[];
+}
+
 export interface DashboardBundle {
   stats: DashboardStats;
   revenue: RevenueOverview[];
@@ -43,15 +59,7 @@ export interface DashboardBundle {
     aiHandlingCount: number;
     humanNeededCount?: number;
   };
-  handoffMetrics?: {
-    aiResolved: number;
-    humanResolved: number;
-    transferred: number;
-    pendingHumanRequests: number;
-    customerSatisfaction: number;
-    aiSatisfaction: number;
-    topEmployees: Array<{ userId: string | null; name: string; handledCount: number }>;
-  };
+  handoffMetrics?: HandoffMetrics;
 }
 
 export interface ConversationTrend {
