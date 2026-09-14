@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --test src/hooks/showHandoffOsNotification.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

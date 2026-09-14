@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNotifications } from '@/hooks/useApi';
+import { handoffNotificationUrl, showHandoffOsNotification } from './showHandoffOsNotification';
 
 function playNotificationSound() {
   try {
@@ -41,16 +42,12 @@ export function useHandoffNotificationAlerts() {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           const conversationId =
             typeof data?.conversationId === 'string' ? data.conversationId : undefined;
-          const n = new Notification(notification.title, {
+          void showHandoffOsNotification({
+            title: notification.title,
             body: notification.message,
             tag: notification.id,
-          });
-          if (conversationId) {
-            n.onclick = () => {
-              window.focus();
-              window.location.href = `/conversations?conversation=${conversationId}`;
-            };
-          }
+            url: handoffNotificationUrl(conversationId),
+          }).catch(() => undefined);
         }
       }
 
