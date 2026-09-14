@@ -48,11 +48,11 @@ export class BillingRepository {
   }
 
   getPlanLimits(plan: SubscriptionPlan) {
-    return PLAN_LIMITS[plan];
+    return PLAN_LIMITS[plan] ?? PLAN_LIMITS.FREE;
   }
 
   getPlanPrice(plan: SubscriptionPlan) {
-    return PLAN_PRICES[plan];
+    return PLAN_PRICES[plan] ?? PLAN_PRICES.FREE;
   }
 }
 

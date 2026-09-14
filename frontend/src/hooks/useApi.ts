@@ -36,6 +36,7 @@ import {
   toApiConversationStatus,
 } from '@/lib/conversation-status';
 import type { ConversationActivity } from '@/lib/entities';
+import { normalizeBillingData, normalizeDashboardBundle } from '@/lib/dashboard-data';
 
 export { isInitialLoading };
 
@@ -337,7 +338,7 @@ export function useDashboardBundle() {
       const response = await api.get('/analytics/dashboard-bundle', {
         timeout: ANALYTICS_TIMEOUT,
       });
-      return extractData(response);
+      return normalizeDashboardBundle(extractData(response));
     },
   });
 }
@@ -794,7 +795,7 @@ export function useBilling() {
     queryKey: ['billing'],
     queryFn: async () => {
       const response = await api.get('/billing');
-      return extractData(response);
+      return normalizeBillingData(extractData(response));
     },
   });
 }
