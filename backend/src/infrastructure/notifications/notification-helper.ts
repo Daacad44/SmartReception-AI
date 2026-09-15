@@ -1,6 +1,7 @@
 import { NotificationType, Prisma } from '@prisma/client';
 import { notificationsRepository } from '../../modules/notifications/notifications.repository';
 import { logger } from '../../core/logger';
+import { formatCustomerAlertIdentity } from './customer-alert-identity';
 
 interface CreateNotificationParams {
   businessId: string;
@@ -104,17 +105,29 @@ export async function notifyHumanHandoff(params: {
   businessId: string;
   conversationId: string;
   customerName: string;
+  customerPhone?: string | null;
   title: string;
-  message: string;
+  reason?: string;
   urgent?: boolean;
 }): Promise<void> {
+  const existing = await notificationsRepository.findUnreadEscalationForConversation(
+    params.businessId,
+    params.conversationId
+  );
+  if (existing) return;
+
+  const identity = formatCustomerAlertIdentity(params.customerName, params.customerPhone);
+
   await createNotification({
     businessId: params.businessId,
     type: 'AI_ESCALATION',
     title: params.title,
-    message: `${params.customerName}: ${params.message}`,
+    message: identity,
     data: {
       conversationId: params.conversationId,
+      customerName: params.customerName,
+      customerPhone: params.customerPhone ?? null,
+      reason: params.reason,
       urgent: params.urgent ?? true,
       sound: true,
       desktop: true,
@@ -127,6 +140,7 @@ export async function notifyConversationAssignment(params: {
   userId: string;
   conversationId: string;
   customerName: string;
+  customerPhone?: string | null;
   title: string;
   message: string;
 }): Promise<void> {
@@ -139,6 +153,7 @@ export async function notifyConversationAssignment(params: {
     data: {
       conversationId: params.conversationId,
       customerName: params.customerName,
+      customerPhone: params.customerPhone ?? null,
       sound: true,
       desktop: true,
     },
