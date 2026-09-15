@@ -7,6 +7,7 @@ import {
   notifyHumanHandoff,
   notifyConversationAssignment,
 } from '../../infrastructure/notifications/notification-helper';
+import { formatCustomerAlertIdentity } from '../../infrastructure/notifications/customer-alert-identity';
 import { logConversationActivity } from './conversation-activity.service';
 import { logger } from '../../core/logger';
 
@@ -22,6 +23,20 @@ const ACTIVE_STATUSES: ConversationStatus[] = [
 ];
 
 const ROLE_PRIORITY: UserRole[] = ['OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'RECEPTIONIST', 'STAFF'];
+
+const HUMAN_HANDOFF_STATUSES: ConversationStatus[] = ['HUMAN_NEEDED', 'HUMAN_HANDLING'];
+
+function isAlreadyInHumanHandoff(status: ConversationStatus): boolean {
+  return HUMAN_HANDOFF_STATUSES.includes(status);
+}
+
+function customerAlertPhone(customer: {
+  phone?: string | null;
+  whatsappNumber?: string | null;
+}): string | null {
+  const phone = customer.phone?.trim() || customer.whatsappNumber?.trim() || '';
+  return phone || null;
+}
 
 export function isAiHandlingStatus(status: ConversationStatus): boolean {
   return status === 'AI_HANDLING' || status === 'OPEN';
@@ -88,8 +103,9 @@ async function notifyTeamMembers(params: {
   businessId: string;
   conversationId: string;
   customerName: string;
+  customerPhone?: string | null;
   title: string;
-  message: string;
+  reason: string;
   assigneeId?: string | null;
   urgent?: boolean;
 }): Promise<void> {
@@ -98,31 +114,21 @@ async function notifyTeamMembers(params: {
     include: { user: { select: { id: true, email: true, firstName: true } } },
   });
 
+  // One business-wide row. Do not also write per-member TEAM rows — the
+  // assignee already sees userId-null notifications, which was doubling OS alerts.
   await notifyHumanHandoff({
     businessId: params.businessId,
     conversationId: params.conversationId,
     customerName: params.customerName,
+    customerPhone: params.customerPhone,
     title: params.title,
-    message: params.message,
+    reason: params.reason,
     urgent: params.urgent,
   });
 
   const targets = params.assigneeId
     ? members.filter((member) => member.userId === params.assigneeId)
     : members;
-
-  await Promise.all(
-    targets.map((member) =>
-      notifyConversationAssignment({
-        businessId: params.businessId,
-        userId: member.userId,
-        conversationId: params.conversationId,
-        customerName: params.customerName,
-        title: params.title,
-        message: params.message,
-      })
-    )
-  );
 
   await Promise.all(
     targets.map((member) =>
@@ -148,10 +154,11 @@ export async function initiateHumanHandoff(params: {
 }) {
   const conversation = await prisma.conversation.findFirst({
     where: { id: params.conversationId, businessId: params.businessId },
-    include: { customer: { select: { name: true } } },
+    include: { customer: { select: { name: true, phone: true, whatsappNumber: true } } },
   });
   if (!conversation) return null;
 
+  const alreadyNotified = isAlreadyInHumanHandoff(conversation.status);
   const assigneeId = params.assigneeId ?? (await findBestAssignee(params.businessId));
   const now = new Date();
   const status: ConversationStatus = params.immediateHumanHandling
@@ -175,38 +182,41 @@ export async function initiateHumanHandoff(params: {
     },
   });
 
-  await logConversationActivity({
-    businessId: params.businessId,
-    conversationId: params.conversationId,
-    type: 'CUSTOMER_REQUESTED_HUMAN',
-    title: 'Customer requested human support',
-    description: params.reason,
-    actorUserId: params.actorUserId,
-  });
-
-  if (assigneeId) {
-    const assignee = updated.assignedTo;
+  if (!alreadyNotified) {
     await logConversationActivity({
       businessId: params.businessId,
       conversationId: params.conversationId,
-      type: 'ASSIGNED',
-      title: assignee
-        ? `Assigned to ${assignee.firstName} ${assignee.lastName}`
-        : 'Assigned to team member',
+      type: 'CUSTOMER_REQUESTED_HUMAN',
+      title: 'Customer requested human support',
+      description: params.reason,
       actorUserId: params.actorUserId,
-      metadata: { assigneeId, team: params.team ?? 'SUPPORT' },
+    });
+
+    if (assigneeId) {
+      const assignee = updated.assignedTo;
+      await logConversationActivity({
+        businessId: params.businessId,
+        conversationId: params.conversationId,
+        type: 'ASSIGNED',
+        title: assignee
+          ? `Assigned to ${assignee.firstName} ${assignee.lastName}`
+          : 'Assigned to team member',
+        actorUserId: params.actorUserId,
+        metadata: { assigneeId, team: params.team ?? 'SUPPORT' },
+      });
+    }
+
+    await notifyTeamMembers({
+      businessId: params.businessId,
+      conversationId: params.conversationId,
+      customerName: conversation.customer.name,
+      customerPhone: customerAlertPhone(conversation.customer),
+      title: 'Human support needed',
+      reason: params.reason,
+      assigneeId,
+      urgent: true,
     });
   }
-
-  await notifyTeamMembers({
-    businessId: params.businessId,
-    conversationId: params.conversationId,
-    customerName: conversation.customer.name,
-    title: 'Human support needed',
-    message: params.reason,
-    assigneeId,
-    urgent: true,
-  });
 
   void broadcastConversationEvent(params.businessId, {
     conversationId: params.conversationId,
@@ -309,7 +319,7 @@ export async function assignConversation(params: {
 
   const conversation = await prisma.conversation.findFirst({
     where: { id: params.conversationId, businessId: params.businessId },
-    include: { customer: { select: { name: true } } },
+    include: { customer: { select: { name: true, phone: true, whatsappNumber: true } } },
   });
   if (!conversation) return null;
 
@@ -338,13 +348,18 @@ export async function assignConversation(params: {
     metadata: { assigneeId: params.assigneeId, team: params.team },
   });
 
+  const identity = formatCustomerAlertIdentity(
+    conversation.customer.name,
+    customerAlertPhone(conversation.customer)
+  );
   await notifyConversationAssignment({
     businessId: params.businessId,
     userId: params.assigneeId,
     conversationId: params.conversationId,
     customerName: conversation.customer.name,
+    customerPhone: customerAlertPhone(conversation.customer),
     title: 'Conversation assigned to you',
-    message: `${conversation.customer.name} was assigned to you`,
+    message: `${identity} was assigned to you`,
   });
 
   await notifyAssigneeEmail({

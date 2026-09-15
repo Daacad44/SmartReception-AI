@@ -48,6 +48,21 @@ export class NotificationsRepository {
   async create(data: Prisma.NotificationCreateInput) {
     return prisma.notification.create({ data });
   }
+
+  async findUnreadEscalationForConversation(businessId: string, conversationId: string) {
+    return prisma.notification.findFirst({
+      where: {
+        businessId,
+        type: 'AI_ESCALATION',
+        isRead: false,
+        data: {
+          path: ['conversationId'],
+          equals: conversationId,
+        },
+      },
+      select: { id: true },
+    });
+  }
 }
 
 export const notificationsRepository = new NotificationsRepository();

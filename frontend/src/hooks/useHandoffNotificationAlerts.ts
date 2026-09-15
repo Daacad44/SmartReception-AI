@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useNotifications } from '@/hooks/useApi';
 import { handoffNotificationUrl, showHandoffOsNotification } from './showHandoffOsNotification';
+import {
+  loadHandoffSeenIds,
+  markHandoffSeen,
+  osNotificationTag,
+  seedHandoffSeenIds,
+} from './handoffAlertDedupe';
 
 function playNotificationSound() {
   try {
@@ -22,10 +28,20 @@ function playNotificationSound() {
 /** Plays sound and desktop notifications for urgent handoff alerts. */
 export function useHandoffNotificationAlerts() {
   const { data: notifications } = useNotifications();
-  const seenRef = useRef<Set<string>>(new Set());
+  const seenRef = useRef<Set<string>>(loadHandoffSeenIds());
+  const seededRef = useRef(false);
 
   useEffect(() => {
-    if (!notifications?.length) return;
+    if (!notifications) return;
+
+    if (!seededRef.current) {
+      seededRef.current = true;
+      seedHandoffSeenIds(
+        seenRef.current,
+        notifications.map((notification) => notification.id)
+      );
+      return;
+    }
 
     for (const notification of notifications) {
       if (seenRef.current.has(notification.id)) continue;
@@ -45,13 +61,13 @@ export function useHandoffNotificationAlerts() {
           void showHandoffOsNotification({
             title: notification.title,
             body: notification.message,
-            tag: notification.id,
+            tag: osNotificationTag(conversationId, notification.id),
             url: handoffNotificationUrl(conversationId),
           }).catch(() => undefined);
         }
       }
 
-      seenRef.current.add(notification.id);
+      markHandoffSeen(seenRef.current, notification.id);
     }
   }, [notifications]);
 }
