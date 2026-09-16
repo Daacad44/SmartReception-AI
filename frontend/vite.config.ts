@@ -10,9 +10,8 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'autoUpdate',
-      // We register ourselves via useRegisterSW; autoUpdate skip-waits so
-      // installed clients activate a new worker without a manual prompt.
+      registerType: 'prompt',
+      // Waiting worker stays idle until the user taps Aqbal in UpdatePrompt.
       injectRegister: false,
       includeAssets: [
         'favicon.ico',
