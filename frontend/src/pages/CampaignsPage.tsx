@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Megaphone, Send, Calendar, Radio, Plus, BarChart3, FileText, Trash2, Pencil,
   Users, Check, ChevronRight, ChevronLeft, Truck, Clock, XCircle, Loader2,
-  Sparkles, Pause, Play, Copy, Archive, Route,
+  Sparkles, Pause, Play, Copy, Archive, Route, RefreshCw,
 } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,8 @@ interface Campaign {
   failedCount: number;
   readCount: number;
   failedReason?: string | null;
+  retryCount?: number;
+  lastRetryAt?: string | null;
   responseCount?: number;
   linkClickCount?: number;
   scheduledAt?: string;
@@ -186,21 +188,34 @@ function formatLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const RETRY_HIDDEN_STATUSES = ['RUNNING', 'SENDING', 'ARCHIVED', 'CANCELLED'];
+const MAX_CAMPAIGN_RETRIES = 3;
+const CAMPAIGN_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+
 const CampaignCard = memo(function CampaignCard({
   campaign,
   onPause,
   onResume,
   onDuplicate,
   onArchive,
+  onRetryFailed,
 }: {
   campaign: Campaign;
   onPause?: (id: string) => void;
   onResume?: (id: string) => void;
   onDuplicate?: (id: string) => void;
   onArchive?: (id: string) => void;
+  onRetryFailed?: (campaign: Campaign) => void;
 }) {
   const canPause = ['SCHEDULED', 'RUNNING', 'SENDING'].includes(campaign.status);
   const canResume = campaign.status === 'PAUSED';
+  const retryCount = campaign.retryCount ?? 0;
+  const canShowRetry =
+    campaign.failedCount > 0 && !RETRY_HIDDEN_STATUSES.includes(campaign.status);
+  const inCooldown = campaign.lastRetryAt
+    ? Date.now() - new Date(campaign.lastRetryAt).getTime() < CAMPAIGN_RETRY_COOLDOWN_MS
+    : false;
+  const retryDisabled = retryCount >= MAX_CAMPAIGN_RETRIES || inCooldown;
 
   return (
     <Card>
@@ -229,7 +244,32 @@ const CampaignCard = memo(function CampaignCard({
         {campaign.failedCount > 0 && campaign.failedReason && (
           <p className="line-clamp-2 text-xs text-red-600">{campaign.failedReason}</p>
         )}
+        {retryCount > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Retried {retryCount} {retryCount === 1 ? 'time' : 'times'}
+            {campaign.lastRetryAt
+              ? ` · Last retry ${new Date(campaign.lastRetryAt).toLocaleString()}`
+              : ''}
+          </p>
+        )}
         <div className="flex flex-wrap gap-1">
+          {canShowRetry && onRetryFailed && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={retryDisabled}
+              title={
+                retryCount >= MAX_CAMPAIGN_RETRIES
+                  ? 'Maximum retries reached'
+                  : inCooldown
+                    ? 'Please wait 5 minutes between retries'
+                    : 'Resend to failed recipients only'
+              }
+              onClick={() => onRetryFailed(campaign)}
+            >
+              <RefreshCw className="mr-1 h-3 w-3" />Resend Failed
+            </Button>
+          )}
           {canPause && onPause && (
             <Button size="sm" variant="outline" onClick={() => onPause(campaign.id)}>
               <Pause className="mr-1 h-3 w-3" />Pause
@@ -274,6 +314,7 @@ export function CampaignsPage() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiVersions, setAiVersions] = useState<AiVersion[]>([]);
   const [journeyOpen, setJourneyOpen] = useState(false);
+  const [retryTarget, setRetryTarget] = useState<Campaign | null>(null);
   const [journeyForm, setJourneyForm] = useState({
     name: '',
     description: '',
@@ -389,6 +430,22 @@ export function CampaignsPage() {
       toast.success('Campaign archived');
     },
     onError: () => toast.error('Failed to archive campaign'),
+  });
+
+  const retryFailedMutation = useMutation({
+    mutationFn: async (id: string) =>
+      extractData<{ retried: number; skipped: number }>(await api.post(`/campaigns/${id}/retry-failed`)),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-deliveries'] });
+      setRetryTarget(null);
+      toast.success(
+        `Retrying ${data.retried} failed recipient${data.retried === 1 ? '' : 's'}${
+          data.skipped ? ` (${data.skipped} skipped)` : ''
+        }`
+      );
+    },
+    onError: (error) => toast.error(getErrorMessage(error) || 'Failed to retry campaign'),
   });
 
   const generateAiMutation = useMutation({
@@ -595,6 +652,7 @@ export function CampaignsPage() {
       onResume: (id: string) => resumeMutation.mutate(id),
       onDuplicate: (id: string) => duplicateMutation.mutate(id),
       onArchive: (id: string) => archiveMutation.mutate(id),
+      onRetryFailed: (campaign: Campaign) => setRetryTarget(campaign),
     }),
     [pauseMutation, resumeMutation, duplicateMutation, archiveMutation]
   );
@@ -1444,6 +1502,49 @@ export function CampaignsPage() {
               onClick={() => createJourneyMutation.mutate(journeyForm)}
             >
               Create Journey
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!retryTarget} onOpenChange={(open) => { if (!open) setRetryTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resend failed messages?</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Resend <span className="font-medium text-foreground">{retryTarget?.name}</span> to failed
+              recipients only. Recipients who already received this campaign will not be contacted again.
+            </p>
+            <p>
+              Opted-out, blocked, and invalid numbers are skipped. If the 24-hour WhatsApp session has
+              closed, a linked Meta template (or the account re-engagement template) is used.
+            </p>
+            {retryTarget && (
+              <p className="text-xs">
+                {retryTarget.failedCount} failed · {retryTarget.sentCount} already sent
+                {(retryTarget.retryCount ?? 0) > 0
+                  ? ` · retried ${retryTarget.retryCount} time${retryTarget.retryCount === 1 ? '' : 's'}`
+                  : ''}
+              </p>
+            )}
+          </DialogBody>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setRetryTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-accent hover:bg-accent/90"
+              disabled={!retryTarget || retryFailedMutation.isPending}
+              onClick={() => retryTarget && retryFailedMutation.mutate(retryTarget.id)}
+            >
+              {retryFailedMutation.isPending ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1 h-3 w-3" />
+              )}
+              Resend Failed
             </Button>
           </DialogFooter>
         </DialogContent>
