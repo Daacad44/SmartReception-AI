@@ -61,3 +61,15 @@ test('already FAILED does not emit another status write', () => {
     null
   );
 });
+
+test('FAILED campaign with later successes is reclassified COMPLETED', () => {
+  assert.equal(
+    nextCampaignStatusAfterWebhook({
+      currentStatus: 'FAILED',
+      pendingCount: 0,
+      sentCount: 2,
+      failedCount: 1,
+    }),
+    'COMPLETED'
+  );
+});

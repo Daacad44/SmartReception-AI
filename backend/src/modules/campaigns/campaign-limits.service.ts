@@ -65,6 +65,20 @@ export async function assertCampaignCreateAllowed(
     );
   }
 
+  await assertCampaignMonthlyQuota(businessId, recipientCount, limits);
+
+  return limits;
+}
+
+/** Retry must consume monthly send quota without counting as a new active campaign. */
+export async function assertCampaignMonthlyQuota(
+  businessId: string,
+  additionalSends: number,
+  limits?: CampaignPlanLimits
+): Promise<void> {
+  if (additionalSends <= 0) return;
+
+  const resolved = limits ?? (await getCampaignPlanLimits(businessId));
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
@@ -76,11 +90,9 @@ export async function assertCampaignCreateAllowed(
       sentAt: { gte: monthStart },
     },
   });
-  if (sentThisMonth + recipientCount > limits.maxScheduledMessagesPerMonth) {
+  if (sentThisMonth + additionalSends > resolved.maxScheduledMessagesPerMonth) {
     throw new ValidationError(
-      `Plan limit reached: ${limits.maxScheduledMessagesPerMonth} scheduled messages per month`
+      `Plan limit reached: ${resolved.maxScheduledMessagesPerMonth} scheduled messages per month`
     );
   }
-
-  return limits;
 }

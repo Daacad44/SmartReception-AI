@@ -155,6 +155,19 @@ export class CampaignsController {
     }
   }
 
+  async retryFailed(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await campaignsService.retryFailed(
+        req.user!.businessId!,
+        routeParam(req.params.id),
+        req.user!.userId
+      );
+      res.json({ success: true, data, message: 'Retrying failed recipients' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async analytics(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await campaignsService.getAnalytics(req.user!.businessId!);

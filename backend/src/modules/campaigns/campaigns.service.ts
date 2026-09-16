@@ -5,13 +5,17 @@ import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.
 import type { CustomerType, Prisma } from '@prisma/client';
 import { logger } from '../../core/logger';
 import { enqueueCampaignSend, removeCampaignQueueJobs } from './campaign-queue.utils';
-import { assertCampaignCreateAllowed } from './campaign-limits.service';
+import { assertCampaignCreateAllowed, assertCampaignMonthlyQuota } from './campaign-limits.service';
 import { enqueueCampaignBatches, finalizeCampaignIfComplete } from './campaign-batch.service';
 import { applyCampaignDeliveryStats, getCampaignDeliveryStats } from './campaign-stats.service';
 import { computeNextCampaignRun, type ScheduleConfig } from './campaign-scheduler.service';
 import { personalizeCampaignMessage } from './campaign-personalization.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
+import {
+  getCampaignRetryBlockReason,
+  isRetryableFailedRecipient,
+} from './campaign-retry.util';
 
 type RecipientOptions = {
   segmentId?: string | null;
@@ -609,6 +613,96 @@ export class CampaignsService {
     await prisma.auditLog.create({
       data: { businessId, userId, action: 'UPDATE', entity: 'Campaign', entityId: id, newData: { sendNow: true } },
     });
+  }
+
+  async retryFailed(businessId: string, id: string, userId: string) {
+    const campaign = await prisma.campaign.findFirst({ where: { id, businessId } });
+    if (!campaign) throw new NotFoundError('Campaign not found');
+
+    const blocked = getCampaignRetryBlockReason({
+      status: campaign.status,
+      retryCount: campaign.retryCount,
+      lastRetryAt: campaign.lastRetryAt,
+    });
+    if (blocked) throw new ValidationError(blocked);
+
+    const failedRecipients = await prisma.campaignRecipient.findMany({
+      where: { campaignId: id, status: 'FAILED' },
+      include: {
+        customer: { select: { id: true, phone: true, whatsappNumber: true } },
+      },
+    });
+
+    const optOuts = await prisma.customerCampaignOptOut.findMany({
+      where: { businessId, customerId: { in: failedRecipients.map((r) => r.customerId) } },
+      select: { customerId: true },
+    });
+    const optedOutIds = new Set(optOuts.map((row) => row.customerId));
+
+    const retryable = failedRecipients.filter((recipient) =>
+      isRetryableFailedRecipient({
+        status: recipient.status,
+        phone: recipient.phone || recipient.customer.whatsappNumber || recipient.customer.phone,
+        failedReason: recipient.failedReason,
+        optedOut: optedOutIds.has(recipient.customerId),
+      })
+    );
+
+    if (retryable.length === 0) {
+      throw new ValidationError(
+        'No retryable failed recipients. Permanently failed numbers (opted out, blocked, invalid) are skipped.'
+      );
+    }
+
+    await assertCampaignMonthlyQuota(businessId, retryable.length);
+
+    const nextRunVersion = campaign.runVersion + 1;
+    const retryableIds = retryable.map((r) => r.id);
+    const now = new Date();
+
+    await prisma.$transaction([
+      prisma.campaignRecipient.updateMany({
+        where: { id: { in: retryableIds }, campaignId: id, status: 'FAILED' },
+        data: {
+          status: 'PENDING',
+          isSent: false,
+          whatsappMsgId: null,
+          failedReason: null,
+          runVersion: nextRunVersion,
+        },
+      }),
+      prisma.campaign.update({
+        where: { id },
+        data: {
+          status: 'RUNNING',
+          isSent: false,
+          retryCount: { increment: 1 },
+          lastRetryAt: now,
+          runVersion: nextRunVersion,
+        },
+      }),
+    ]);
+
+    const batches = await enqueueCampaignBatches(id, businessId, nextRunVersion);
+    if (batches === 0) {
+      await finalizeCampaignIfComplete(id, businessId);
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        businessId,
+        userId,
+        action: 'UPDATE',
+        entity: 'Campaign',
+        entityId: id,
+        newData: { retryFailed: true, retried: retryable.length, skipped: failedRecipients.length - retryable.length },
+      },
+    });
+
+    return {
+      retried: retryable.length,
+      skipped: failedRecipients.length - retryable.length,
+    };
   }
 
   async getAnalytics(businessId: string) {

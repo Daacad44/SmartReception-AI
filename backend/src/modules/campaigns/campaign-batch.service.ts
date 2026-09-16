@@ -4,7 +4,9 @@ import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { personalizeCampaignMessage } from './campaign-personalization.service';
 import { syncCampaignDeliveryStats } from './campaign-stats.service';
 import { logger } from '../../core/logger';
-import type { CampaignMessageType } from '@prisma/client';
+import { getWhatsAppSessionWindow } from '../whatsapp/whatsapp-session.service';
+import { resolveCampaignSessionSend } from './campaign-session-send';
+import { isPartialCampaignRetry } from './campaign-retry.util';
 
 const BATCH_SIZE = 50;
 
@@ -19,6 +21,15 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
   const campaign = await prisma.campaign.findFirst({
     where: { id: data.campaignId, businessId: data.businessId },
     include: {
+      template: {
+        select: {
+          name: true,
+          content: true,
+          variables: true,
+          whatsappTemplateName: true,
+          whatsappTemplateLanguage: true,
+        },
+      },
       business: { include: { whatsappAccounts: { where: { isActive: true }, take: 1 } } },
     },
   });
@@ -82,16 +93,42 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
       });
 
       const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
-      const messageType = mapMessageType(campaign.messageType);
+      const sessionWindow = await getWhatsAppSessionWindow('', recipient.customerId);
+      const outbound = resolveCampaignSessionSend({
+        messageType: campaign.messageType,
+        sessionOpen: sessionWindow.isOpen,
+        template: campaign.template,
+        reengagement: {
+          name: whatsappAccount.reengagementTemplateName,
+          language: whatsappAccount.reengagementTemplateLanguage,
+          hasBodyVariable: whatsappAccount.reengagementTemplateHasBodyVariable,
+        },
+        personalization: {
+          businessName: campaign.business.name,
+          customer: recipient.customer,
+        },
+      });
+
+      if (outbound.skipReason) {
+        failed++;
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: { status: 'FAILED', isSent: true, failedReason: outbound.skipReason },
+        });
+        continue;
+      }
 
       const result = await whatsappService.sendOutbound({
         phoneNumberId: whatsappAccount.phoneNumberId,
         to: phone,
         accessToken: resolveStoredToken(whatsappAccount.accessToken),
-        type: messageType,
+        type: outbound.type,
         content,
         mediaUrl: campaign.mediaUrl ?? undefined,
         mediaFilename: campaign.mediaFilename ?? undefined,
+        templateName: outbound.templateName,
+        templateLanguage: outbound.templateLanguage,
+        templateComponents: outbound.templateComponents,
       });
 
       if (result.success) {
@@ -162,21 +199,6 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
   return { sent, failed };
 }
 
-function mapMessageType(type: CampaignMessageType): 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'VIDEO' | 'AUDIO' {
-  switch (type) {
-    case 'IMAGE':
-      return 'IMAGE';
-    case 'DOCUMENT':
-      return 'DOCUMENT';
-    case 'VIDEO':
-      return 'VIDEO';
-    case 'AUDIO':
-      return 'AUDIO';
-    default:
-      return 'TEXT';
-  }
-}
-
 export async function enqueueCampaignBatches(
   campaignId: string,
   businessId: string,
@@ -222,16 +244,26 @@ export async function finalizeCampaignIfComplete(campaignId: string, businessId:
   const { enqueueCampaignSend } = await import('./campaign-queue.utils');
   const { broadcastBusinessEvent } = await import('../../infrastructure/realtime/broadcast.service');
 
+  const recipientVersions = await prisma.campaignRecipient.findMany({
+    where: { campaignId },
+    select: { runVersion: true },
+  });
+  const partialRetry = isPartialCampaignRetry(
+    campaign.runVersion,
+    recipientVersions.map((r) => r.runVersion)
+  );
+
   const isRecurring = campaign.schedule !== 'ONE_TIME';
-  const runsCompleted = campaign.runsCompleted + 1;
+  const runsCompleted = partialRetry ? campaign.runsCompleted : campaign.runsCompleted + 1;
   const stop = shouldStopRecurring({
     runsCompleted,
     repeatCount: campaign.repeatCount,
     repeatUntil: campaign.repeatUntil,
   });
 
-  const nextRunAt =
-    isRecurring && !stop
+  const nextRunAt = partialRetry
+    ? campaign.nextRunAt
+    : isRecurring && !stop
       ? computeNextCampaignRun({
           schedule: campaign.schedule,
           from: new Date(),
@@ -245,7 +277,7 @@ export async function finalizeCampaignIfComplete(campaignId: string, businessId:
 
   const agg = await prisma.campaignRecipient.groupBy({
     by: ['status'],
-    where: { campaignId, runVersion: campaign.runVersion },
+    where: { campaignId },
     _count: { status: true },
   });
   const sent = agg
@@ -265,11 +297,11 @@ export async function finalizeCampaignIfComplete(campaignId: string, businessId:
       lastRunAt: new Date(),
       runsCompleted,
       nextRunAt: oneTimeComplete ? null : nextRunAt,
-      runVersion: isRecurring && !stop ? nextRunVersion : undefined,
+      runVersion: !partialRetry && isRecurring && !stop ? nextRunVersion : undefined,
     },
   });
 
-  if (isRecurring && nextRunAt && !stop) {
+  if (!partialRetry && isRecurring && nextRunAt && !stop) {
     await prisma.campaignRecipient.updateMany({
       where: { campaignId },
       data: { isSent: false, status: 'PENDING', runVersion: nextRunVersion },

@@ -60,6 +60,9 @@ router.post('/:id/cancel', authorize(PERMISSIONS['campaigns:write']), (req, res,
 router.post('/:id/send', authorize(PERMISSIONS['campaigns:write']), (req, res, next) =>
   campaignsController.sendNow(req, res, next)
 );
+router.post('/:id/retry-failed', authorize(PERMISSIONS['campaigns:write']), (req, res, next) =>
+  campaignsController.retryFailed(req, res, next)
+);
 router.post('/:id/pause', authorize(PERMISSIONS['campaigns:write']), (req, res, next) =>
   campaignsController.pause(req, res, next)
 );
