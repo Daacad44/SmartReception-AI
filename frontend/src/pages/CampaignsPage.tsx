@@ -74,6 +74,7 @@ interface Campaign {
   deliveredCount: number;
   failedCount: number;
   readCount: number;
+  failedReason?: string | null;
   responseCount?: number;
   linkClickCount?: number;
   scheduledAt?: string;
@@ -225,6 +226,9 @@ const CampaignCard = memo(function CampaignCard({
           <div><p className="font-semibold text-red-600">{campaign.failedCount}</p><p className="text-muted-foreground">Failed</p></div>
           <div><p className="font-semibold">{campaign.readCount}</p><p className="text-muted-foreground">Read</p></div>
         </div>
+        {campaign.failedCount > 0 && campaign.failedReason && (
+          <p className="line-clamp-2 text-xs text-red-600">{campaign.failedReason}</p>
+        )}
         <div className="flex flex-wrap gap-1">
           {canPause && onPause && (
             <Button size="sm" variant="outline" onClick={() => onPause(campaign.id)}>
@@ -581,7 +585,7 @@ export function CampaignsPage() {
     [campaigns]
   );
   const broadcastCampaigns = useMemo(
-    () => campaigns?.filter((c) => ['COMPLETED', 'SENDING', 'RUNNING', 'PAUSED'].includes(c.status)) ?? [],
+    () => campaigns?.filter((c) => ['COMPLETED', 'FAILED', 'SENDING', 'RUNNING', 'PAUSED'].includes(c.status)) ?? [],
     [campaigns]
   );
 

@@ -34,21 +34,22 @@ export function ConversationModeToggle({
         size="sm"
         variant={!isHumanMode ? 'default' : 'ghost'}
         className={cn(
-          'h-8 gap-1.5 rounded-md px-3 text-xs',
+          'h-8 gap-1.5 rounded-md px-2 text-xs sm:px-3',
           !isHumanMode && 'bg-accent text-white hover:bg-accent/90'
         )}
         disabled={disabled || takeoverPending || returnPending || !isHumanMode}
         onClick={onReturnToAi}
+        aria-label="AI"
       >
         <Bot className="h-3.5 w-3.5" />
-        AI
+        <span className="hidden sm:inline">AI</span>
       </Button>
       <Button
         type="button"
         size="sm"
         variant={isHumanMode ? 'default' : 'ghost'}
         className={cn(
-          'h-8 gap-1.5 rounded-md px-3 text-xs',
+          'h-8 gap-1.5 rounded-md px-2 text-xs sm:px-3',
           isHumanMode && 'bg-accent text-white hover:bg-accent/90'
         )}
         disabled={disabled || takeoverPending || returnPending || (isHumanMode && conversation.status === 'human_handling')}
@@ -59,9 +60,10 @@ export function ConversationModeToggle({
           }
           if (!isHumanMode) onTakeover();
         }}
+        aria-label="Human"
       >
         <User className="h-3.5 w-3.5" />
-        Human
+        <span className="hidden sm:inline">Human</span>
       </Button>
     </div>
   );

@@ -36,7 +36,7 @@ export function SubscriptionTimeline({ items }: SubscriptionTimelineProps) {
           <div className="absolute left-1 top-1 h-5 w-5 rounded-full border-2 border-amber-500/50 bg-slate-950" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className={ACTION_COLORS[item.action] ?? ''}>
+              <Badge variant="outline" className={ACTION_COLORS[item.action] ?? 'border-slate-700 text-slate-300'}>
                 {item.action}
               </Badge>
               <span className="text-xs text-slate-500">

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingState } from '@/components/LoadingState';
+import { SUB_SELECT_CONTENT, SUB_SELECT_ITEM } from '@/components/subscription-admin/theme';
 
 interface SubscriptionRow {
   id: string;
@@ -103,15 +104,15 @@ export function SubscriptionManagementPage() {
                 <Filter className="mr-2 h-4 w-4 text-slate-400" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="TRIAL">Trial</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="EXPIRED">Expired</SelectItem>
-                <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                <SelectItem value="LOCKED">Locked</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              <SelectContent className={SUB_SELECT_CONTENT}>
+                <SelectItem value="all" className={SUB_SELECT_ITEM}>All statuses</SelectItem>
+                <SelectItem value="ACTIVE" className={SUB_SELECT_ITEM}>Active</SelectItem>
+                <SelectItem value="TRIAL" className={SUB_SELECT_ITEM}>Trial</SelectItem>
+                <SelectItem value="PENDING" className={SUB_SELECT_ITEM}>Pending</SelectItem>
+                <SelectItem value="EXPIRED" className={SUB_SELECT_ITEM}>Expired</SelectItem>
+                <SelectItem value="SUSPENDED" className={SUB_SELECT_ITEM}>Suspended</SelectItem>
+                <SelectItem value="LOCKED" className={SUB_SELECT_ITEM}>Locked</SelectItem>
+                <SelectItem value="CANCELLED" className={SUB_SELECT_ITEM}>Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>

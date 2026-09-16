@@ -54,7 +54,13 @@ export function AuditLogsPage() {
                         {log.action} — {log.entity}
                         {log.entityId && <span className="text-muted-foreground font-normal"> #{log.entityId.slice(0, 8)}</span>}
                       </p>
-                      <p className="text-xs text-muted-foreground">{formatRelativeTime(log.createdAt)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {log.user
+                          ? [log.user.firstName, log.user.lastName].filter(Boolean).join(' ') || log.user.email
+                          : 'System'}
+                        {' · '}
+                        {formatRelativeTime(log.createdAt)}
+                      </p>
                     </div>
                   </div>
                   <Badge className={`shrink-0 ${actionColors[log.action] ?? 'bg-muted'}`}>{log.action}</Badge>
