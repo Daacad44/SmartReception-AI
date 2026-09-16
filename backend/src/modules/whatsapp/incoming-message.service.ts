@@ -23,7 +23,12 @@ import {
 import type { SalesFlowContext } from '../../infrastructure/ai/sales-flow.types';
 import { isAutoReplyEnabled } from '../ai/ai-config.service';
 import { processAndSendAiReply } from '../ai/ai-reply.service';
-import { sendAutomatedReply, sendServiceMenu, sendTenantWelcomeMenu } from '../ai/menu-reply.service';
+import {
+  sendAutomatedReply,
+  sendMenuOptionReply,
+  sendServiceMenu,
+  sendTenantWelcomeMenu,
+} from '../ai/menu-reply.service';
 import {
   getMonthlyMessageUsage,
   maybeNotifyUsageThresholds,
@@ -513,6 +518,15 @@ async function runSomaliSalesAgent(params: SomaliSalesAgentParams): Promise<void
 
     const menuOption = parseMenuSelection(params.customerMessage);
     if (menuOption !== null && !activeFlow) {
+      // Option 8 is static pricing copy (MENU_OPTIONS[8]), not a sales questionnaire.
+      if (menuOption === 8) {
+        console.log('[AI] Static menu option', { option: menuOption });
+        await sendMenuOptionReply({ ...base, option: menuOption });
+        invalidateSalesFlowCache(params.conversationId, params.businessId);
+        logPipelineStep(params.pipelineKey, 'menu_option', { option: menuOption });
+        return;
+      }
+
       console.log('[AI] Starting sales consultant flow', { option: menuOption });
       const start = createSalesFlow(menuOption);
       if (start.handled && start.reply) {

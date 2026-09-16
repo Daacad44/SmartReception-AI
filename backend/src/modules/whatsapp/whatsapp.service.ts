@@ -685,7 +685,7 @@ export class WhatsAppModuleService {
     };
   }
 
-  async connectAccount(businessId: string, input: ConnectWhatsAppInput) {
+  async connectAccount(businessId: string, input: ConnectWhatsAppInput, userId?: string) {
     const existing = await prisma.whatsAppAccount.findUnique({
       where: { phoneNumberId: input.phoneNumberId },
     });
@@ -746,6 +746,7 @@ export class WhatsAppModuleService {
     await prisma.auditLog.create({
       data: {
         businessId,
+        userId,
         action: 'CREATE',
         entity: 'WhatsAppAccount',
         entityId: account.id,
@@ -762,7 +763,7 @@ export class WhatsAppModuleService {
     return account;
   }
 
-  async connectFromEnv(businessId: string) {
+  async connectFromEnv(businessId: string, userId?: string) {
     const phoneNumberId = config.whatsapp.phoneNumberId;
     const accessToken = config.whatsapp.accessToken;
     const wabaId = config.whatsapp.businessAccountId;
@@ -782,7 +783,7 @@ export class WhatsAppModuleService {
       displayName: info?.verifiedName,
       wabaId: wabaId || undefined,
       accessToken,
-    });
+    }, userId);
   }
 
   async testConnection(businessId: string, accountId?: string) {
@@ -853,7 +854,7 @@ export class WhatsAppModuleService {
     });
   }
 
-  async disconnectAccount(businessId: string, accountId: string) {
+  async disconnectAccount(businessId: string, accountId: string, userId?: string) {
     const account = await prisma.whatsAppAccount.findFirst({
       where: { id: accountId, businessId },
     });
@@ -871,6 +872,7 @@ export class WhatsAppModuleService {
     await prisma.auditLog.create({
       data: {
         businessId,
+        userId,
         action: 'DELETE',
         entity: 'WhatsAppAccount',
         entityId: accountId,

@@ -15,7 +15,8 @@ import {
   buildAppointmentSummary,
   buildLeadSummary,
 } from './sales-flow-content';
-import { MENU_OPTIONS } from './somali-menu';
+import { MENU_OPTIONS, getMenuOptionContent } from './somali-menu';
+import { FLOW_META_TYPE, resolveActiveSalesFlowFromMessages } from './sales-flow-state';
 import { isValidEmail, INVALID_EMAIL_MESSAGE } from '../appointments/email-validation';
 import { scheduleAppointmentReminders } from '../appointments/appointment-scheduler.service';
 import { sendAppointmentConfirmation } from '../appointments/appointment-notification.service';
@@ -30,8 +31,6 @@ import { resolveCustomerForAppointment } from '../../core/utils/customer-phone';
 import { appointmentsRepository } from '../../modules/appointments/appointments.repository';
 import { notifyAppointment } from '../notifications/notification-helper';
 import { broadcastBusinessEvent } from '../realtime/broadcast.service';
-
-const FLOW_META_TYPE = 'sales_flow';
 
 const SALES_FLOW_CACHE_TTL_MS = 120_000;
 const salesFlowCache = new Map<string, { state: SalesFlowState | null; loadedAt: number }>();
@@ -67,20 +66,13 @@ export async function getActiveSalesFlow(
       isAiGenerated: true,
     },
     orderBy: { createdAt: 'desc' },
-    take: 3,
+    take: 5,
     select: { metadata: true },
   });
 
-  for (const msg of messages) {
-    const meta = msg.metadata as { type?: string; salesFlow?: SalesFlowState } | null;
-    if (meta?.type === FLOW_META_TYPE && meta.salesFlow && meta.salesFlow.phase !== 'completed') {
-      salesFlowCache.set(cacheKey, { state: meta.salesFlow, loadedAt: now });
-      return meta.salesFlow;
-    }
-  }
-
-  salesFlowCache.set(cacheKey, { state: null, loadedAt: now });
-  return null;
+  const state = resolveActiveSalesFlowFromMessages(messages);
+  salesFlowCache.set(cacheKey, { state, loadedAt: now });
+  return state;
 }
 
 export function createSalesFlow(serviceOption: number): SalesFlowResult {
@@ -118,6 +110,15 @@ export function createSalesFlow(serviceOption: number): SalesFlowResult {
       handled: true,
       reply: `${intro}\n\n${CUSTOM_SOFTWARE_TYPE_MENU}`,
       nextState: state,
+    };
+  }
+
+  // Option 8 is informational pricing copy — never start a questionnaire.
+  if (serviceOption === 8) {
+    return {
+      handled: true,
+      reply: getMenuOptionContent(8) ?? intro,
+      nextState: null,
     };
   }
 
@@ -334,7 +335,7 @@ export async function processSalesFlowMessage(
         handled: true,
         reply:
           'Waan ka xunnahay, ballanka lama diiwaangelin karin. Fadlan isku day mar kale ama nagala soo xiriir WhatsApp: +252687716299',
-        nextState: { ...state, answers, questionIndex: APPOINTMENT_QUESTIONS.length - 1 },
+        nextState: { ...state, answers, phase: 'completed' },
       };
     }
 

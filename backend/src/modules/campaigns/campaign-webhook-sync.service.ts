@@ -1,6 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
 import { advanceJourneyAfterStep } from './campaign-journey.service';
+import { syncCampaignDeliveryStatsAndStatus } from './campaign-stats.service';
 
 type WhatsAppStatus = 'sent' | 'delivered' | 'read' | 'failed';
 
@@ -22,30 +23,20 @@ export async function syncCampaignRecipientFromWebhook(params: {
   const businessId = recipient.campaign.businessId;
 
   if (params.status === 'delivered') {
-    await prisma.$transaction([
-      prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: 'DELIVERED', deliveredAt: at },
-      }),
-      prisma.campaign.update({
-        where: { id: campaignId },
-        data: { deliveredCount: { increment: 1 } },
-      }),
-    ]);
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: { status: 'DELIVERED', deliveredAt: at },
+    });
+    await syncCampaignDeliveryStatsAndStatus(campaignId);
     return;
   }
 
   if (params.status === 'read') {
-    await prisma.$transaction([
-      prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: 'READ', readAt: at },
-      }),
-      prisma.campaign.update({
-        where: { id: campaignId },
-        data: { readCount: { increment: 1 } },
-      }),
-    ]);
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: { status: 'READ', readAt: at },
+    });
+    await syncCampaignDeliveryStatsAndStatus(campaignId);
     return;
   }
 
@@ -54,10 +45,7 @@ export async function syncCampaignRecipientFromWebhook(params: {
       where: { id: recipient.id },
       data: { status: 'FAILED', failedReason: params.errorMessage ?? 'Delivery failed' },
     });
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { failedCount: { increment: 1 } },
-    });
+    await syncCampaignDeliveryStatsAndStatus(campaignId);
     return;
   }
 

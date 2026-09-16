@@ -204,7 +204,7 @@ export class WhatsAppController {
       ) {
         return;
       }
-      const account = await whatsappModuleService.connectAccount(req.user!.businessId!, input);
+      const account = await whatsappModuleService.connectAccount(req.user!.businessId!, input, req.user!.userId);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
       next(error);
@@ -234,7 +234,7 @@ export class WhatsAppController {
       ) {
         return;
       }
-      const account = await whatsappModuleService.connectAccount(req.user!.businessId!, signupResult);
+      const account = await whatsappModuleService.connectAccount(req.user!.businessId!, signupResult, req.user!.userId);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
       next(error);
@@ -246,7 +246,7 @@ export class WhatsAppController {
       if (!req.user!.isSuperAdmin) {
         throw new ForbiddenError('Environment-based WhatsApp connect is restricted to Super Admin');
       }
-      const account = await whatsappModuleService.connectFromEnv(req.user!.businessId!);
+      const account = await whatsappModuleService.connectFromEnv(req.user!.businessId!, req.user!.userId);
       res.status(201).json({ success: true, data: account });
     } catch (error) {
       next(error);
@@ -310,7 +310,8 @@ export class WhatsAppController {
       }
       await whatsappModuleService.disconnectAccount(
         req.user!.businessId!,
-        routeParam(req.params.id)
+        routeParam(req.params.id),
+        req.user!.userId
       );
       res.json({ success: true, message: 'WhatsApp account disconnected' });
     } catch (error) {

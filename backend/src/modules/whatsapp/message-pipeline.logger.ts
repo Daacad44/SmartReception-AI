@@ -10,6 +10,7 @@ export type PipelineStep =
   | 'new_conversation_welcome'
   | 'new_conversation_profile_welcome'
   | 'tenant_menu_option'
+  | 'menu_option'
   | 'sales_flow_handled'
   | 'ai_started'
   | 'ai_finished'
