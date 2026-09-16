@@ -7,7 +7,7 @@
  *  - Runtime-cache fonts, images and GET API responses for offline use.
  *  - Serve the SPA shell for navigations, with an offline.html ultimate fallback.
  *  - Handle Web Push notifications + notification clicks.
- *  - Apply updates immediately when the app asks (SKIP_WAITING message).
+ *  - Apply updates only after the user accepts (SKIP_WAITING message).
  */
 import { clientsClaim } from 'workbox-core';
 import {
@@ -120,10 +120,13 @@ setCatchHandler(async ({ request }) => {
 // ---------------------------------------------------------------------------
 // Update lifecycle
 // ---------------------------------------------------------------------------
-// registerType is 'autoUpdate': activate the new worker immediately so
-// installed PWAs pick up a deploy on the next launch without a manual prompt.
+// First install activates immediately so offline/push work on the first visit.
+// Later deploys wait: UpdatePrompt posts SKIP_WAITING after the user taps Aqbal.
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  const isFirstInstall = !self.registration.active;
+  if (isFirstInstall) {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener('message', (event) => {
