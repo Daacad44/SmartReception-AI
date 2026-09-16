@@ -19,6 +19,7 @@ test('131026 / opted out / blocked / invalid are permanent failures', () => {
 test('131047 session errors are retryable, not permanent', () => {
   assert.equal(isPermanentCampaignFailure('(#131047) Re-engagement message'), false);
   assert.equal(isPermanentCampaignFailure('Message failed to send because more than 24 hours have passed (131047)'), false);
+  assert.equal(isPermanentCampaignFailure('Re-engagement message'), false);
 });
 
 test('isRetryableFailedRecipient skips opt-out, empty phone, and permanent fails', () => {
