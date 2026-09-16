@@ -163,11 +163,12 @@ export async function executeGovernanceAction(
         displayName: payload.displayName as string | undefined,
         wabaId: payload.wabaId as string | undefined,
         accessToken: payload.accessToken as string,
-      });
+      }, userId);
     case 'WHATSAPP_DISCONNECT':
       return whatsappModuleService.disconnectAccount(
         businessId,
-        payload.accountId as string
+        payload.accountId as string,
+        userId
       );
     default:
       throw new NotFoundError(`Unsupported governance action: ${request.actionType}`);

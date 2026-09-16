@@ -21,6 +21,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import {
+  SUB_DATE_INPUT,
+  SUB_DIALOG_FOOTER,
+  SUB_OUTLINE_BTN,
+  SUB_SELECT_CONTENT,
+  SUB_SELECT_ITEM,
+} from '@/components/subscription-admin/theme';
 
 export interface AssignSubscriptionDetail {
   business: {
@@ -219,11 +226,11 @@ export function AssignSubscriptionModal({
                 <SelectTrigger className="border-slate-700 bg-slate-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={SUB_SELECT_CONTENT}>
                   {(plans ?? [])
                     .filter((p) => !HIDDEN_PLAN_CODES.includes(p.code))
                     .map((p) => (
-                      <SelectItem key={p.id} value={p.code}>
+                      <SelectItem key={p.id} value={p.code} className={SUB_SELECT_ITEM}>
                         {p.name} — ${Number(p.monthlyPrice)}/mo
                       </SelectItem>
                     ))}
@@ -239,9 +246,9 @@ export function AssignSubscriptionModal({
                 <SelectTrigger className="border-slate-700 bg-slate-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={SUB_SELECT_CONTENT}>
                   {DURATIONS.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
+                    <SelectItem key={d.value} value={d.value} className={SUB_SELECT_ITEM}>
                       {d.label}
                     </SelectItem>
                   ))}
@@ -265,7 +272,7 @@ export function AssignSubscriptionModal({
                 <Label className="text-slate-300">Start Date</Label>
                 <Input
                   type="date"
-                  className="border-slate-700 bg-slate-900"
+                  className={SUB_DATE_INPUT}
                   value={form.startDate}
                   onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
                 />
@@ -274,7 +281,7 @@ export function AssignSubscriptionModal({
                 <Label className="text-slate-300">Exact End Date &amp; Time (optional)</Label>
                 <Input
                   type="datetime-local"
-                  className="border-slate-700 bg-slate-900"
+                  className={SUB_DATE_INPUT}
                   value={form.endDate}
                   onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
                 />
@@ -289,9 +296,9 @@ export function AssignSubscriptionModal({
                 <SelectTrigger className="border-slate-700 bg-slate-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no">No</SelectItem>
-                  <SelectItem value="yes">Yes</SelectItem>
+                <SelectContent className={SUB_SELECT_CONTENT}>
+                  <SelectItem value="no" className={SUB_SELECT_ITEM}>No</SelectItem>
+                  <SelectItem value="yes" className={SUB_SELECT_ITEM}>Yes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -315,9 +322,9 @@ export function AssignSubscriptionModal({
               <SelectTrigger className="border-slate-700 bg-slate-900">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={SUB_SELECT_CONTENT}>
                 {PAYMENT_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
+                  <SelectItem key={s} value={s} className={SUB_SELECT_ITEM}>
                     {s.replace(/_/g, ' ')}
                   </SelectItem>
                 ))}
@@ -333,9 +340,9 @@ export function AssignSubscriptionModal({
               <SelectTrigger className="border-slate-700 bg-slate-900">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={SUB_SELECT_CONTENT}>
                 {PAYMENT_METHODS.map((m) => (
-                  <SelectItem key={m} value={m}>
+                  <SelectItem key={m} value={m} className={SUB_SELECT_ITEM}>
                     {m.replace(/_/g, ' ')}
                   </SelectItem>
                 ))}
@@ -379,8 +386,8 @@ export function AssignSubscriptionModal({
           />
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className={SUB_DIALOG_FOOTER}>
+          <Button variant="outline" className={SUB_OUTLINE_BTN} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
@@ -400,7 +407,7 @@ function Field({ label, value, readonly }: { label: string; value: string; reado
   return (
     <div>
       <Label className="text-slate-400">{label}</Label>
-      <Input className="border-slate-800 bg-slate-900/80" value={value} readOnly={readonly} />
+      <Input className="border-slate-800 bg-slate-900/80 text-slate-100" value={value} readOnly={readonly} />
     </div>
   );
 }

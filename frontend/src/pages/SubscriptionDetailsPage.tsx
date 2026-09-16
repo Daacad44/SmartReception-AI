@@ -32,6 +32,7 @@ import { ExtendSubscriptionModal } from '@/components/subscription-admin/ExtendS
 import { UsageMetricsGrid } from '@/components/subscription-admin/UsageMetricsGrid';
 import { SubscriptionTimeline } from '@/components/subscription-admin/SubscriptionTimeline';
 import { toast } from 'sonner';
+import { SUB_BADGE_MUTED, SUB_OUTLINE_BTN, SUB_TAB_TRIGGER } from '@/components/subscription-admin/theme';
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
@@ -185,12 +186,13 @@ export function SubscriptionDetailsPage() {
             >
               <Plus className="mr-1 h-3 w-3" /> Assign
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setExtendOpen(true)}>
+            <Button size="sm" variant="outline" className={SUB_OUTLINE_BTN} onClick={() => setExtendOpen(true)}>
               <Clock className="mr-1 h-3 w-3" /> Extend
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
+              className={SUB_OUTLINE_BTN}
               onClick={() => actionMutation.mutate({ action: 'pause' })}
               disabled={actionMutation.isPending}
             >
@@ -198,7 +200,8 @@ export function SubscriptionDetailsPage() {
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
+              className={SUB_OUTLINE_BTN}
               onClick={() => actionMutation.mutate({ action: 'resume' })}
               disabled={actionMutation.isPending}
             >
@@ -206,7 +209,8 @@ export function SubscriptionDetailsPage() {
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
+              className={SUB_OUTLINE_BTN}
               onClick={() => actionMutation.mutate({ action: 'unlock' })}
               disabled={actionMutation.isPending}
             >
@@ -214,7 +218,8 @@ export function SubscriptionDetailsPage() {
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
+              className={SUB_OUTLINE_BTN}
               onClick={() => actionMutation.mutate({ action: 'lock' })}
               disabled={actionMutation.isPending}
             >
@@ -280,11 +285,11 @@ export function SubscriptionDetailsPage() {
       )}
 
       <Tabs defaultValue="activity" className="space-y-4">
-        <TabsList className="border border-slate-800 bg-slate-900">
-          <TabsTrigger value="activity">Audit Log</TabsTrigger>
-          <TabsTrigger value="history">Subscription History</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+        <TabsList className="h-auto flex-wrap border border-slate-800 bg-slate-900">
+          <TabsTrigger value="activity" className={SUB_TAB_TRIGGER}>Audit Log</TabsTrigger>
+          <TabsTrigger value="history" className={SUB_TAB_TRIGGER}>Subscription History</TabsTrigger>
+          <TabsTrigger value="payments" className={SUB_TAB_TRIGGER}>Payment History</TabsTrigger>
+          <TabsTrigger value="notifications" className={SUB_TAB_TRIGGER}>Notifications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity">
@@ -349,7 +354,7 @@ export function SubscriptionDetailsPage() {
                       }) => (
                         <TableRow key={h.id} className="border-slate-800">
                           <TableCell>
-                            <Badge variant="outline" className="border-slate-700">
+                            <Badge variant="outline" className={SUB_BADGE_MUTED}>
                               {h.action}
                             </Badge>
                           </TableCell>

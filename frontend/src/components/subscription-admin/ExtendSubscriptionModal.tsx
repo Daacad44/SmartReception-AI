@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { SUB_DATE_INPUT, SUB_DIALOG_FOOTER, SUB_OUTLINE_BTN } from '@/components/subscription-admin/theme';
 
 const EXTEND_PRESETS = [7, 14, 30, 60, 90, 180, 365];
 
@@ -80,7 +81,7 @@ export function ExtendSubscriptionModal({
               key={days}
               size="sm"
               variant="outline"
-              className="border-slate-700"
+              className={SUB_OUTLINE_BTN}
               onClick={() => extendMutation.mutate(days)}
               disabled={extendMutation.isPending}
             >
@@ -109,7 +110,7 @@ export function ExtendSubscriptionModal({
             </p>
             <Input
               type="datetime-local"
-              className="border-slate-700 bg-slate-900"
+              className={SUB_DATE_INPUT}
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
             />
@@ -132,8 +133,8 @@ export function ExtendSubscriptionModal({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className={SUB_DIALOG_FOOTER}>
+          <Button variant="outline" className={SUB_OUTLINE_BTN} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button

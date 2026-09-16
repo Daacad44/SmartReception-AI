@@ -342,7 +342,7 @@ export function AITrainingPage() {
         <LoadingState rows={8} />
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="flex-wrap">
+          <TabsList className="flex h-auto flex-wrap gap-1">
             {!isAdmin && (
               <TabsTrigger value="overview" className="gap-2">
                 <Sparkles className="h-4 w-4" />

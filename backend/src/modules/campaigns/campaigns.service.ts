@@ -391,6 +391,7 @@ export class CampaignsService {
     void this.attachRecipientsAndDispatch({
       campaignId: campaign.id,
       businessId,
+      userId,
       recipientOptions,
       sendNow,
       scheduledAt,
@@ -402,11 +403,12 @@ export class CampaignsService {
   private async attachRecipientsAndDispatch(params: {
     campaignId: string;
     businessId: string;
+    userId: string;
     recipientOptions: RecipientOptions;
     sendNow: boolean;
     scheduledAt: Date | null;
   }) {
-    const { campaignId, businessId, recipientOptions, sendNow, scheduledAt } = params;
+    const { campaignId, businessId, userId, recipientOptions, sendNow, scheduledAt } = params;
 
     for await (const batch of iterateRecipientBatches(businessId, recipientOptions)) {
       await prisma.campaignRecipient.createMany({
@@ -422,7 +424,7 @@ export class CampaignsService {
     }
 
     await prisma.auditLog.create({
-      data: { businessId, action: 'CREATE', entity: 'Campaign', entityId: campaignId },
+      data: { businessId, userId, action: 'CREATE', entity: 'Campaign', entityId: campaignId },
     });
 
     if (sendNow) {
