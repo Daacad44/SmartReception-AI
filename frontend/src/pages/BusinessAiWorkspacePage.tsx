@@ -34,7 +34,6 @@ import type {
   TrainingBusinessCard,
   TrainingOperation,
   TrainingSessionLog,
-  TrainingVerificationRequest,
 } from '@/lib/ai-training-center-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +44,6 @@ import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { DeploymentPanel, AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
-import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { formatNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -232,8 +230,6 @@ export function BusinessAiWorkspacePage() {
   const { businessId } = useParams<{ businessId: string }>();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<SectionKey>('overview');
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [verification, setVerification] = useState<TrainingVerificationRequest | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ['ai-workspace', 'detail', businessId],
@@ -280,12 +276,11 @@ export function BusinessAiWorkspacePage() {
         operation,
         businessIds: [businessId],
       });
-      return extractData<TrainingVerificationRequest>(res);
+      return extractData<{ message?: string }>(res);
     },
     onSuccess: (result) => {
-      setVerification(result);
-      setOtpOpen(true);
-      toast.message('Verification code sent to your email');
+      queryClient.invalidateQueries({ queryKey: ['ai-workspace'] });
+      toast.success(result.message ?? 'Training started');
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -446,16 +441,6 @@ export function BusinessAiWorkspacePage() {
           </SectionErrorBoundary>
         </div>
       </div>
-
-      <TrainingOtpDialog
-        open={otpOpen}
-        onOpenChange={setOtpOpen}
-        verification={verification}
-        onVerified={() => {
-          queryClient.invalidateQueries({ queryKey: ['ai-workspace'] });
-          toast.success('Operation authorized and queued');
-        }}
-      />
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
 import type { GovernanceApprovalRequest, GovernanceCapabilities } from '@/lib/governance';
-import type { TrainingOperation, TrainingVerificationRequest } from '@/lib/ai-training-center-types';
+import type { TrainingOperation } from '@/lib/ai-training-center-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +36,6 @@ import { GovernanceApprovalBanner } from '@/components/governance/GovernanceAppr
 import { SandboxChat } from '@/components/ai-training/SandboxChat';
 import { SandboxValidationPanel } from '@/components/ai-training/SandboxValidationPanel';
 import { DeploymentPanel, AiTrainingVersionsPanel } from '@/components/ai-training/TrainingPanels';
-import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { toast } from 'sonner';
 
 interface AiTrainingOverview {
@@ -159,8 +158,6 @@ export function AITrainingPage() {
     Boolean(searchParams.get('request'))
   );
   const [activeTab, setActiveTab] = useState(isAdmin ? 'profile' : 'overview');
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [verification, setVerification] = useState<TrainingVerificationRequest | null>(null);
   const queryClient = useQueryClient();
 
   const selfServeQuery = useQuery({
@@ -212,12 +209,11 @@ export function AITrainingPage() {
       businessIds: string[];
     }) => {
       const res = await api.post('/super-admin/enterprise-ai-intelligence/verify/request', params);
-      return extractData<TrainingVerificationRequest>(res);
+      return extractData<{ message?: string }>(res);
     },
     onSuccess: (result) => {
-      setVerification(result);
-      setOtpOpen(true);
-      toast.message('Verification code sent to your email');
+      queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] });
+      toast.success(result.message ?? 'Training started');
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -722,17 +718,6 @@ export function AITrainingPage() {
         />
       )}
 
-      {/* Admin-mode OTP dialog */}
-      {isAdmin && (
-        <TrainingOtpDialog
-          open={otpOpen}
-          onOpenChange={setOtpOpen}
-          verification={verification}
-          onVerified={() => {
-            queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] });
-          }}
-        />
-      )}
     </div>
   );
 }
