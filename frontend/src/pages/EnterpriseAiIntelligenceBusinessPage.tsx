@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, FlaskConical, History, RefreshCw, ShieldCheck, Upload } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
-import type { TrainingOperation, TrainingSessionLog, TrainingVerificationRequest } from '@/lib/ai-training-center-types';
+import type { TrainingOperation, TrainingSessionLog } from '@/lib/ai-training-center-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatNumber } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { SandboxChat } from '@/components/ai-training/SandboxChat';
 import { toast } from 'sonner';
 
@@ -42,8 +40,6 @@ interface BusinessDetail {
 export function EnterpriseAiIntelligenceBusinessPage() {
   const { businessId } = useParams<{ businessId: string }>();
   const queryClient = useQueryClient();
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [verification, setVerification] = useState<TrainingVerificationRequest | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['enterprise-ai-intelligence', 'business', businessId],
@@ -61,12 +57,11 @@ export function EnterpriseAiIntelligenceBusinessPage() {
         operation,
         businessIds: [businessId],
       });
-      return extractData<TrainingVerificationRequest>(res);
+      return extractData<{ message?: string }>(res);
     },
     onSuccess: (result) => {
-      setVerification(result);
-      setOtpOpen(true);
-      toast.message('Verification code sent to your email');
+      queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] });
+      toast.success(result.message ?? 'Training started');
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -126,9 +121,9 @@ export function EnterpriseAiIntelligenceBusinessPage() {
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => requestOperation.mutate('TRAIN_ONE')}><RefreshCw className="mr-2 h-4 w-4" />Train</Button>
-            <Button variant="secondary" onClick={() => requestOperation.mutate('RETRAIN_ONE')}>Retrain</Button>
-            <Button variant="outline" onClick={() => requestOperation.mutate('VALIDATE')}>Validate</Button>
+            <Button disabled={requestOperation.isPending} onClick={() => requestOperation.mutate('TRAIN_ONE')}><RefreshCw className="mr-2 h-4 w-4" />Train</Button>
+            <Button variant="secondary" disabled={requestOperation.isPending} onClick={() => requestOperation.mutate('RETRAIN_ONE')}>Retrain</Button>
+            <Button variant="outline" disabled={requestOperation.isPending} onClick={() => requestOperation.mutate('VALIDATE')}>Validate</Button>
           </div>
         </TabsContent>
 
@@ -232,13 +227,6 @@ export function EnterpriseAiIntelligenceBusinessPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <TrainingOtpDialog
-        open={otpOpen}
-        onOpenChange={setOtpOpen}
-        verification={verification}
-        onVerified={() => queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] })}
-      />
     </div>
   );
 }

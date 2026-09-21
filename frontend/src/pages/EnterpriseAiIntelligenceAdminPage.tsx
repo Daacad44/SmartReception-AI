@@ -15,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import api, { extractData, getErrorMessage } from '@/lib/api';
-import type { TrainingBusinessCard, TrainingOperation, TrainingVerificationRequest } from '@/lib/ai-training-center-types';
+import type { TrainingBusinessCard, TrainingOperation } from '@/lib/ai-training-center-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatNumber } from '@/lib/utils';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { TrainingOtpDialog } from '@/components/ai-training/TrainingOtpDialog';
 import { toast } from 'sonner';
 
 interface MonitoringData {
@@ -37,8 +36,6 @@ interface MonitoringData {
 export function EnterpriseAiIntelligenceAdminPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [verification, setVerification] = useState<TrainingVerificationRequest | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -66,12 +63,11 @@ export function EnterpriseAiIntelligenceAdminPage() {
       payload?: Record<string, unknown>;
     }) => {
       const res = await api.post('/super-admin/enterprise-ai-intelligence/verify/request', params);
-      return extractData<TrainingVerificationRequest>(res);
+      return extractData<{ message?: string; operationLabel?: string }>(res);
     },
     onSuccess: (result) => {
-      setVerification(result);
-      setOtpOpen(true);
-      toast.message('Verification code sent to your email');
+      queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] });
+      toast.success(result.message ?? 'Training started');
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -167,22 +163,22 @@ export function EnterpriseAiIntelligenceAdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => startOperation('TRAIN_ONE', selected.size ? [[...selected][0]!] : undefined)}>
+              <Button size="sm" disabled={requestOperation.isPending} onClick={() => startOperation('TRAIN_ONE', selected.size ? [[...selected][0]!] : undefined)}>
                 Train One
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => startOperation('RETRAIN_ONE', selected.size ? [[...selected][0]!] : undefined)}>
+              <Button size="sm" variant="secondary" disabled={requestOperation.isPending} onClick={() => startOperation('RETRAIN_ONE', selected.size ? [[...selected][0]!] : undefined)}>
                 Retrain One
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => startOperation('TRAIN_MULTIPLE')} disabled={!selected.size}>
+              <Button size="sm" variant="secondary" onClick={() => startOperation('TRAIN_MULTIPLE')} disabled={!selected.size || requestOperation.isPending}>
                 Train Selected ({selected.size})
               </Button>
-              <Button size="sm" variant="outline" onClick={() => startOperation('TRAIN_ALL')}>
+              <Button size="sm" variant="outline" disabled={requestOperation.isPending} onClick={() => startOperation('TRAIN_ALL')}>
                 Train All
               </Button>
-              <Button size="sm" variant="outline" onClick={() => startOperation('REBUILD_EMBEDDINGS', selected.size ? [[...selected][0]!] : undefined)}>
+              <Button size="sm" variant="outline" disabled={requestOperation.isPending} onClick={() => startOperation('REBUILD_EMBEDDINGS', selected.size ? [[...selected][0]!] : undefined)}>
                 Rebuild Embeddings
               </Button>
-              <Button size="sm" variant="outline" onClick={() => startOperation('VALIDATE', selected.size ? [[...selected][0]!] : undefined)}>
+              <Button size="sm" variant="outline" disabled={requestOperation.isPending} onClick={() => startOperation('VALIDATE', selected.size ? [[...selected][0]!] : undefined)}>
                 Validate
               </Button>
             </CardContent>
@@ -255,7 +251,7 @@ export function EnterpriseAiIntelligenceAdminPage() {
                       </Link>
                     </Button>
                     <div className="flex gap-2">
-                      <Button size="sm" className="flex-1" onClick={() => startOperation('TRAIN_ONE', [business.businessId])}>
+                      <Button size="sm" className="flex-1" disabled={requestOperation.isPending} onClick={() => startOperation('TRAIN_ONE', [business.businessId])}>
                         <RefreshCw className="mr-1 h-3 w-3" />Train
                       </Button>
                       <Button size="sm" variant="outline" className="flex-1" onClick={() => previewBusiness.mutate(business.businessId)}>
@@ -305,15 +301,6 @@ export function EnterpriseAiIntelligenceAdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <TrainingOtpDialog
-        open={otpOpen}
-        onOpenChange={setOtpOpen}
-        verification={verification}
-        onVerified={() => {
-          queryClient.invalidateQueries({ queryKey: ['enterprise-ai-intelligence'] });
-        }}
-      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
-import type { AiTrainingJobType, AiTrainingOperation, Prisma } from '@prisma/client';
+import type { AiTrainingJobType, AiTrainingOperation } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { otpService } from '../../infrastructure/auth/otp.service';
-import { emailService } from '../../infrastructure/email/email.service';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../core/errors';
 import { recordAiTrainingAudit } from './audit.service';
 import { trainingEngineService } from './training-engine.service';
@@ -36,7 +35,15 @@ const OPERATION_LABELS: Record<AiTrainingOperation, string> = {
 };
 
 export class TrainingVerificationService {
+  /**
+   * Super Admin training runs immediately. No OTP is generated or emailed.
+   * Kept as requestVerification so existing /verify/request clients keep working.
+   */
   async requestVerification(input: TrainingVerificationInput) {
+    return this.executeOperation(input);
+  }
+
+  async executeOperation(input: TrainingVerificationInput) {
     const user = await prisma.user.findUnique({ where: { id: input.userId } });
     if (!user?.isSuperAdmin) {
       throw new ForbiddenError('Only Super Admins can initiate training operations');
@@ -46,53 +53,44 @@ export class TrainingVerificationService {
       throw new ValidationError('At least one business ID is required');
     }
 
-    const code = otpService.generateCode();
-    const otpHash = otpService.hashCode(code);
-    const otpExpiresAt = otpService.getExpiry();
-
-    const request = await prisma.aiTrainingVerificationRequest.create({
-      data: {
-        userId: input.userId,
-        operation: input.operation,
-        jobType: input.jobType,
-        businessIds: input.businessIds,
-        payload: (input.payload ?? undefined) as Prisma.InputJsonValue | undefined,
-        otpHash,
-        otpExpiresAt,
-        status: 'PENDING_OTP',
-        ipAddress: input.ipAddress,
-        userAgent: input.userAgent,
-      },
+    const result = await trainingEngineService.executeVerifiedOperation({
+      operation: input.operation,
+      businessIds: input.businessIds,
+      jobType: input.jobType ?? undefined,
+      payload: input.payload ?? {},
+      userId: input.userId,
     });
-
-    await emailService.sendOtpEmail(input.email, code, input.firstName, 'verification');
 
     const primaryBusinessId = input.businessIds[0];
     if (primaryBusinessId) {
       await recordAiTrainingAudit(
-        { businessId: primaryBusinessId, userId: input.userId, ipAddress: input.ipAddress, userAgent: input.userAgent },
-        'TRAINING_OTP_REQUESTED',
         {
-          entity: 'AiTrainingVerificationRequest',
-          entityId: request.id,
+          businessId: primaryBusinessId,
+          userId: input.userId,
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+        },
+        'TRAIN_STARTED',
+        {
+          entity: 'AiTrainingOperation',
           newData: { operation: input.operation, businessIds: input.businessIds },
         }
       );
     }
 
-    logger.info('Training OTP requested', {
-      requestId: request.id,
+    logger.info('Training operation started without OTP', {
       operation: input.operation,
       businessCount: input.businessIds.length,
+      userId: input.userId,
     });
 
     return {
-      requestId: request.id,
+      ...result,
+      executed: true,
       operation: input.operation,
       operationLabel: OPERATION_LABELS[input.operation],
       businessIds: input.businessIds,
-      otpExpiresAt,
-      message: 'A 6-digit verification code has been sent to your email. Training is locked until verified.',
+      message: `${OPERATION_LABELS[input.operation]} started.`,
     };
   }
 
