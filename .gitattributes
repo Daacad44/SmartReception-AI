@@ -1,8 +1,1 @@
-# Use Unix line endings for all text files
-*.txt text eol=lf
-
-# Treat lock files as binary (no diffs or merges)
-*.lock binary
-
-# Ensure shell scripts always use LF
-*.sh text eol=lf
+* text=auto eol=lf
