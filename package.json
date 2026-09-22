@@ -16,10 +16,12 @@
     "db:migrate": "npm run db:migrate -w @smartreception/backend",
     "db:push": "npm run db:push -w @smartreception/backend",
     "db:seed": "npm run db:seed -w @smartreception/backend",
-    "lint": "npm run lint -w @smartreception/backend && npm run lint -w @smartreception/frontend"
+    "lint": "npm run lint -w @smartreception/backend && npm run lint -w @smartreception/frontend",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "husky": "^9.1.7"
   },
   "engines": {
     "node": ">=20.0.0"
