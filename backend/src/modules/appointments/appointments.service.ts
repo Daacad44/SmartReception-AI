@@ -13,7 +13,6 @@ import {
   normalizeEmail,
 } from '../../infrastructure/appointments/email-validation';
 import {
-  scheduleAppointmentReminders,
   cancelAppointmentReminderJobs,
 } from '../../infrastructure/appointments/appointment-scheduler.service';
 import {

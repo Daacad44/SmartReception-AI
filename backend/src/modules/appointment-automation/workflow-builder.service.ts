@@ -225,7 +225,7 @@ export class AppointmentWorkflowBuilderService {
       }>;
     }
   ) {
-    const workflow = await this.getWorkflow(businessId, workflowId);
+    await this.getWorkflow(businessId, workflowId);
 
     await prisma.appointmentWorkflow.update({
       where: { id: workflowId },

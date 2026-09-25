@@ -1,14 +1,12 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { CreateCampaignInput, UpdateCampaignInput, PaginationInput } from '@smartreception/shared';
-import { broadcastBusinessEvent } from '../../infrastructure/realtime/broadcast.service';
 import type { CustomerType, Prisma } from '@prisma/client';
 import { logger } from '../../core/logger';
 import { enqueueCampaignSend, removeCampaignQueueJobs } from './campaign-queue.utils';
 import { assertCampaignCreateAllowed, assertCampaignMonthlyQuota } from './campaign-limits.service';
 import { enqueueCampaignBatches, finalizeCampaignIfComplete } from './campaign-batch.service';
 import { applyCampaignDeliveryStats, getCampaignDeliveryStats } from './campaign-stats.service';
-import { computeNextCampaignRun, type ScheduleConfig } from './campaign-scheduler.service';
 import { personalizeCampaignMessage } from './campaign-personalization.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
@@ -75,7 +73,7 @@ async function* iterateRecipientBatches(
   options: RecipientOptions,
   batchSize = 500
 ): AsyncGenerator<Array<{ id: string; phone: string; whatsappNumber: string | null }>> {
-  const { segmentId, customerTypes, sendToAll, targetCustomerId, customerIds } = options;
+  const { segmentId, customerTypes, targetCustomerId, customerIds } = options;
 
   if (segmentId) {
     const segment = await prisma.customerSegment.findFirst({
@@ -360,7 +358,6 @@ export class CampaignsService {
 
     const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
     const sendNow = input.sendNow ?? !scheduledAt;
-    const status = sendNow ? 'RUNNING' : scheduledAt ? 'SCHEDULED' : 'DRAFT';
     const timezone = input.timezone ?? business?.timezone ?? 'UTC';
 
     const campaign = await prisma.campaign.create({

@@ -219,7 +219,7 @@ export class SandboxService {
    * state — never a placeholder — and reported as COMPLETE / PENDING / FAILED.
    */
   async getReadinessChecklist(businessId: string, versionId?: string) {
-    const [profile, docAgg, indexedCount, chunkAgg, embeddedChunks, workspace, sandboxAgg, deployment] =
+    const [profile, docAgg, indexedCount, chunkAgg, embeddedChunks, workspace, _sandboxAgg, deployment] =
       await Promise.all([
         prisma.businessProfile.findUnique({ where: { businessId } }),
         prisma.knowledgeDocument.count({ where: { knowledgeBase: { businessId } } }),

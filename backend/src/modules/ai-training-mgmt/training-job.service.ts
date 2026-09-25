@@ -3,7 +3,6 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { getAiTrainingQueue } from '../../infrastructure/queue/queues';
 import { workspaceService } from './workspace.service';
 import { executeTrainingPipeline } from './training-pipeline.service';
-import { recordAiTrainingAudit } from './audit.service';
 import { logger } from '../../core/logger';
 
 export interface CreateJobInput {
