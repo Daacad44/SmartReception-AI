@@ -1,6 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
-import { aiAnalyticsRepository, estimateTokensFromText, daysAgo } from './ai-analytics.repository';
+import { estimateTokensFromText, daysAgo } from './ai-analytics.repository';
 import { businessSnapshotService } from './business-snapshot.service';
 import { estimateCostUsd } from '../../infrastructure/ai/providers/types';
 

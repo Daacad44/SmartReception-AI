@@ -4,7 +4,7 @@ import { getCachedBusinessProfile } from '../../infrastructure/ai/business-tenan
 import { getBusinessProfileContext } from '../../infrastructure/ai/business-profile-prompt.service';
 import { searchKnowledgeContext } from '../../infrastructure/ai/knowledge-search.service';
 import { ValidationError } from '../../core/errors';
-import { assertCampaignCreateAllowed, getCampaignPlanLimits } from './campaign-limits.service';
+import { getCampaignPlanLimits } from './campaign-limits.service';
 
 export type GenerateCampaignInput = {
   prompt: string;

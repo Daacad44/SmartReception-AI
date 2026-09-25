@@ -18,7 +18,6 @@ import { processDocumentById } from './infrastructure/documents/document-process
 import { connectDatabase, disconnectDatabase, prisma } from './infrastructure/database/prisma';
 import { resolveStoredToken } from './infrastructure/crypto/token-crypto';
 import {
-  processReminderJob,
   processMissedAppointments,
 } from './infrastructure/appointments/appointment-notification.service';
 import { processAndSendAiReply } from './modules/ai/ai-reply.service';

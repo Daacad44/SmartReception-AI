@@ -168,11 +168,6 @@ export class EmailCostProvider implements CostProvider {
     const appt = countByStatus(appointmentEmails);
     const sub = countByStatus(subscriptionEmails);
 
-    const sent =
-      (appt.SENT ?? 0) +
-      (appt.DELIVERED ?? 0) +
-      (appt.READ ?? 0) +
-      (sub.SENT ?? 0);
     const delivered = (appt.DELIVERED ?? 0) + (appt.READ ?? 0) + (sub.SENT ?? 0);
     const failed = (appt.FAILED ?? 0) + (appt.BOUNCED ?? 0) + (sub.FAILED ?? 0);
     const total = Object.values(appt).reduce((a, b) => a + b, 0) +

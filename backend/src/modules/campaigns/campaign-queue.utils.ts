@@ -1,4 +1,3 @@
-import { prisma } from '../../infrastructure/database/prisma';
 import { getCampaignQueue } from '../../infrastructure/queue/queues';
 import { logger } from '../../core/logger';
 

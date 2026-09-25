@@ -3,7 +3,6 @@ import { authService } from './auth.service';
 import {
   registerSchema,
   loginSchema,
-  refreshTokenSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyOtpSchema,

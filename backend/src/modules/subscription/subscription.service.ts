@@ -3,26 +3,12 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { ValidationError, NotFoundError } from '../../core/errors';
 import { subscriptionRepository } from './subscription.repository';
 import {
-  DURATION_PRESET_DAYS,
   calculateSubscriptionDates,
   type AssignSubscriptionInput,
   type SubscriptionActorContext,
 } from './subscription.types';
 import { scheduleSubscriptionReminders } from './subscription-scheduler.service';
 import { getBusinessUsageSnapshot } from './subscription-usage.service';
-
-function resolveDurationDays(
-  preset: AssignSubscriptionInput['durationPreset'],
-  customDays?: number
-): number {
-  if (preset === 'CUSTOM') {
-    if (!customDays || customDays < 1) {
-      throw new ValidationError('Custom duration requires at least 1 day');
-    }
-    return customDays;
-  }
-  return DURATION_PRESET_DAYS[preset];
-}
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);

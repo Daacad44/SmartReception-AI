@@ -363,17 +363,6 @@ export class AiAnalyticsService {
     return rows.map((r) => ({ hour: r.hour, count: Number(r.count) }));
   }
 
-  private async getPeakDays(businessId: string, since: Date) {
-    const rows = await prisma.$queryRaw<Array<{ dow: number; count: bigint }>>`
-      SELECT EXTRACT(DOW FROM m."createdAt")::int AS dow, COUNT(*)::bigint AS count
-      FROM "messages" m
-      JOIN "conversations" c ON c."id" = m."conversationId"
-      WHERE c."businessId" = ${businessId} AND m."createdAt" >= ${since}
-      GROUP BY 1 ORDER BY 1
-    `;
-    return rows.map((r) => ({ day: r.dow, count: Number(r.count) }));
-  }
-
   private async getProviderUsage(businessId: string, since: Date) {
     const rows = await prisma.aiUsageEvent.groupBy({
       by: ['provider'],

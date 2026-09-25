@@ -80,7 +80,7 @@ export async function sendAutomatedReply(params: SendAutomatedReplyParams): Prom
     logger.warn('Automated WhatsApp send failed', { conversationId, error: sendResult.error });
   }
 
-  const outboundMessage = await prisma.message.create({
+  await prisma.message.create({
     data: {
       conversationId,
       direction: 'OUTBOUND',

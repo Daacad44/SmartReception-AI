@@ -11,7 +11,7 @@ export interface TrainerRequest extends Request {
   };
 }
 
-export async function authenticateTrainer(req: TrainerRequest, res: Response, next: NextFunction) {
+export async function authenticateTrainer(req: TrainerRequest, _res: Response, next: NextFunction) {
   try {
     const header = req.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : req.cookies?.trainer_token;
@@ -56,7 +56,7 @@ export async function authenticateTrainer(req: TrainerRequest, res: Response, ne
 }
 
 export function requireTrainerPermission(...perms: string[]) {
-  return (req: TrainerRequest, res: Response, next: NextFunction) => {
+  return (req: TrainerRequest, _res: Response, next: NextFunction) => {
     if (!req.trainer) {
       return next(new UnauthorizedError('Trainer authentication required'));
     }
@@ -72,7 +72,7 @@ export function requireTrainerPermission(...perms: string[]) {
   };
 }
 
-export function requireTrainerBusiness(req: TrainerRequest, res: Response, next: NextFunction) {
+export function requireTrainerBusiness(req: TrainerRequest, _res: Response, next: NextFunction) {
   if (!req.trainer?.businessId) {
     return next(new UnauthorizedError('Business selection required'));
   }
