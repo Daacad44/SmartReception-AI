@@ -88,7 +88,6 @@ export class WhatsAppModuleService {
     console.log('[WhatsApp] Webhook payload:', JSON.stringify(body));
 
     for (const msg of parsed.messages) {
-      const contactName = resolveContactName(parsed.contacts, msg.from);
       const extracted = extractMessageContent(msg);
       console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
     }

@@ -8,7 +8,6 @@ import { versionService } from './version.service';
 import { deploymentService } from './deployment.service';
 import { insightsService } from './insights.service';
 import { aiTrainingAnalyticsService } from './analytics.service';
-import { sandboxService } from './sandbox.service';
 import { calculateQualityScores, buildSnapshotDocument } from './quality.service';
 
 export class AiTrainingMgmtService {

@@ -1,4 +1,3 @@
-import { DocumentStatus, DocumentType } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { storageService } from '../storage';
 import { getDocumentQueue } from '../queue/queues';

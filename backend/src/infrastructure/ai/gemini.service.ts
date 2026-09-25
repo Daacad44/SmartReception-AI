@@ -18,8 +18,6 @@ export interface GenerateResponseOptions {
   sandbox?: boolean;
 }
 
-const CHAT_MODEL = 'gemini-2.5-flash';
-
 let genAI: GoogleGenerativeAI | null = null;
 
 function getClient(): GoogleGenerativeAI {

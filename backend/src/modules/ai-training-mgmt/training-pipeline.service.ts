@@ -42,7 +42,7 @@ async function updateJobProgress(
 }
 
 async function loadDocuments(
-  businessId: string,
+  _businessId: string,
   baseId: string,
   documentIds?: string[]
 ) {

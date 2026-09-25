@@ -163,7 +163,7 @@ export async function scheduleJourneyStep(enrollmentId: string): Promise<void> {
 }
 
 export async function advanceJourneyAfterStep(
-  businessId: string,
+  _businessId: string,
   journeyId: string,
   customerId: string
 ): Promise<void> {

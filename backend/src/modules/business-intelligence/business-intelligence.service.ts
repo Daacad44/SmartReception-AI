@@ -114,7 +114,7 @@ export class BusinessIntelligenceService {
     };
   }
 
-  async listBusinesses(page = 1, limit = 50, search?: string, filters: BusinessIntelligenceFilters = {}) {
+  async listBusinesses(page = 1, limit = 50, search?: string, _filters: BusinessIntelligenceFilters = {}) {
     const result = await aiAnalyticsService.listSuperAdminBusinessCards(page, limit, search);
     const enriched = await Promise.all(
       result.data.map(async (card) => {

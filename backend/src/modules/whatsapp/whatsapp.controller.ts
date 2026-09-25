@@ -211,7 +211,7 @@ export class WhatsAppController {
     }
   }
 
-  async getOAuthConfig(req: Request, res: Response, next: NextFunction) {
+  async getOAuthConfig(_req: Request, res: Response, next: NextFunction) {
     try {
       res.json({ success: true, data: whatsappOAuthService.getClientConfig() });
     } catch (error) {

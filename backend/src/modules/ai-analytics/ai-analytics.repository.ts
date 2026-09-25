@@ -1,5 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
-import { estimateCostUsd, type AiProviderName } from '../../infrastructure/ai/providers/types';
+import { estimateCostUsd } from '../../infrastructure/ai/providers/types';
 
 export interface AnalyticsFilters {
   customerId?: string;

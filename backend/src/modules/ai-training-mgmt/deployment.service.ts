@@ -218,7 +218,7 @@ export class DeploymentService {
   async approve(
     requestId: string,
     userId: string,
-    audit: AuditContext,
+    _audit: AuditContext,
     opts: { override?: boolean } = {}
   ) {
     const request = await this.getRequest(requestId);
@@ -273,7 +273,7 @@ export class DeploymentService {
     });
   }
 
-  async requestChanges(requestId: string, userId: string, notes: string) {
+  async requestChanges(requestId: string, _userId: string, notes: string) {
     const request = await this.getRequest(requestId);
     if (request.status !== 'PENDING') {
       throw new ValidationError('Request is not pending');

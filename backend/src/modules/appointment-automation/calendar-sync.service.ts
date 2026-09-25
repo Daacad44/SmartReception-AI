@@ -1,6 +1,4 @@
 import QRCode from 'qrcode';
-import { prisma } from '../../infrastructure/database/prisma';
-import type { AppointmentWorkflowEventType } from '@prisma/client';
 import type { AppointmentTemplateVariables } from './types';
 
 export class AppointmentCalendarSyncService {
