@@ -15,7 +15,7 @@ test('isLicenseStatusLocked covers enterprise statuses', () => {
 });
 
 test('formatRemainingTime handles future and past expiration', () => {
-  const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000);
   assert.match(formatRemainingTime(future), /3 days/);
   const past = new Date(Date.now() - 1000);
   assert.equal(formatRemainingTime(past), 'Expired');
