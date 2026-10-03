@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiResponse } from '@/lib/types';
+import { createSingleFlight, shouldRefreshAfterUnauthorized } from '@/lib/auth-retry-policy';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 const API_TIMEOUT_MS = 15_000;
@@ -104,51 +105,29 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // Auth endpoints where a 401 means "bad/expired credentials", NOT an expired
 // access token. These must never trigger the refresh-token retry, otherwise a
 // failed login surfaces "No refresh token available" instead of the real error.
-const AUTH_ENDPOINTS_NO_REFRESH = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/refresh',
-  '/auth/verify-2fa',
-  '/auth/verify-otp',
-  '/auth/verify-approval',
-  '/auth/forgot-password',
-  '/auth/reset-password',
-];
-
-let refreshPromise: Promise<string> | null = null;
+const singleFlightRefresh = createSingleFlight<string>();
 
 async function refreshAccessToken(): Promise<string> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  const storeRefreshToken = useAuthStore.getState().refreshToken;
-
-  if (!storeRefreshToken) {
-    clearSession();
-    return Promise.reject(new Error('No refresh token available'));
-  }
-
-  refreshPromise = axios
-    .post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
-      `${API_BASE_URL}/auth/refresh`,
-      { refreshToken: storeRefreshToken },
-      { timeout: 10_000, withCredentials: true }
-    )
-    .then((response) => {
+  return singleFlightRefresh(async () => {
+    const storeRefreshToken = useAuthStore.getState().refreshToken;
+    if (!storeRefreshToken) {
+      clearSession();
+      throw new Error('No refresh token available');
+    }
+    try {
+      const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
+        `${API_BASE_URL}/auth/refresh`,
+        { refreshToken: storeRefreshToken },
+        { timeout: 10_000, withCredentials: true }
+      );
       const tokens = extractData(response);
       useAuthStore.getState().setTokens(tokens.accessToken, tokens.refreshToken);
       return tokens.accessToken;
-    })
-    .catch((error) => {
+    } catch (error) {
       clearSession();
       throw error;
-    })
-    .finally(() => {
-      refreshPromise = null;
-    });
-
-  return refreshPromise;
+    }
+  });
 }
 
 api.interceptors.response.use(
@@ -184,7 +163,10 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (AUTH_ENDPOINTS_NO_REFRESH.some((path) => originalRequest.url?.includes(path))) {
+    if (!shouldRefreshAfterUnauthorized({
+      url: originalRequest.url,
+      retryAttempted: originalRequest._retry,
+    })) {
       // Only the refresh endpoint itself should clear the session on 401;
       // login/register/etc. must surface their real error (e.g. wrong password).
       if (originalRequest.url?.includes('/auth/refresh')) {

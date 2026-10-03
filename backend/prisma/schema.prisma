@@ -1596,6 +1596,12 @@ model CampaignRecipient {
   respondedAt   DateTime?
   clickedAt     DateTime?
   failedReason  String?
+  failureCode   String?
+  failureTitle  String?
+  failureMessage String?
+  failureDetails String?
+  failureHref   String?
+  failedAt      DateTime?
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
 
@@ -1606,6 +1612,7 @@ model CampaignRecipient {
   @@index([campaignId])
   @@index([customerId])
   @@index([status])
+  @@index([whatsappMsgId])
   @@map("campaign_recipients")
 }
 
