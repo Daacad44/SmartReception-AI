@@ -112,7 +112,9 @@ export class AuthController {
     try {
       const bodyToken = req.body?.refreshToken as string | undefined;
       const cookieToken = getRefreshTokenFromCookies(req.cookies as Record<string, string | undefined>);
-      const refreshToken = bodyToken || cookieToken;
+      // Prefer the rotating HttpOnly cookie. Another tab may already have
+      // replaced it while this tab still carries the previous persisted token.
+      const refreshToken = cookieToken || bodyToken;
       if (!refreshToken) {
         res.status(401).json({ success: false, error: 'No refresh token provided' });
         return;

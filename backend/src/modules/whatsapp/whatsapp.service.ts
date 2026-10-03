@@ -21,6 +21,7 @@ import { encryptToken, resolveStoredToken } from '../../infrastructure/crypto/to
 import { startPipelineTrace } from './message-pipeline.logger';
 import { whatsappTenantResolver } from './whatsapp-tenant-resolver.service';
 import { whatsappConnectionRequestService } from './whatsapp-connection-request.service';
+import { logWhatsAppEvent, webhookEventId } from './whatsapp-observability';
 
 export interface WhatsAppHealth {
   connection: 'connected' | 'disconnected';
@@ -84,17 +85,24 @@ export class WhatsAppModuleService {
       data: { whatsappStatus: status },
     });
   }
-  private logWebhookPayload(body: Record<string, unknown>, parsed: ReturnType<typeof parseWebhookBody>) {
-    console.log('[WhatsApp] Webhook payload:', JSON.stringify(body));
-
+  private logWebhookPayload(parsed: ReturnType<typeof parseWebhookBody>) {
     for (const msg of parsed.messages) {
       const extracted = extractMessageContent(msg);
-      console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
+      logWhatsAppEvent('Incoming MESSAGE', {
+        messageId: msg.id,
+        recipientId: msg.from,
+        type: extracted.type.toLowerCase(),
+        timestamp: this.webhookTimestamp(msg.timestamp),
+        processingStartedAt: new Date().toISOString(),
+      });
     }
+  }
 
-    for (const status of parsed.statuses) {
-      console.log('[WhatsApp] Status update:', status.status, 'for', status.recipient_id);
-    }
+  private webhookTimestamp(timestamp?: string): string {
+    const milliseconds = Number(timestamp) * 1000;
+    return timestamp && Number.isFinite(milliseconds)
+      ? new Date(milliseconds).toISOString()
+      : new Date().toISOString();
   }
   private isWebhookInfrastructureReady(): boolean {
     return Boolean(config.whatsapp.verifyToken && config.whatsapp.webhookUrl);
@@ -157,7 +165,6 @@ export class WhatsAppModuleService {
   }
 
   async handleWebhook(body: Record<string, unknown>): Promise<void> {
-    console.log('[WhatsApp] Incoming webhook received');
     await this.processWebhook(body);
   }
 
@@ -167,7 +174,7 @@ export class WhatsAppModuleService {
     }
 
     const parsed = parseWebhookBody(body);
-    this.logWebhookPayload(body, parsed);
+    this.logWebhookPayload(parsed);
 
     const phoneNumberId = parsed.phoneNumberId?.trim();
     if (!phoneNumberId) {
@@ -237,19 +244,36 @@ export class WhatsAppModuleService {
 
     // Inbound messages first — customer is waiting for a WhatsApp reply.
     for (const msg of parsed.messages) {
+      const eventId = webhookEventId('message', msg.id);
       const recorded = await whatsappRepository.tryRecordWebhookEvent(
-        msg.id,
+        eventId,
         `message:${msg.type}`,
         tenant.businessId
       );
-      if (!recorded) continue;
+      if (!recorded) {
+        logWhatsAppEvent('Webhook DUPLICATE_IGNORED', {
+          eventId,
+          messageId: msg.id,
+          eventType: 'message',
+          reason: 'event_already_processed',
+        });
+        continue;
+      }
 
       // Isolate each message: one failure must not abort the rest of the batch
       // or vanish silently. Every failure is logged with the tenant + message id.
       try {
+        const startedAt = Date.now();
         const contactName = resolveContactName(parsed.contacts, msg.from);
         const extracted = extractMessageContent(msg);
-        console.log('[WhatsApp] Message parsed:', extracted.type, extracted.content);
+        logWhatsAppEvent('Incoming MESSAGE', {
+          messageId: msg.id,
+          businessId: tenant.businessId,
+          recipientId: msg.from,
+          type: extracted.type.toLowerCase(),
+          timestamp: this.webhookTimestamp(msg.timestamp),
+          processingStartedAt: new Date().toISOString(),
+        });
 
         startPipelineTrace(msg.id, {
           businessId: tenant.businessId,
@@ -266,7 +290,14 @@ export class WhatsAppModuleService {
           pipelineKey: msg.id,
           extracted,
         });
+        logWhatsAppEvent('Webhook PROCESSED', {
+          eventId,
+          eventType: 'message',
+          messageId: msg.id,
+          durationMs: Date.now() - startedAt,
+        });
       } catch (error) {
+        await whatsappRepository.releaseWebhookEvent(eventId);
         logger.error('[WhatsApp] Inbound message processing failed', {
           error: error instanceof Error ? error.message : String(error),
           businessId: tenant.businessId,
@@ -278,12 +309,96 @@ export class WhatsAppModuleService {
       }
     }
 
-    void this.deferWebhookMaintenance(account, parsed);
+    // Delivery state and its idempotency marker are critical. Finish these
+    // lightweight writes before acknowledging Meta; slow account maintenance
+    // remains deferred below.
+    for (const status of parsed.statuses) {
+      await this.processDeliveryStatus(status, tenant.businessId);
+    }
+
+    void this.deferWebhookMaintenance(account);
+  }
+
+  private async processDeliveryStatus(
+    status: ReturnType<typeof parseWebhookBody>['statuses'][number],
+    businessId: string
+  ): Promise<void> {
+    const startedAt = Date.now();
+    const eventId = webhookEventId('status', status.id, status.status);
+    const eventType = 'delivery_status';
+    const recorded = await whatsappRepository.tryRecordWebhookEvent(
+      eventId,
+      `status:${status.status}`,
+      businessId
+    );
+    if (!recorded) {
+      logWhatsAppEvent('Webhook DUPLICATE_IGNORED', {
+        eventId,
+        messageId: status.id,
+        eventType,
+        status: status.status,
+        reason: 'event_already_processed',
+      });
+      return;
+    }
+
+    let campaignId: string | null = null;
+    try {
+      await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
+      const campaignSync = await import('../campaigns/campaign-webhook-sync.service');
+      campaignId = await campaignSync.syncCampaignRecipientFromWebhook({
+        whatsappMsgId: status.id,
+        status: status.status,
+        timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
+        errors: status.errors,
+      });
+      const employeeSync = await import('../employee-comms/employee-inbox.service');
+      await employeeSync.syncEmployeeRecipientFromWebhook({
+        whatsappMsgId: status.id,
+        status: status.status,
+        timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
+        errorMessage: status.errors?.[0]?.message ?? status.errors?.[0]?.title,
+      });
+    } catch (error) {
+      // Do not permanently deduplicate a status whose persistence failed. Meta's
+      // next delivery can claim it again after this request returns an error.
+      await whatsappRepository.releaseWebhookEvent(eventId);
+      throw error;
+    }
+
+    const baseFields = {
+      messageId: status.id,
+      recipientId: status.recipient_id,
+      campaignId,
+      status: status.status,
+      timestamp: this.webhookTimestamp(status.timestamp),
+    };
+    if (status.status === 'failed') {
+      const errors = status.errors?.length ? status.errors : [undefined];
+      for (const error of errors) {
+        logWhatsAppEvent('Delivery FAILED', {
+          ...baseFields,
+          code: error?.code,
+          title: error?.title,
+          message: error?.message,
+          details: error?.error_data?.details,
+          href: error?.href,
+        }, 'error');
+      }
+    } else {
+      logWhatsAppEvent(`Delivery ${status.status.toUpperCase()}`, baseFields);
+    }
+    logWhatsAppEvent('Webhook PROCESSED', {
+      eventId,
+      eventType,
+      messageId: status.id,
+      status: status.status,
+      durationMs: Date.now() - startedAt,
+    });
   }
 
   private deferWebhookMaintenance(
-    account: NonNullable<Awaited<ReturnType<typeof whatsappRepository.resolveAccountForWebhook>>>,
-    parsed: ReturnType<typeof parseWebhookBody>
+    account: NonNullable<Awaited<ReturnType<typeof whatsappRepository.resolveAccountForWebhook>>>
   ): void {
     void (async () => {
       try {
@@ -299,32 +414,6 @@ export class WhatsAppModuleService {
       await whatsappRepository.updateAccountSync(account.phoneNumberId, {
         webhookStatus: 'verified',
       });
-
-      for (const status of parsed.statuses) {
-        const recorded = await whatsappRepository.tryRecordWebhookEvent(
-          status.id,
-          `status:${status.status}`,
-          account.businessId
-        );
-        if (!recorded) continue;
-
-        await whatsappRepository.updateMessageStatus(status.id, status.status, status.errors);
-        const { syncCampaignRecipientFromWebhook } = await import('../campaigns/campaign-webhook-sync.service');
-        void syncCampaignRecipientFromWebhook({
-          whatsappMsgId: status.id,
-          status: status.status.toLowerCase() as 'sent' | 'delivered' | 'read' | 'failed',
-          timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
-          errorMessage: status.errors?.[0]?.title,
-        }).catch(() => undefined);
-        const { syncEmployeeRecipientFromWebhook } = await import('../employee-comms/employee-inbox.service');
-        void syncEmployeeRecipientFromWebhook({
-          whatsappMsgId: status.id,
-          status: status.status.toLowerCase() as 'sent' | 'delivered' | 'read' | 'failed',
-          timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000) : undefined,
-          errorMessage: status.errors?.[0]?.title,
-        }).catch(() => undefined);
-        console.log(`[WhatsApp] Delivery status ${status.status} for message ${status.id}`);
-      }
 
       await whatsappRepository.markWebhookVerified(account.phoneNumberId);
       await whatsappRepository.syncAccountHealth(account.phoneNumberId, {

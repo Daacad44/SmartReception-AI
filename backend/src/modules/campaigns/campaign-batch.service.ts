@@ -119,6 +119,8 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
       }
 
       const result = await whatsappService.sendOutbound({
+        businessId: data.businessId,
+        campaignId: data.campaignId,
         phoneNumberId: whatsappAccount.phoneNumberId,
         to: phone,
         accessToken: resolveStoredToken(whatsappAccount.accessToken),

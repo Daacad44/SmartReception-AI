@@ -22,11 +22,6 @@ export class WhatsAppController {
       const token = req.query['hub.verify_token'] as string;
       const challenge = req.query['hub.challenge'] as string;
 
-      console.log('Mode:', mode);
-      console.log('Token:', token);
-      console.log('Challenge:', challenge);
-      console.log('Expected:', process.env.WHATSAPP_VERIFY_TOKEN ?? config.whatsapp.verifyToken);
-
       logger.info('WhatsApp webhook verification attempt', {
         mode,
         tokenReceived: Boolean(token),
@@ -81,7 +76,11 @@ export class WhatsAppController {
           res.status(404).json({ success: false, error: error.message });
           return;
         }
-        logger.error('WhatsApp webhook processing error:', error);
+        logger.error('WhatsApp webhook processing error', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        res.status(500).json({ success: false, error: 'Webhook processing failed' });
+        return;
       }
 
       // Meta allows up to ~20s; we process synchronously so waitUntil cannot

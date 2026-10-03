@@ -52,7 +52,18 @@ export interface WhatsAppWebhookStatus {
   status: 'sent' | 'delivered' | 'read' | 'failed';
   timestamp: string;
   recipient_id: string;
-  errors?: Array<{ code: number; title: string }>;
+  errors?: WhatsAppWebhookError[];
+}
+
+export interface WhatsAppWebhookError {
+  code?: number | string;
+  title?: string;
+  message?: string;
+  href?: string;
+  error_data?: {
+    details?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface ParsedWebhookPayload {
@@ -73,6 +84,9 @@ export type OutboundMessageType =
   | 'INTERACTIVE';
 
 export interface SendOutboundParams {
+  businessId?: string;
+  conversationId?: string;
+  campaignId?: string;
   phoneNumberId: string;
   to: string;
   accessToken?: string;
