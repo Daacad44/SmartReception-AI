@@ -1,5 +1,5 @@
 import { prisma } from '../../infrastructure/database/prisma';
-import { NotFoundError, ValidationError } from '../../core/errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { CreateCampaignInput, UpdateCampaignInput, PaginationInput } from '@smartreception/shared';
 import type { CustomerType, Prisma } from '@prisma/client';
 import { logger } from '../../core/logger';
@@ -14,6 +14,7 @@ import {
   getCampaignRetryBlockReason,
   isRetryableFailedRecipient,
 } from './campaign-retry.util';
+import { logCampaignEvent } from '../whatsapp/whatsapp-observability';
 
 type RecipientOptions = {
   segmentId?: string | null;
@@ -613,6 +614,7 @@ export class CampaignsService {
   }
 
   async retryFailed(businessId: string, id: string, userId: string) {
+    const startedAt = Date.now();
     const campaign = await prisma.campaign.findFirst({ where: { id, businessId } });
     if (!campaign) throw new NotFoundError('Campaign not found');
 
@@ -651,55 +653,100 @@ export class CampaignsService {
       );
     }
 
-    await assertCampaignMonthlyQuota(businessId, retryable.length);
-
     const nextRunVersion = campaign.runVersion + 1;
     const retryableIds = retryable.map((r) => r.id);
     const now = new Date();
 
-    await prisma.$transaction([
-      prisma.campaignRecipient.updateMany({
-        where: { id: { in: retryableIds }, campaignId: id, status: 'FAILED' },
-        data: {
-          status: 'PENDING',
-          isSent: false,
-          whatsappMsgId: null,
-          failedReason: null,
-          runVersion: nextRunVersion,
-        },
-      }),
-      prisma.campaign.update({
-        where: { id },
-        data: {
-          status: 'RUNNING',
-          isSent: false,
-          retryCount: { increment: 1 },
-          lastRetryAt: now,
-          runVersion: nextRunVersion,
-        },
-      }),
-    ]);
-
-    const batches = await enqueueCampaignBatches(id, businessId, nextRunVersion);
-    if (batches === 0) {
-      await finalizeCampaignIfComplete(id, businessId);
-    }
-
-    await prisma.auditLog.create({
-      data: {
+    try {
+      logCampaignEvent('Retry STARTED', {
+        campaignId: id,
         businessId,
-        userId,
-        action: 'UPDATE',
-        entity: 'Campaign',
-        entityId: id,
-        newData: { retryFailed: true, retried: retryable.length, skipped: failedRecipients.length - retryable.length },
-      },
-    });
+        failedRecipients: retryable.length,
+        requestedByUserId: userId,
+      });
 
-    return {
-      retried: retryable.length,
-      skipped: failedRecipients.length - retryable.length,
-    };
+      await assertCampaignMonthlyQuota(businessId, retryable.length);
+
+      await prisma.$transaction(async (tx) => {
+        // Optimistic claim: only one concurrent click may advance this exact run.
+        const claimed = await tx.campaign.updateMany({
+          where: {
+            id,
+            businessId,
+            runVersion: campaign.runVersion,
+            retryCount: campaign.retryCount,
+            lastRetryAt: campaign.lastRetryAt,
+            status: campaign.status,
+          },
+          data: {
+            status: 'RUNNING',
+            isSent: false,
+            retryCount: { increment: 1 },
+            lastRetryAt: now,
+            runVersion: nextRunVersion,
+          },
+        });
+        if (claimed.count !== 1) {
+          throw new ConflictError('Campaign retry is already in progress');
+        }
+
+        await tx.campaignRecipient.updateMany({
+          where: { id: { in: retryableIds }, campaignId: id, status: 'FAILED' },
+          data: {
+            status: 'PENDING',
+            isSent: false,
+            whatsappMsgId: null,
+            failedReason: null,
+            failureCode: null,
+            failureTitle: null,
+            failureMessage: null,
+            failureDetails: null,
+            failureHref: null,
+            failedAt: null,
+            runVersion: nextRunVersion,
+          },
+        });
+      });
+
+      const batches = await enqueueCampaignBatches(id, businessId, nextRunVersion);
+      if (batches === 0) {
+        await finalizeCampaignIfComplete(id, businessId);
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          businessId,
+          userId,
+          action: 'UPDATE',
+          entity: 'Campaign',
+          entityId: id,
+          newData: { retryFailed: true, retried: retryable.length, skipped: failedRecipients.length - retryable.length },
+        },
+      });
+
+      logCampaignEvent('Retry COMPLETED', {
+        campaignId: id,
+        businessId,
+        attempted: retryable.length,
+        accepted: retryable.length,
+        failedImmediately: 0,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        retried: retryable.length,
+        skipped: failedRecipients.length - retryable.length,
+      };
+    } catch (error) {
+      logCampaignEvent('Retry FAILED', {
+        campaignId: id,
+        businessId,
+        reason: error instanceof Error ? error.message : 'Unknown retry failure',
+        statusCode: error instanceof ConflictError ? 409 : 500,
+        durationMs: Date.now() - startedAt,
+      }, 'error');
+      throw error;
+    }
   }
 
   async getAnalytics(businessId: string) {

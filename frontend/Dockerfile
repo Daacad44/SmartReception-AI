@@ -7,7 +7,11 @@ COPY package.json package-lock.json* ./
 COPY frontend/package.json ./frontend/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN npm install --workspace=@smartreception/frontend
+# The root workspace has a developer-only Husky prepare hook. This image installs
+# only the frontend workspace, so the Husky binary is intentionally absent.
+# Do not execute repository lifecycle hooks in the production image dependency
+# layer; the frontend has no required install-time scripts and is built below.
+RUN npm install --ignore-scripts --workspace=@smartreception/frontend
 
 COPY frontend ./frontend
 COPY packages/shared ./packages/shared

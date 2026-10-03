@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test src/hooks/showHandoffOsNotification.test.ts src/hooks/handoffAlertDedupe.test.ts src/pwa/sw-update-check.test.ts",
+    "test:unit": "node --experimental-strip-types --test src/hooks/showHandoffOsNotification.test.ts src/hooks/handoffAlertDedupe.test.ts src/pwa/sw-update-check.test.ts src/lib/auth-retry-policy.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

@@ -2,33 +2,78 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { logger } from '../../core/logger';
 import { advanceJourneyAfterStep } from './campaign-journey.service';
 import { syncCampaignDeliveryStatsAndStatus } from './campaign-stats.service';
+import type { WhatsAppWebhookError } from '../../infrastructure/whatsapp/whatsapp.types';
 
 type WhatsAppStatus = 'sent' | 'delivered' | 'read' | 'failed';
+
+const STATUS_RANK: Record<string, number> = {
+  PENDING: 0,
+  SENDING: 1,
+  SENT: 2,
+  FAILED: 3,
+  DELIVERED: 4,
+  READ: 5,
+};
+
+/** A terminal success cannot be downgraded by a late Meta status. */
+export function canApplyCampaignWebhookStatus(current: string, incoming: WhatsAppStatus): boolean {
+  const next = incoming.toUpperCase();
+  if (current === next) return false;
+  if (current === 'FAILED') return false;
+  if (incoming === 'failed') return !['FAILED', 'DELIVERED', 'READ'].includes(current);
+  if (incoming === 'sent') return (STATUS_RANK[current] ?? 0) < STATUS_RANK.SENT;
+  return (STATUS_RANK[current] ?? 0) < STATUS_RANK[next];
+}
+
+export function deliveryFailureMetadata(errors: WhatsAppWebhookError[] | undefined, at: Date) {
+  const error = errors?.[0];
+  return {
+    failedReason: error?.message ?? error?.title ?? 'Delivery failed',
+    failureCode: error?.code === undefined ? null : String(error.code),
+    failureTitle: error?.title ?? null,
+    failureMessage: error?.message ?? null,
+    failureDetails: error?.error_data?.details ?? null,
+    failureHref: error?.href ?? null,
+    failedAt: at,
+  };
+}
 
 /** Sync WhatsApp delivery webhooks to campaign recipient analytics. */
 export async function syncCampaignRecipientFromWebhook(params: {
   whatsappMsgId: string;
   status: WhatsAppStatus;
   timestamp?: Date;
-  errorMessage?: string;
-}): Promise<void> {
+  errors?: WhatsAppWebhookError[];
+}): Promise<string | null> {
   const recipient = await prisma.campaignRecipient.findFirst({
     where: { whatsappMsgId: params.whatsappMsgId },
     include: { campaign: { select: { id: true, businessId: true, journeyId: true } } },
   });
-  if (!recipient) return;
+  if (!recipient) return null;
 
   const at = params.timestamp ?? new Date();
   const campaignId = recipient.campaign.id;
   const businessId = recipient.campaign.businessId;
 
+  if (!canApplyCampaignWebhookStatus(recipient.status, params.status)) return campaignId;
+
   if (params.status === 'delivered') {
     await prisma.campaignRecipient.update({
       where: { id: recipient.id },
-      data: { status: 'DELIVERED', deliveredAt: at },
+      data: {
+        status: 'DELIVERED',
+        deliveredAt: at,
+        failedReason: null,
+        failureCode: null,
+        failureTitle: null,
+        failureMessage: null,
+        failureDetails: null,
+        failureHref: null,
+        failedAt: null,
+      },
     });
     await syncCampaignDeliveryStatsAndStatus(campaignId);
-    return;
+    return campaignId;
   }
 
   if (params.status === 'read') {
@@ -37,16 +82,27 @@ export async function syncCampaignRecipientFromWebhook(params: {
       data: { status: 'READ', readAt: at },
     });
     await syncCampaignDeliveryStatsAndStatus(campaignId);
-    return;
+    return campaignId;
   }
 
   if (params.status === 'failed') {
     await prisma.campaignRecipient.update({
       where: { id: recipient.id },
-      data: { status: 'FAILED', failedReason: params.errorMessage ?? 'Delivery failed' },
+      data: {
+        status: 'FAILED',
+        ...deliveryFailureMetadata(params.errors, at),
+      },
     });
     await syncCampaignDeliveryStatsAndStatus(campaignId);
-    return;
+    return campaignId;
+  }
+
+  if (params.status === 'sent') {
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: { status: 'SENT', sentAt: recipient.sentAt ?? at },
+    });
+    await syncCampaignDeliveryStatsAndStatus(campaignId);
   }
 
   if (params.status === 'sent' && recipient.campaign.journeyId) {
@@ -54,6 +110,7 @@ export async function syncCampaignRecipientFromWebhook(params: {
       (error) => logger.warn('Journey advance failed', { error })
     );
   }
+  return campaignId;
 }
 
 /** Mark campaign recipient as replied when customer sends inbound message after campaign. */

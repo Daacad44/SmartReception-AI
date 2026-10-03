@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { findCustomerByPhoneDigits, phoneDigits } from '../../core/utils/customer-phone';
 import { normalizeSomaliPhone } from '@smartreception/shared';
 import { resolveInboundTimestamp } from './whatsapp-session.service';
+import type { WhatsAppWebhookError } from '../../infrastructure/whatsapp/whatsapp.types';
+import { randomUUID } from 'node:crypto';
 
 export class WhatsAppRepository {
   async findAccountByPhoneNumberId(phoneNumberId: string) {
@@ -26,14 +28,18 @@ export class WhatsAppRepository {
     eventType: string,
     businessId?: string
   ): Promise<boolean> {
-    try {
-      await prisma.whatsAppWebhookEvent.create({
-        data: { eventId, eventType, businessId },
-      });
-      return true;
-    } catch {
-      return false;
-    }
+    // An atomic conflict-free insert avoids both the find/create race and the
+    // Prisma error event that would otherwise print an expected P2002.
+    const inserted = await prisma.$executeRaw`
+      INSERT INTO "whatsapp_webhook_events" ("id", "eventId", "eventType", "businessId", "receivedAt")
+      VALUES (${randomUUID()}, ${eventId}, ${eventType}, ${businessId ?? null}, NOW())
+      ON CONFLICT ("eventId") DO NOTHING
+    `;
+    return inserted === 1;
+  }
+
+  async releaseWebhookEvent(eventId: string): Promise<void> {
+    await prisma.whatsAppWebhookEvent.deleteMany({ where: { eventId } });
   }
 
   async findOrCreateCustomer(businessId: string, phone: string, name?: string) {
@@ -275,7 +281,7 @@ export class WhatsAppRepository {
   async updateMessageStatus(
     whatsappMsgId: string,
     status: string,
-    errors?: Array<{ code?: number; title?: string; message?: string }>
+    errors?: WhatsAppWebhookError[]
   ) {
     const statusMap: Record<string, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = {
       sent: 'SENT',
@@ -301,8 +307,15 @@ export class WhatsAppRepository {
         ? { ...(existing.metadata as object), ...metadataUpdate }
         : metadataUpdate;
 
+    const allowedCurrentStatuses: Record<string, Array<'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED'>> = {
+      SENT: ['PENDING'],
+      DELIVERED: ['PENDING', 'SENT'],
+      READ: ['PENDING', 'SENT', 'DELIVERED'],
+      FAILED: ['PENDING', 'SENT'],
+    };
+
     return prisma.message.updateMany({
-      where: { whatsappMsgId },
+      where: { whatsappMsgId, status: { in: allowedCurrentStatuses[mapped] } },
       data: {
         status: mapped,
         ...(mergedMetadata ? { metadata: mergedMetadata as object } : {}),

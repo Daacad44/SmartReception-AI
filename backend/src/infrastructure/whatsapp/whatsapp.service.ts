@@ -6,6 +6,7 @@ import type { SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 import type { WhatsAppWebhookMessage } from './whatsapp.types';
 import { parseWebhookBody } from './whatsapp-webhook.parser';
 import { normalizeWhatsAppTemplateLanguage } from './whatsapp-template-language.util';
+import { logWhatsAppEvent } from '../../modules/whatsapp/whatsapp-observability';
 
 export type { WhatsAppWebhookMessage, SendOutboundParams, SendOutboundResult } from './whatsapp.types';
 export { parseWebhookBody, extractMessageContent, resolveContactName } from './whatsapp-webhook.parser';
@@ -76,13 +77,18 @@ export class WhatsAppService {
   }
 
   async sendOutbound(params: SendOutboundParams): Promise<SendOutboundResult> {
+    const requestStartedAt = Date.now();
     const token = this.getToken(params.accessToken);
     const to = params.to.replace(/\D/g, '');
-
-    console.log('[WhatsApp] Phone Number ID:', params.phoneNumberId);
-    console.log('[WhatsApp] Access Token configured:', Boolean(token));
-    console.log('[WhatsApp] Recipient:', to);
-    console.log('[WhatsApp] Message body:', params.content?.slice(0, 500) ?? '');
+    logWhatsAppEvent('Message SEND_REQUEST', {
+      businessId: params.businessId,
+      conversationId: params.conversationId,
+      campaignId: params.campaignId,
+      recipientId: to,
+      messageType: params.type.toLowerCase(),
+      templateName: params.templateName,
+      requestStartedAt: new Date(requestStartedAt).toISOString(),
+    });
 
     if (!token) {
       logger.warn('WhatsApp access token not configured');
@@ -202,9 +208,6 @@ export class WhatsAppService {
     }
 
     const url = `${config.whatsapp.apiUrl}/${params.phoneNumberId}/messages`;
-    console.log('[WhatsApp] Sending message');
-    console.log('[WhatsApp] Graph API request:', JSON.stringify({ url, to, type: params.type }));
-
     try {
       const response = await fetchWithRetry(url, {
         method: 'POST',
@@ -216,8 +219,6 @@ export class WhatsAppService {
       });
 
       const responseText = await response.text();
-      console.log('[WhatsApp] Graph API response:', responseText);
-
       if (!response.ok) {
         let errorCode: number | string = response.status;
         let errorMessage = responseText;
@@ -234,8 +235,15 @@ export class WhatsAppService {
         }
 
         const graphError = { code: errorCode, message: errorMessage, recipient: to };
-        console.error('[WhatsApp] Message failed:', graphError);
-        logger.error('WhatsApp send failed:', graphError);
+        logWhatsAppEvent('Message SEND_REJECTED', {
+          businessId: params.businessId,
+          conversationId: params.conversationId,
+          campaignId: params.campaignId,
+          recipientId: to,
+          code: graphError.code,
+          message: graphError.message,
+          durationMs: Date.now() - requestStartedAt,
+        }, 'error');
         if (isWhatsAppAuthGraphError(graphError)) {
           void markWhatsAppTokenInvalid(params.phoneNumberId, graphError);
         }
@@ -244,13 +252,26 @@ export class WhatsAppService {
 
       const data = JSON.parse(responseText) as { messages?: { id: string }[] };
       const whatsappMsgId = data.messages?.[0]?.id ?? null;
-      console.log('[WhatsApp] Message delivered:', whatsappMsgId ?? 'unknown id');
+      logWhatsAppEvent('Message ACCEPTED', {
+        messageId: whatsappMsgId,
+        recipientId: to,
+        campaignId: params.campaignId,
+        status: 'accepted',
+        durationMs: Date.now() - requestStartedAt,
+      });
       return { success: Boolean(whatsappMsgId), whatsappMsgId, response: data };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const graphError = { code: 'NETWORK_ERROR', message, recipient: to };
-      console.error('[WhatsApp] Message failed:', graphError);
-      logger.error('WhatsApp send error:', graphError);
+      logWhatsAppEvent('Message SEND_REJECTED', {
+        businessId: params.businessId,
+        conversationId: params.conversationId,
+        campaignId: params.campaignId,
+        recipientId: to,
+        code: graphError.code,
+        message: graphError.message,
+        durationMs: Date.now() - requestStartedAt,
+      }, 'error');
       return { success: false, whatsappMsgId: null, error: graphError };
     }
   }

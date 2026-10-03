@@ -65,6 +65,8 @@ export async function sendConversationMessage(
 
   const msgType = (type ?? 'TEXT') as OutboundMessageType;
   const sendResult = await whatsappService.sendOutbound({
+    businessId,
+    conversationId: params.conversationId,
     phoneNumberId,
     to: recipient,
     accessToken,
