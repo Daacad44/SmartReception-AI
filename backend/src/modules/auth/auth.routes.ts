@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { authController } from './auth.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { createRateLimiter } from '../../core/rate-limit-store';
@@ -21,9 +22,10 @@ const loginLimiter = createRateLimiter({
   message: 'Too many login attempts, please try again later',
   code: 'RATE_LIMITED',
   keyGenerator: (req) => {
-    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown-ip';
+    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+    const clientIp = rawIp ? ipKeyGenerator(rawIp) : 'unknown-ip';
     const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : 'anonymous';
-    return `login:${rawIp}:${email}`;
+    return `login:${clientIp}:${email}`;
   },
 });
 

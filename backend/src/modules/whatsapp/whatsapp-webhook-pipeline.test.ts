@@ -14,7 +14,7 @@ test('failed status preserves all optional Meta error fields', () => {
   });
   const at = new Date('2026-10-03T20:11:00.000Z');
   assert.deepEqual(deliveryFailureMetadata(parsed.statuses[0].errors, at), {
-    failedReason: 'Meta message', failureCode: '131047', failureTitle: 'Re-engagement message',
+    failedReason: 'WhatsApp error 131047: Meta details', failureCode: '131047', failureTitle: 'Re-engagement message',
     failureMessage: 'Meta message', failureDetails: 'Meta details',
     failureHref: 'https://developers.facebook.com/docs/whatsapp', failedAt: at,
   });

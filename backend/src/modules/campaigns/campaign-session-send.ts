@@ -73,15 +73,19 @@ export function resolveCampaignSessionSend(input: {
     return { type: input.messageType as OutboundMessageType };
   }
 
-  if (input.sessionOpen) {
+  const linkedMetaTemplateName =
+    input.template?.whatsappTemplateName ??
+    (input.template && isMetaTemplateSlug(input.template.name) ? input.template.name.trim() : null);
+
+  // A campaign explicitly linked to a Meta template must always be sent through
+  // the template endpoint. Converting it to free-form TEXT during a locally
+  // estimated open session discards its approved-template identity and can be
+  // rejected asynchronously by Meta with 131047.
+  const metaTemplateName = linkedMetaTemplateName ?? (!input.sessionOpen ? input.reengagement?.name : null);
+
+  if (!metaTemplateName && input.sessionOpen) {
     return { type: 'TEXT' };
   }
-
-  const metaTemplateName =
-    input.template?.whatsappTemplateName ??
-    (input.template && isMetaTemplateSlug(input.template.name) ? input.template.name.trim() : null) ??
-    input.reengagement?.name ??
-    null;
 
   if (!metaTemplateName) {
     return {
@@ -95,7 +99,7 @@ export function resolveCampaignSessionSend(input: {
     input.template?.whatsappTemplateLanguage ?? input.reengagement?.language ?? 'en'
   );
 
-  const useBodyVariable = input.template?.whatsappTemplateName
+  const useBodyVariable = linkedMetaTemplateName
     ? templateUsesBodyVariables(input.template)
     : (input.reengagement?.hasBodyVariable ?? false);
 
