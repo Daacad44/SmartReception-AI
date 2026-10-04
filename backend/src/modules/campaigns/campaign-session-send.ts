@@ -100,7 +100,7 @@ export function resolveCampaignSessionSend(input: {
   );
 
   const useBodyVariable = linkedMetaTemplateName
-    ? templateUsesBodyVariables(input.template)
+    ? input.template ? templateUsesBodyVariables(input.template) : false
     : (input.reengagement?.hasBodyVariable ?? false);
 
   const templateForParams = input.template ?? {
