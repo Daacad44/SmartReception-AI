@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'net';
 import express, { type Express } from 'express';
 import cors from 'cors';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { createRateLimiter } from '../../core/rate-limit-store';
 import { errorHandler, notFoundHandler } from '../../core/error-handler';
 
@@ -37,9 +38,10 @@ function createAuthApp(): Express {
     message: 'Too many login attempts, please try again later',
     code: 'RATE_LIMITED',
     keyGenerator: (req) => {
-      const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown-ip';
+      const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+      const clientIp = rawIp ? ipKeyGenerator(rawIp) : 'unknown-ip';
       const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : 'anonymous';
-      return `login:${rawIp}:${email}`;
+      return `login:${clientIp}:${email}`;
     },
   });
 

@@ -696,13 +696,9 @@ export class CampaignsService {
             status: 'PENDING',
             isSent: false,
             whatsappMsgId: null,
-            failedReason: null,
-            failureCode: null,
-            failureTitle: null,
-            failureMessage: null,
-            failureDetails: null,
-            failureHref: null,
-            failedAt: null,
+            // Keep the previous failure metadata until this attempt succeeds.
+            // The batch sender uses Meta's authoritative 131047 result to force
+            // a template retry even if our local 24-hour-session estimate is stale.
             runVersion: nextRunVersion,
           },
         });

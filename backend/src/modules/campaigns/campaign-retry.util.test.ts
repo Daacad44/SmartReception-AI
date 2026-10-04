@@ -149,6 +149,26 @@ test('closed session TEXT send uses Meta template; missing template skips', () =
   assert.equal(openSession.type, 'TEXT');
   assert.equal(openSession.skipReason, undefined);
 
+  const approvedTemplateInOpenSession = resolveCampaignSessionSend({
+    messageType: 'TEXT',
+    sessionOpen: true,
+    template: {
+      name: 'Welcome',
+      content: 'Hi {{customer_name}}',
+      variables: ['customer_name'],
+      whatsappTemplateName: 'approved_welcome',
+      whatsappTemplateLanguage: 'en_US',
+    },
+    reengagement: null,
+    personalization: { businessName: 'Botan', customer },
+  });
+  assert.equal(approvedTemplateInOpenSession.type, 'TEMPLATE');
+  assert.equal(approvedTemplateInOpenSession.templateName, 'approved_welcome');
+  assert.equal(approvedTemplateInOpenSession.templateLanguage, 'en_US');
+  assert.deepEqual(approvedTemplateInOpenSession.templateComponents, [
+    { type: 'body', parameters: [{ type: 'text', text: 'Ahmed' }] },
+  ]);
+
   const media = resolveCampaignSessionSend({
     messageType: 'IMAGE',
     sessionOpen: false,

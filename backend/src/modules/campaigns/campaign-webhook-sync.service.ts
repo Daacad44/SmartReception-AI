@@ -27,9 +27,14 @@ export function canApplyCampaignWebhookStatus(current: string, incoming: WhatsAp
 
 export function deliveryFailureMetadata(errors: WhatsAppWebhookError[] | undefined, at: Date) {
   const error = errors?.[0];
+  const failureCode = error?.code === undefined ? null : String(error.code);
+  const explanation = error?.error_data?.details ?? error?.message ?? error?.title ?? 'Delivery failed';
   return {
-    failedReason: error?.message ?? error?.title ?? 'Delivery failed',
-    failureCode: error?.code === undefined ? null : String(error.code),
+    // Meta's `message` is often only a category (for example "Re-engagement
+    // message"). Prefer error_data.details so Campaign Center shows the actual
+    // corrective cause instead of an unhelpful heading.
+    failedReason: failureCode ? `WhatsApp error ${failureCode}: ${explanation}` : explanation,
+    failureCode,
     failureTitle: error?.title ?? null,
     failureMessage: error?.message ?? null,
     failureDetails: error?.error_data?.details ?? null,

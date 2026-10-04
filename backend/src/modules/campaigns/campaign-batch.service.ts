@@ -94,9 +94,13 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
 
       const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
       const sessionWindow = await getWhatsAppSessionWindow('', recipient.customerId);
+      const metaRejectedFreeForm = recipient.failureCode === '131047';
       const outbound = resolveCampaignSessionSend({
         messageType: campaign.messageType,
-        sessionOpen: sessionWindow.isOpen,
+        // Meta is the source of truth. Once it reports 131047, do not repeat the
+        // same free-form send merely because a local timestamp says the session
+        // is open; retry through an approved template instead.
+        sessionOpen: sessionWindow.isOpen && !metaRejectedFreeForm,
         template: campaign.template,
         reengagement: {
           name: whatsappAccount.reengagementTemplateName,
@@ -142,6 +146,13 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
             isSent: true,
             whatsappMsgId: result.whatsappMsgId,
             sentAt: new Date(),
+            failedReason: null,
+            failureCode: null,
+            failureTitle: null,
+            failureMessage: null,
+            failureDetails: null,
+            failureHref: null,
+            failedAt: null,
           },
         });
       } else {
