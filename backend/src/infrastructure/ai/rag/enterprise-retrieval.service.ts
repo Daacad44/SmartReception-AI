@@ -18,6 +18,17 @@ import { resolveEmbeddingProvider } from '../providers/provider-factory';
 import type { EnterpriseRetrievalResult, ScoredChunk } from './types';
 import type { RouteContext } from '../ai-intent-router.service';
 
+export function resolveVersionDocumentIds(snapshotData: unknown): string[] {
+  if (!snapshotData || typeof snapshotData !== 'object') return [];
+  const documents = (snapshotData as { documents?: unknown }).documents;
+  if (!Array.isArray(documents)) return [];
+  return [...new Set(documents.flatMap((document) => {
+    if (!document || typeof document !== 'object') return [];
+    const id = (document as { id?: unknown }).id;
+    return typeof id === 'string' && id.trim() ? [id] : [];
+  }))];
+}
+
 function parseEmbedding(value: unknown): number[] | null {
   if (!value) return null;
   if (Array.isArray(value) && value.every((v) => typeof v === 'number')) {
@@ -53,9 +64,14 @@ async function getQueryEmbedding(businessId: string, query: string): Promise<num
   return embedding ?? null;
 }
 
-async function loadBusinessChunks(businessId: string) {
+async function loadBusinessChunks(businessId: string, documentIds?: string[]) {
   let chunks = await prisma.knowledgeChunk.findMany({
-    where: { businessId, isActive: true, status: 'ACTIVE' },
+    where: {
+      businessId,
+      isActive: true,
+      status: 'ACTIVE',
+      ...(documentIds ? { documentId: { in: documentIds } } : {}),
+    },
     select: {
       id: true,
       title: true,
@@ -73,7 +89,7 @@ async function loadBusinessChunks(businessId: string) {
     take: 300,
   });
 
-  if (!chunks.length) {
+  if (!chunks.length && !documentIds) {
     await backfillChunksFromLegacyDocuments(businessId);
     chunks = await prisma.knowledgeChunk.findMany({
       where: { businessId, isActive: true, status: 'ACTIVE' },
@@ -101,9 +117,10 @@ async function loadBusinessChunks(businessId: string) {
 async function scoreChunks(
   businessId: string,
   query: string,
-  categoryHints: string[]
+  categoryHints: string[],
+  documentIds?: string[]
 ): Promise<{ candidates: ScoredChunk[]; baselineCharEstimate: number }> {
-  const chunks = await loadBusinessChunks(businessId);
+  const chunks = await loadBusinessChunks(businessId, documentIds);
   const baselineCharEstimate = chunks.reduce((sum, c) => sum + c.content.length, 0);
 
   if (!chunks.length) {
@@ -166,11 +183,22 @@ export async function executeEnterpriseRetrieval(
   businessId: string,
   query: string,
   routeContext: RouteContext,
-  options: { topK?: number; allowSecondary?: boolean } = {}
+  options: { topK?: number; allowSecondary?: boolean; versionId?: string } = {}
 ): Promise<EnterpriseRetrievalResult> {
   const retrievalStarted = Date.now();
   const topK = options.topK ?? config.ai.ragTopK;
   const intentResult = detectCustomerIntent(query, routeContext);
+  let versionDocumentIds: string[] | undefined;
+
+  if (options.versionId) {
+    const version = await prisma.aiTrainingVersion.findFirst({
+      where: { id: options.versionId, businessId },
+      select: { snapshotData: true },
+    });
+    // An unknown/cross-tenant version must retrieve no knowledge rather than
+    // silently falling back to the business's live production index.
+    versionDocumentIds = resolveVersionDocumentIds(version?.snapshotData);
+  }
 
   if (intentResult.route === 'business_profile') {
     return {
@@ -194,7 +222,7 @@ export async function executeEnterpriseRetrieval(
     };
   }
 
-  const cached = getCachedRetrieval(businessId, query);
+  const cached = options.versionId ? null : getCachedRetrieval(businessId, query);
   if (cached?.length) {
     const { groundedConfidence, hallucinationRisk, maxScore, avgScore } =
       computeGroundedConfidence(cached);
@@ -222,7 +250,8 @@ export async function executeEnterpriseRetrieval(
   let { candidates, baselineCharEstimate } = await scoreChunks(
     businessId,
     query,
-    intentResult.categoryHints
+    intentResult.categoryHints,
+    versionDocumentIds
   );
 
   let secondaryRetrievalUsed = false;
@@ -231,7 +260,12 @@ export async function executeEnterpriseRetrieval(
     config.ai.ragSecondaryRetrieval &&
     candidates.filter((c) => c.score >= config.ai.ragMinScore).length < 2
   ) {
-    const broader = await scoreChunks(businessId, `${query} ${intentResult.intent}`, []);
+    const broader = await scoreChunks(
+      businessId,
+      `${query} ${intentResult.intent}`,
+      [],
+      versionDocumentIds
+    );
     const merged = new Map<string, ScoredChunk>();
     for (const c of [...candidates, ...broader.candidates]) {
       const existing = merged.get(c.id);
@@ -249,7 +283,7 @@ export async function executeEnterpriseRetrieval(
     computeGroundedConfidence(finalChunks);
 
   if (finalChunks.length) {
-    setCachedRetrieval(businessId, query, finalChunks);
+    if (!options.versionId) setCachedRetrieval(businessId, query, finalChunks);
     const scoreMap = new Map(finalChunks.map((c) => [c.id, c.score]));
     void recordChunkRetrieval(finalChunks.map((c) => c.id), scoreMap).catch(() => undefined);
   }
