@@ -85,6 +85,7 @@ export class SandboxService {
     const result = await generateResponse(businessId, `sandbox-${sessionId}`, content, {
       sandbox: true,
       preferEnglish,
+      versionId: session.versionId,
     });
     const meta = result._meta;
 
@@ -232,17 +233,24 @@ export class SandboxService {
         }),
         prisma.aiTrainingWorkspace.findUnique({ where: { businessId } }),
         prisma.aiSandboxSession.aggregate({
-          where: { businessId },
+          where: { businessId, ...(versionId ? { versionId } : {}) },
           _count: { _all: true },
         }),
         prisma.aiDeploymentRequest.findFirst({
-          where: { businessId, status: { in: ['APPROVED', 'DEPLOYED'] } },
+          where: {
+            businessId,
+            ...(versionId ? { versionId } : {}),
+            status: { in: ['APPROVED', 'DEPLOYED'] },
+          },
           orderBy: { requestedAt: 'desc' },
         }),
       ]);
 
     const sandboxMessageCount = await prisma.aiSandboxMessage.count({
-      where: { session: { businessId }, role: 'ASSISTANT' },
+      where: {
+        session: { businessId, ...(versionId ? { versionId } : {}) },
+        role: 'ASSISTANT',
+      },
     });
 
     const version = versionId
