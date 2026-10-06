@@ -69,4 +69,5 @@ Webhook: `https://<domain>/api/v1/webhooks/whatsapp`
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_STUDIO_V2_ENABLED` | `false` | Enables the future AI Agent Studio v2 surfaces. Keep disabled throughout Phase 0/1 compatibility rollout. |
+| `AGENT_STUDIO_V2_ENABLED` | `false` | Enables the protected Agent Studio backend API. |
+| `VITE_AGENT_STUDIO_V2_ENABLED` | `false` | Shows the Agent Studio route and navigation in the frontend build. Enable only after the backend migration and API are ready. |
