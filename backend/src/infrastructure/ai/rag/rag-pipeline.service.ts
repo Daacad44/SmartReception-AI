@@ -39,6 +39,8 @@ export interface RagPipelineOptions {
    * pollute live cost or conversation metrics.
    */
   sandbox?: boolean;
+  /** Version-scoped retrieval used by the training sandbox. */
+  versionId?: string;
 }
 
 /** Super-admin-only diagnostics attached to every pipeline result. */
@@ -102,7 +104,12 @@ export async function executeRagPipeline(
     getCachedBusinessProfile(businessId),
     loadBusinessAIPrompt(businessId),
     buildConversationMemory(businessId, conversationId),
-    executeEnterpriseRetrieval(businessId, customerMessage, { isFirstCustomerMessage }),
+    executeEnterpriseRetrieval(
+      businessId,
+      customerMessage,
+      { isFirstCustomerMessage },
+      { versionId: options.versionId }
+    ),
   ]);
 
   const route = options.forceRoute ?? retrieval.route;

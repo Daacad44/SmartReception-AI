@@ -16,6 +16,8 @@ export interface GenerateResponseOptions {
   customerId?: string;
   messageId?: string;
   sandbox?: boolean;
+  /** Restrict retrieval to this immutable training-version snapshot. */
+  versionId?: string;
 }
 
 let genAI: GoogleGenerativeAI | null = null;
