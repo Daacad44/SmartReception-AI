@@ -1,13 +1,38 @@
 import type { NextFunction, Request, Response } from 'express';
 import { aiAgentStudioService } from './ai-agent-studio.service';
 import {
+  applyAgentDiscoverySchema,
   createAgentReleaseSchema,
   updateAgentDraftSchema,
   updateAgentSchema,
   upsertAgentSkillSchema,
 } from './ai-agent-studio.schemas';
+import { agentDiscoveryService } from './agent-discovery.service';
 
 export class AiAgentStudioController {
+  listDiscoveryTemplates = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: agentDiscoveryService.listTemplates() });
+    } catch (error) { next(error); }
+  };
+
+  getDiscovery = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await agentDiscoveryService.getDiscovery(req.user!.businessId!, String(req.params.agentId));
+      res.json({ success: true, data });
+    } catch (error) { next(error); }
+  };
+
+  applyDiscovery = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = applyAgentDiscoverySchema.parse(req.body);
+      const data = await agentDiscoveryService.apply(
+        req.user!.businessId!, String(req.params.agentId), input, req.user!.userId
+      );
+      res.json({ success: true, data });
+    } catch (error) { next(error); }
+  };
+
   listAgents = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await aiAgentStudioService.listAgents(req.user!.businessId!, req.user!.userId);

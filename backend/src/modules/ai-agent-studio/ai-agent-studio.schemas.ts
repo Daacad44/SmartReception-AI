@@ -31,7 +31,23 @@ export const upsertAgentSkillSchema = z.object({
   configuration: jsonObject.default({}),
 });
 
+export const applyAgentDiscoverySchema = z.object({
+  expectedRevision: z.number().int().positive(),
+  templateId: z.string().trim().min(2).max(80),
+  answers: z.object({
+    primaryGoal: z.string().trim().min(10).max(1000),
+    customerTypes: z.array(z.string().trim().min(2).max(120)).min(1).max(20),
+    commonQuestions: z.array(z.string().trim().min(3).max(500)).min(1).max(50),
+    prohibitedTopics: z.array(z.string().trim().min(2).max(300)).max(30).default([]),
+    handoverRules: z.array(z.string().trim().min(3).max(500)).min(1).max(30),
+    tone: z.enum(['PROFESSIONAL', 'FRIENDLY', 'FORMAL', 'CONCISE']),
+    languages: z.array(z.string().trim().min(2).max(10)).min(1).max(10),
+    operatingNotes: z.string().trim().max(2000).default(''),
+  }),
+});
+
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
 export type UpdateAgentDraftInput = z.infer<typeof updateAgentDraftSchema>;
 export type CreateAgentReleaseInput = z.infer<typeof createAgentReleaseSchema>;
 export type UpsertAgentSkillInput = z.infer<typeof upsertAgentSkillSchema>;
+export type ApplyAgentDiscoveryInput = z.infer<typeof applyAgentDiscoverySchema>;

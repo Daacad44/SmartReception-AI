@@ -21,11 +21,14 @@ function requireAgentStudioV2(_req: Request, res: Response, next: NextFunction) 
 }
 
 router.use(requireAgentStudioV2);
+router.get('/discovery/templates', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listDiscoveryTemplates);
 router.get('/', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listAgents);
 router.get('/:agentId', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.getAgent);
 router.patch('/:agentId', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateAgent);
 router.put('/:agentId/draft', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateDraft);
 router.post('/:agentId/releases', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.createRelease);
 router.put('/:agentId/skills/:skillKey', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.upsertSkill);
+router.get('/:agentId/discovery', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.getDiscovery);
+router.post('/:agentId/discovery/apply', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.applyDiscovery);
 
 export default router;

@@ -48,3 +48,23 @@ export interface AgentStudioAgent {
   skills: AgentStudioSkill[];
   _count?: { releases: number; executions: number };
 }
+
+export interface AgentDiscoveryTemplate {
+  id: string;
+  name: string;
+  industries: string[];
+  agentType: AgentStudioAgent['type'];
+  role: string;
+  objectives: string[];
+  boundaries: string[];
+  suggestedSkills: string[];
+  requiredFacts: string[];
+}
+
+export interface AgentDiscoveryReadiness {
+  recommendedTemplateId: string;
+  business: { name: string; industry: string; businessType?: string | null };
+  documentCount: number;
+  checks: Array<{ key: string; label: string; complete: boolean }>;
+  readinessPercent: number;
+}

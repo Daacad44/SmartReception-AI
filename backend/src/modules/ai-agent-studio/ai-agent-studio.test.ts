@@ -4,10 +4,12 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { buildLegacyReleaseSnapshot } from './ai-agent-studio.service';
 import {
+  applyAgentDiscoverySchema,
   createAgentReleaseSchema,
   updateAgentDraftSchema,
   upsertAgentSkillSchema,
 } from './ai-agent-studio.schemas';
+import { AGENT_DISCOVERY_TEMPLATES, templateForIndustry } from './agent-discovery.templates';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -66,4 +68,29 @@ test('Phase 2 migration creates and backfills the complete Agent Studio foundati
   }
   assert.match(sql, /Migrated from the legacy AI Training workspace/);
   assert.match(sql, /ON CONFLICT \("sourceTrainingVersionId"\) DO NOTHING/);
+});
+
+test('Phase 4 discovery selects category templates with a safe general fallback', () => {
+  assert.equal(templateForIndustry('CLINIC').id, 'healthcare-reception');
+  assert.equal(templateForIndustry('ECOMMERCE').id, 'commerce-sales');
+  assert.equal(templateForIndustry('UNKNOWN').id, 'general-business');
+  assert.ok(AGENT_DISCOVERY_TEMPLATES.every((template) => template.boundaries.length > 0));
+});
+
+test('Phase 4 discovery requires enough business context to train professionally', () => {
+  assert.equal(applyAgentDiscoverySchema.safeParse({}).success, false);
+  assert.equal(applyAgentDiscoverySchema.safeParse({
+    expectedRevision: 2,
+    templateId: 'healthcare-reception',
+    answers: {
+      primaryGoal: 'Help patients get accurate clinic information and appointments.',
+      customerTypes: ['Patients'],
+      commonQuestions: ['When is the clinic open?'],
+      prohibitedTopics: ['Medical diagnosis'],
+      handoverRules: ['Handover every clinical question'],
+      tone: 'PROFESSIONAL',
+      languages: ['so', 'en'],
+      operatingNotes: '',
+    },
+  }).success, true);
 });

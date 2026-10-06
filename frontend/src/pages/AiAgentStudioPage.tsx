@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, CheckCircle2, History, Loader2, MessageCircle, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
-import type { AgentStudioAgent, AgentStudioSkill } from '@/lib/agent-studio';
+import type { AgentDiscoveryReadiness, AgentDiscoveryTemplate, AgentStudioAgent, AgentStudioSkill } from '@/lib/agent-studio';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,12 @@ export function AiAgentStudioPage() {
   const [description, setDescription] = useState('');
   const [role, setRole] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [primaryGoal, setPrimaryGoal] = useState('');
+  const [customerTypes, setCustomerTypes] = useState('');
+  const [commonQuestions, setCommonQuestions] = useState('');
+  const [handoverRules, setHandoverRules] = useState('');
+  const [prohibitedTopics, setProhibitedTopics] = useState('');
 
   const agentsQuery = useQuery({
     queryKey: ['ai-agent-studio'],
@@ -43,6 +49,15 @@ export function AiAgentStudioPage() {
     },
   });
   const agent = agentsQuery.data?.[0];
+  const discoveryQuery = useQuery({
+    queryKey: ['ai-agent-studio', agent?.id, 'discovery'],
+    queryFn: async () => extractData<AgentDiscoveryReadiness>(await api.get(`/ai-agent-studio/${agent!.id}/discovery`)),
+    enabled: Boolean(agent),
+  });
+  const templatesQuery = useQuery({
+    queryKey: ['ai-agent-studio', 'discovery-templates'],
+    queryFn: async () => extractData<AgentDiscoveryTemplate[]>(await api.get('/ai-agent-studio/discovery/templates')),
+  });
 
   useEffect(() => {
     if (!agent) return;
@@ -50,6 +65,10 @@ export function AiAgentStudioPage() {
     setDescription(agent.description ?? '');
     setRole(typeof agent.draft?.instructions.role === 'string' ? agent.draft.instructions.role : '');
   }, [agent]);
+
+  useEffect(() => {
+    if (!templateId && discoveryQuery.data?.recommendedTemplateId) setTemplateId(discoveryQuery.data.recommendedTemplateId);
+  }, [discoveryQuery.data?.recommendedTemplateId, templateId]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['ai-agent-studio'] });
   const identityMutation = useMutation({
@@ -83,6 +102,27 @@ export function AiAgentStudioPage() {
     onSuccess: async () => { await invalidate(); toast.success('Skill policy updated'); },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
+  const discoveryMutation = useMutation({
+    mutationFn: () => api.post(`/ai-agent-studio/${agent!.id}/discovery/apply`, {
+      expectedRevision: agent!.draft!.revision,
+      templateId,
+      answers: {
+        primaryGoal,
+        customerTypes: customerTypes.split('\n').map((item) => item.trim()).filter(Boolean),
+        commonQuestions: commonQuestions.split('\n').map((item) => item.trim()).filter(Boolean),
+        prohibitedTopics: prohibitedTopics.split('\n').map((item) => item.trim()).filter(Boolean),
+        handoverRules: handoverRules.split('\n').map((item) => item.trim()).filter(Boolean),
+        tone: 'PROFESSIONAL',
+        languages: agent!.supportedLanguages,
+        operatingNotes: '',
+      },
+    }),
+    onSuccess: async () => {
+      await Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: ['ai-agent-studio', agent!.id, 'discovery'] })]);
+      toast.success('Business discovery applied to the agent draft');
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
 
   const readiness = useMemo(() => {
     if (!agent) return [];
@@ -100,7 +140,8 @@ export function AiAgentStudioPage() {
   if (!agent) return <ErrorState message="No WhatsApp agent could be provisioned for this business." onRetry={() => agentsQuery.refetch()} />;
 
   const completed = readiness.filter((item) => item.complete).length;
-  const busy = identityMutation.isPending || draftMutation.isPending || releaseMutation.isPending || skillMutation.isPending;
+  const busy = identityMutation.isPending || draftMutation.isPending || releaseMutation.isPending || skillMutation.isPending || discoveryMutation.isPending;
+  const discoveryReady = primaryGoal.trim().length >= 10 && customerTypes.trim().length >= 2 && commonQuestions.trim().length >= 3 && handoverRules.trim().length >= 3 && Boolean(templateId) && Boolean(agent.draft);
 
   return (
     <div className="space-y-6 pb-10">
@@ -119,12 +160,15 @@ export function AiAgentStudioPage() {
       </section>
 
       <Tabs defaultValue="overview" className="space-y-5">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:w-auto md:grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="behavior">Behavior</TabsTrigger><TabsTrigger value="skills">Skills & safety</TabsTrigger><TabsTrigger value="releases">Releases</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:w-auto md:grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="discovery">Business discovery</TabsTrigger><TabsTrigger value="behavior">Behavior</TabsTrigger><TabsTrigger value="skills">Skills & safety</TabsTrigger><TabsTrigger value="releases">Releases</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Agent identity</CardTitle><CardDescription>This identity is customer-facing on WhatsApp.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="agent-name">Agent name</Label><Input id="agent-name" value={name} onChange={(e) => setName(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="agent-description">Purpose</Label><Textarea id="agent-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} /></div><Button disabled={busy || name.trim().length < 2} onClick={() => identityMutation.mutate()}>{identityMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save identity</Button></CardContent></Card>
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Launch checklist</CardTitle><CardDescription>Minimum controls for a dependable WhatsApp agent.</CardDescription></CardHeader><CardContent className="space-y-3">{readiness.map((item) => <div key={item.label} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{item.label}</span>{item.complete ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <span className="text-xs text-muted-foreground">Required</span>}</div>)}</CardContent></Card>
+        </TabsContent>
+        <TabsContent value="discovery" className="space-y-5">
+          <Card><CardHeader><CardTitle>Professional business discovery</CardTitle><CardDescription>Convert verified business context into structured instructions, safety boundaries and handover rules. Nothing is deployed automatically.</CardDescription></CardHeader><CardContent><div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{discoveryQuery.data?.checks.map((check) => <div key={check.key} className="flex items-center gap-2 rounded-lg border p-3 text-sm">{check.complete ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <span className="h-4 w-4 rounded-full border-2" />} {check.label}</div>)}</div><div className="grid gap-5 lg:grid-cols-2"><div className="space-y-4"><div className="space-y-2"><Label>Business template</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>{templatesQuery.data?.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></div><div className="space-y-2"><Label>Primary WhatsApp goal</Label><Textarea value={primaryGoal} onChange={(event) => setPrimaryGoal(event.target.value)} placeholder="Help customers receive accurate answers and reach the correct team..." rows={4} /></div><div className="space-y-2"><Label>Customer types — one per line</Label><Textarea value={customerTypes} onChange={(event) => setCustomerTypes(event.target.value)} placeholder={'New customers\nExisting customers'} rows={4} /></div></div><div className="space-y-4"><div className="space-y-2"><Label>Most common questions — one per line</Label><Textarea value={commonQuestions} onChange={(event) => setCommonQuestions(event.target.value)} placeholder={'What services do you provide?\nWhen are you open?'} rows={4} /></div><div className="space-y-2"><Label>Mandatory handover rules — one per line</Label><Textarea value={handoverRules} onChange={(event) => setHandoverRules(event.target.value)} placeholder={'Handover when approved information is unavailable\nHandover complaints'} rows={4} /></div><div className="space-y-2"><Label>Topics the agent must not answer — one per line</Label><Textarea value={prohibitedTopics} onChange={(event) => setProhibitedTopics(event.target.value)} placeholder="Legal advice" rows={3} /></div></div></div><div className="mt-5 flex items-center justify-between gap-4 rounded-xl bg-muted/50 p-4"><div><p className="font-medium">Discovery readiness: {discoveryQuery.data?.readinessPercent ?? 0}%</p><p className="text-sm text-muted-foreground">Applying this interview updates draft revision {agent.draft?.revision ?? '—'} safely.</p></div><Button disabled={busy || !discoveryReady} onClick={() => discoveryMutation.mutate()}>{discoveryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Apply to draft</Button></div></CardContent></Card>
         </TabsContent>
         <TabsContent value="behavior">
           <Card><CardHeader><CardTitle>Professional role & boundaries</CardTitle><CardDescription>Tell the agent what it represents and how it should serve customers. Draft revision {agent.draft?.revision ?? '—'} prevents accidental overwrites.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="agent-role">Primary instruction</Label><Textarea id="agent-role" value={role} onChange={(e) => setRole(e.target.value)} rows={8} placeholder="You are the professional WhatsApp receptionist for..." /></div><Button disabled={busy || !agent.draft || role.trim().length < 10} onClick={() => draftMutation.mutate()}>{draftMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save draft safely</Button></CardContent></Card>
