@@ -186,6 +186,12 @@ export const config = {
     maxContextMessages: parseInt(process.env.AI_MAX_CONTEXT_MESSAGES || '20', 10),
     timeoutMs: parseInt(process.env.AI_REPLY_TIMEOUT_MS || '5000', 10),
   },
+
+  features: {
+    // Phase 0 compatibility gate. The current UI/API remains the default until
+    // the Agent Studio domain and migration are ready for tenant rollout.
+    agentStudioV2: process.env.AGENT_STUDIO_V2_ENABLED === 'true',
+  },
 } as const;
 
 const INSECURE_JWT_SECRETS = new Set([
