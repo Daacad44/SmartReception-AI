@@ -10,6 +10,8 @@ import {
   upsertAgentSkillSchema,
 } from './ai-agent-studio.schemas';
 import { AGENT_DISCOVERY_TEMPLATES, templateForIndustry } from './agent-discovery.templates';
+import { knowledgeChecksum } from './agent-knowledge.service';
+import { evaluateReleaseSnapshot } from './agent-evaluation.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -93,4 +95,20 @@ test('Phase 4 discovery requires enough business context to train professionally
       operatingNotes: '',
     },
   }).success, true);
+});
+
+test('Phase 5 knowledge checksums detect identical content deterministically', () => {
+  const document = { title: 'Pricing', content: 'Approved price list', question: null, answer: null };
+  assert.equal(knowledgeChecksum(document), knowledgeChecksum({ ...document }));
+  assert.notEqual(knowledgeChecksum(document), knowledgeChecksum({ ...document, content: 'Changed' }));
+});
+
+test('Phase 6 release gate blocks ungrounded agents and passes governed snapshots', () => {
+  const unsafe = evaluateReleaseSnapshot({}, 0);
+  assert.ok(unsafe.some((gate) => gate.critical && !gate.passed));
+  const safe = evaluateReleaseSnapshot({
+    draft: { instructions: { role: 'Professional business receptionist', boundaries: ['Never invent facts'] }, escalationPolicy: { handoverOnMissingKnowledge: true } },
+    skills: [{ skillKey: 'human.handover', enabled: true }],
+  }, 2);
+  assert.equal(safe.filter((gate) => gate.critical && !gate.passed).length, 0);
 });

@@ -2,14 +2,43 @@ import type { NextFunction, Request, Response } from 'express';
 import { aiAgentStudioService } from './ai-agent-studio.service';
 import {
   applyAgentDiscoverySchema,
+  attachAgentKnowledgeSchema,
+  reviewAgentKnowledgeSchema,
   createAgentReleaseSchema,
   updateAgentDraftSchema,
   updateAgentSchema,
   upsertAgentSkillSchema,
 } from './ai-agent-studio.schemas';
 import { agentDiscoveryService } from './agent-discovery.service';
+import { agentKnowledgeService } from './agent-knowledge.service';
+import { agentEvaluationService } from './agent-evaluation.service';
 
 export class AiAgentStudioController {
+  listKnowledge = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentKnowledgeService.list(req.user!.businessId!, String(req.params.agentId)) }); }
+    catch (error) { next(error); }
+  };
+
+  attachKnowledge = async (req: Request, res: Response, next: NextFunction) => {
+    try { const input = attachAgentKnowledgeSchema.parse(req.body); res.status(201).json({ success: true, data: await agentKnowledgeService.attach(req.user!.businessId!, String(req.params.agentId), input, req.user!.userId) }); }
+    catch (error) { next(error); }
+  };
+
+  reviewKnowledge = async (req: Request, res: Response, next: NextFunction) => {
+    try { const input = reviewAgentKnowledgeSchema.parse(req.body); res.json({ success: true, data: await agentKnowledgeService.review(req.user!.businessId!, String(req.params.agentId), String(req.params.sourceId), input, req.user!.userId) }); }
+    catch (error) { next(error); }
+  };
+
+  evaluateRelease = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.status(201).json({ success: true, data: await agentEvaluationService.evaluate(req.user!.businessId!, String(req.params.agentId), String(req.params.releaseId), req.user!.userId) }); }
+    catch (error) { next(error); }
+  };
+
+  listEvaluations = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentEvaluationService.list(req.user!.businessId!, String(req.params.agentId)) }); }
+    catch (error) { next(error); }
+  };
+
   listDiscoveryTemplates = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ success: true, data: agentDiscoveryService.listTemplates() });

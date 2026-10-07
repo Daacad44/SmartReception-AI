@@ -46,8 +46,21 @@ export const applyAgentDiscoverySchema = z.object({
   }),
 });
 
+export const attachAgentKnowledgeSchema = z.object({
+  documentId: z.string().uuid(),
+  freshnessDays: z.number().int().min(7).max(730).default(90),
+});
+
+export const reviewAgentKnowledgeSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED']),
+  reviewNotes: z.string().trim().min(3).max(1000),
+  freshnessDays: z.number().int().min(7).max(730).default(90),
+});
+
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
 export type UpdateAgentDraftInput = z.infer<typeof updateAgentDraftSchema>;
 export type CreateAgentReleaseInput = z.infer<typeof createAgentReleaseSchema>;
 export type UpsertAgentSkillInput = z.infer<typeof upsertAgentSkillSchema>;
 export type ApplyAgentDiscoveryInput = z.infer<typeof applyAgentDiscoverySchema>;
+export type AttachAgentKnowledgeInput = z.infer<typeof attachAgentKnowledgeSchema>;
+export type ReviewAgentKnowledgeInput = z.infer<typeof reviewAgentKnowledgeSchema>;

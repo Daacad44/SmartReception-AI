@@ -30,5 +30,10 @@ router.post('/:agentId/releases', authorize(PERMISSIONS['knowledge:write']), aiA
 router.put('/:agentId/skills/:skillKey', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.upsertSkill);
 router.get('/:agentId/discovery', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.getDiscovery);
 router.post('/:agentId/discovery/apply', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.applyDiscovery);
+router.get('/:agentId/knowledge', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listKnowledge);
+router.post('/:agentId/knowledge', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.attachKnowledge);
+router.post('/:agentId/knowledge/:sourceId/review', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.reviewKnowledge);
+router.get('/:agentId/evaluations', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listEvaluations);
+router.post('/:agentId/releases/:releaseId/evaluate', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.evaluateRelease);
 
 export default router;

@@ -690,6 +690,7 @@ model Business {
   aiAgentReleases               AiAgentRelease[]
   aiAgentExecutions             AiAgentExecution[]
   aiAgentEvaluationRuns         AiAgentEvaluationRun[]
+  aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -1783,6 +1784,7 @@ model KnowledgeDocument {
 
   knowledgeBase KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   chunks        KnowledgeChunk[]
+  agentSources  AiAgentKnowledgeSource[]
 
   @@index([knowledgeBaseId])
   @@index([knowledgeBaseId, type])
@@ -3020,6 +3022,14 @@ enum AiAgentSkillRisk {
   CRITICAL
 }
 
+enum AiAgentKnowledgeStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  STALE
+  ARCHIVED
+}
+
 model AiTrainingWorkspace {
   id                  String    @id @default(uuid())
   businessId          String    @unique
@@ -3108,6 +3118,7 @@ model AiAgent {
   skills         AiAgentSkillConfiguration[]
   executions     AiAgentExecution[]
   evaluations    AiAgentEvaluationRun[]
+  knowledgeSources AiAgentKnowledgeSource[]
 
   @@unique([businessId, slug])
   @@index([businessId, status])
@@ -3274,6 +3285,49 @@ model AiAgentEvaluationCase {
   @@unique([runId, caseKey])
   @@index([runId, category])
   @@map("ai_agent_evaluation_cases")
+}
+
+model AiAgentKnowledgeSource {
+  id                String                 @id @default(uuid())
+  businessId        String
+  agentId           String
+  documentId        String
+  status            AiAgentKnowledgeStatus @default(PENDING_REVIEW)
+  contentChecksum   String
+  sourceVersion     Int                    @default(1)
+  reviewNotes       String?
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  freshnessDueAt   DateTime?
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revisions AiAgentKnowledgeRevision[]
+
+  @@unique([agentId, documentId])
+  @@unique([agentId, contentChecksum])
+  @@index([businessId, status])
+  @@index([agentId, freshnessDueAt])
+  @@map("ai_agent_knowledge_sources")
+}
+
+model AiAgentKnowledgeRevision {
+  id              String   @id @default(uuid())
+  sourceId        String
+  version         Int
+  contentChecksum String
+  snapshotData    Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  source AiAgentKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, version])
+  @@map("ai_agent_knowledge_revisions")
 }
 
 model AiTrainingJob {
