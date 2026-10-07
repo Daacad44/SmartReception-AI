@@ -41,6 +41,10 @@ export interface RagPipelineOptions {
   sandbox?: boolean;
   /** Version-scoped retrieval used by the training sandbox. */
   versionId?: string;
+  /** Production Agent Studio release-scoped document allowlist. */
+  documentIds?: string[];
+  /** Immutable active-release policy appended to the tenant system prompt. */
+  agentInstructions?: Record<string, unknown>;
 }
 
 /** Super-admin-only diagnostics attached to every pipeline result. */
@@ -108,13 +112,16 @@ export async function executeRagPipeline(
       businessId,
       customerMessage,
       { isFirstCustomerMessage },
-      { versionId: options.versionId }
+      { versionId: options.versionId, documentIds: options.documentIds }
     ),
   ]);
 
   const route = options.forceRoute ?? retrieval.route;
   const business = profile.business;
   const aiConfig = businessContext.aiConfiguration;
+  const releaseSystemPrompt = options.agentInstructions
+    ? `${businessContext.systemPrompt}\n\nACTIVE WHATSAPP AGENT RELEASE POLICY (mandatory):\n${JSON.stringify(options.agentInstructions)}\nNever contradict these boundaries. If approved knowledge does not support an answer, request human handover.`
+    : businessContext.systemPrompt;
 
   const fallback: AIResponse = {
     content: businessContext.fallbackMessage || aiConfig?.fallbackMessage || GEMINI_ERROR_MESSAGE_SO,
@@ -171,7 +178,7 @@ export async function executeRagPipeline(
     const profileContext = await getBusinessProfileContext(businessId);
     built = buildEnterpriseProfilePrompt({
       businessName: businessContext.businessName,
-      systemPrompt: businessContext.systemPrompt,
+      systemPrompt: releaseSystemPrompt,
       compressed,
       customerMessage,
       preferEnglish,
@@ -232,7 +239,7 @@ export async function executeRagPipeline(
 
     built = buildEnterpriseKnowledgePrompt({
       businessName: businessContext.businessName,
-      systemPrompt: businessContext.systemPrompt,
+      systemPrompt: releaseSystemPrompt,
       compressed,
       customerMessage,
       preferEnglish,

@@ -18,6 +18,10 @@ export interface GenerateResponseOptions {
   sandbox?: boolean;
   /** Restrict retrieval to this immutable training-version snapshot. */
   versionId?: string;
+  /** Restrict retrieval to explicitly approved Agent Studio documents. */
+  documentIds?: string[];
+  /** Immutable instructions compiled into the active Agent Studio release. */
+  agentInstructions?: Record<string, unknown>;
 }
 
 let genAI: GoogleGenerativeAI | null = null;

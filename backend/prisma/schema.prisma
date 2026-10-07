@@ -3217,7 +3217,7 @@ model AiAgentExecution {
   agentId           String
   releaseId         String?
   conversationId    String?
-  inboundMessageId  String?
+  inboundMessageId  String?                @unique
   status            AiAgentExecutionStatus @default(RUNNING)
   intent            String?
   input              Json?

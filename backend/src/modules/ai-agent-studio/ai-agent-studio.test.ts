@@ -12,6 +12,7 @@ import {
 import { AGENT_DISCOVERY_TEMPLATES, templateForIndustry } from './agent-discovery.templates';
 import { knowledgeChecksum } from './agent-knowledge.service';
 import { evaluateReleaseSnapshot } from './agent-evaluation.service';
+import { enforceRuntimePolicy } from './agent-runtime.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -111,4 +112,19 @@ test('Phase 6 release gate blocks ungrounded agents and passes governed snapshot
     skills: [{ skillKey: 'human.handover', enabled: true }],
   }, 2);
   assert.equal(safe.filter((gate) => gate.critical && !gate.passed).length, 0);
+});
+
+test('Phase 7 runtime hands over low-grounding responses and blocks unconfirmed writes', () => {
+  const unsafe = enforceRuntimePolicy({ content: 'Guess', intent: 'general', confidence: 0.2, actions: [{ type: 'none' }], _meta: { missingKnowledge: true } as never }, [], false);
+  assert.equal(unsafe.status, 'HANDED_OVER');
+  assert.equal(unsafe.response.actions[0]?.type, 'escalate');
+
+  const write = enforceRuntimePolicy(
+    { content: 'Ready', intent: 'booking', confidence: 0.9, actions: [{ type: 'book_appointment', data: {} }] },
+    [{ skillKey: 'appointment.create', enabled: true, requiresConfirmation: true }],
+    true
+  );
+  assert.equal(write.status, 'HANDED_OVER');
+  assert.deepEqual(write.blockedActions, ['book_appointment']);
+  assert.equal(write.response.actions.some((action) => action.type === 'book_appointment'), false);
 });

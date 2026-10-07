@@ -183,12 +183,14 @@ export async function executeEnterpriseRetrieval(
   businessId: string,
   query: string,
   routeContext: RouteContext,
-  options: { topK?: number; allowSecondary?: boolean; versionId?: string } = {}
+  options: { topK?: number; allowSecondary?: boolean; versionId?: string; documentIds?: string[] } = {}
 ): Promise<EnterpriseRetrievalResult> {
   const retrievalStarted = Date.now();
   const topK = options.topK ?? config.ai.ragTopK;
   const intentResult = detectCustomerIntent(query, routeContext);
-  let versionDocumentIds: string[] | undefined;
+  let versionDocumentIds: string[] | undefined = options.documentIds
+    ? [...new Set(options.documentIds.filter(Boolean))]
+    : undefined;
 
   if (options.versionId) {
     const version = await prisma.aiTrainingVersion.findFirst({
@@ -222,7 +224,8 @@ export async function executeEnterpriseRetrieval(
     };
   }
 
-  const cached = options.versionId ? null : getCachedRetrieval(businessId, query);
+  const scopedRetrieval = options.versionId !== undefined || options.documentIds !== undefined;
+  const cached = scopedRetrieval ? null : getCachedRetrieval(businessId, query);
   if (cached?.length) {
     const { groundedConfidence, hallucinationRisk, maxScore, avgScore } =
       computeGroundedConfidence(cached);
@@ -283,7 +286,7 @@ export async function executeEnterpriseRetrieval(
     computeGroundedConfidence(finalChunks);
 
   if (finalChunks.length) {
-    if (!options.versionId) setCachedRetrieval(businessId, query, finalChunks);
+    if (!scopedRetrieval) setCachedRetrieval(businessId, query, finalChunks);
     const scoreMap = new Map(finalChunks.map((c) => [c.id, c.score]));
     void recordChunkRetrieval(finalChunks.map((c) => c.id), scoreMap).catch(() => undefined);
   }

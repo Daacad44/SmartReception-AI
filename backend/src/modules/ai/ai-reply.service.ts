@@ -1,4 +1,3 @@
-import { aiService } from '../../infrastructure/ai/conversation-ai.service';
 import { whatsappService } from '../../infrastructure/whatsapp/whatsapp.service';
 import { prisma } from '../../infrastructure/database/prisma';
 import { conversationScope } from '../../infrastructure/database/tenant-query';
@@ -17,6 +16,7 @@ import type { LeadData } from '../../infrastructure/ai/ai.types';
 import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 import { shouldAiReply } from '../conversations/conversation-handoff.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
+import { agentRuntimeService } from '../ai-agent-studio/agent-runtime.service';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -123,17 +123,26 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     })
     .catch(() => {});
 
-  const aiResponse = await aiService.generateResponse(
+  const runtimeResult = await agentRuntimeService.execute({
     businessId,
     conversationId,
+    inboundMessageId,
     customerMessage,
-    {
-      preferEnglish: params.preferEnglish,
-      isFirstCustomerMessage: params.isFirstCustomerMessage,
-      customerId: conversation.customerId,
-      messageId: inboundMessageId,
+    customerId: conversation.customerId,
+    preferEnglish: params.preferEnglish,
+    isFirstCustomerMessage: params.isFirstCustomerMessage,
+  });
+  const aiResponse = runtimeResult.response;
+  if (runtimeResult.reused && runtimeResult.executionId) {
+    const alreadyPersisted = await prisma.message.findFirst({
+      where: { conversationId, direction: 'OUTBOUND', status: 'SENT', metadata: { path: ['agentExecutionId'], equals: runtimeResult.executionId } },
+      select: { id: true },
+    });
+    if (alreadyPersisted) {
+      logger.info('Skipping duplicate Agent Studio outbound reply', { executionId: runtimeResult.executionId, inboundMessageId });
+      return;
     }
-  );
+  }
   if (params.pipelineKey) {
     logPipelineStep(params.pipelineKey, 'ai_finished', { intent: aiResponse.intent });
   }
@@ -186,11 +195,15 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
       isAiGenerated: true,
       status: sendResult.success ? 'SENT' : 'FAILED',
       whatsappMsgId: sendResult.whatsappMsgId,
-      metadata: sendResult.error
-        ? { graphApiError: sendResult.error as object }
-        : sendResult.response
-          ? { graphApiResponse: sendResult.response as object }
-          : undefined,
+      metadata: {
+        agentRuntime: runtimeResult.runtime,
+        ...(runtimeResult.executionId ? { agentExecutionId: runtimeResult.executionId } : {}),
+        ...(sendResult.error
+          ? { graphApiError: sendResult.error as object }
+          : sendResult.response
+            ? { graphApiResponse: sendResult.response as object }
+            : {}),
+      },
     },
   });
 
