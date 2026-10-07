@@ -4,6 +4,7 @@ import {
   applyAgentDiscoverySchema,
   attachAgentKnowledgeSchema,
   reviewAgentKnowledgeSchema,
+  agentAnalyticsQuerySchema,
   createAgentReleaseSchema,
   updateAgentDraftSchema,
   updateAgentSchema,
@@ -12,8 +13,16 @@ import {
 import { agentDiscoveryService } from './agent-discovery.service';
 import { agentKnowledgeService } from './agent-knowledge.service';
 import { agentEvaluationService } from './agent-evaluation.service';
+import { agentAnalyticsService } from './agent-analytics.service';
 
 export class AiAgentStudioController {
+  getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { days } = agentAnalyticsQuerySchema.parse(req.query);
+      res.json({ success: true, data: await agentAnalyticsService.get(req.user!.businessId!, String(req.params.agentId), days) });
+    } catch (error) { next(error); }
+  };
+
   listKnowledge = async (req: Request, res: Response, next: NextFunction) => {
     try { res.json({ success: true, data: await agentKnowledgeService.list(req.user!.businessId!, String(req.params.agentId)) }); }
     catch (error) { next(error); }

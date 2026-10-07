@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, CheckCircle2, History, Loader2, MessageCircle, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
+import { Activity, BarChart3, Bot, CheckCircle2, Clock3, History, Loader2, MessageCircle, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { extractData, getErrorMessage } from '@/lib/api';
-import type { AgentDiscoveryReadiness, AgentDiscoveryTemplate, AgentStudioAgent, AgentStudioSkill } from '@/lib/agent-studio';
+import type { AgentDiscoveryReadiness, AgentDiscoveryTemplate, AgentStudioAgent, AgentStudioAnalytics, AgentStudioSkill } from '@/lib/agent-studio';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/lib/permissions';
 
 const riskTone: Record<AgentStudioSkill['riskLevel'], string> = {
   READ_ONLY: 'bg-slate-100 text-slate-700',
@@ -28,6 +30,8 @@ function readableSkill(skillKey: string) {
 
 export function AiAgentStudioPage() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canViewAnalytics = hasPermission(PERMISSIONS['analytics:read']);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [role, setRole] = useState('');
@@ -57,6 +61,12 @@ export function AiAgentStudioPage() {
   const templatesQuery = useQuery({
     queryKey: ['ai-agent-studio', 'discovery-templates'],
     queryFn: async () => extractData<AgentDiscoveryTemplate[]>(await api.get('/ai-agent-studio/discovery/templates')),
+  });
+  const analyticsQuery = useQuery({
+    queryKey: ['ai-agent-studio', agent?.id, 'analytics', 30],
+    queryFn: async () => extractData<AgentStudioAnalytics>(await api.get(`/ai-agent-studio/${agent!.id}/analytics`, { params: { days: 30 } })),
+    enabled: Boolean(agent) && canViewAnalytics,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -160,8 +170,8 @@ export function AiAgentStudioPage() {
       </section>
 
       <Tabs defaultValue="overview" className="space-y-5">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:w-auto md:grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="discovery">Business discovery</TabsTrigger><TabsTrigger value="behavior">Behavior</TabsTrigger><TabsTrigger value="skills">Skills & safety</TabsTrigger><TabsTrigger value="releases">Releases</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:w-auto md:grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="discovery">Business discovery</TabsTrigger><TabsTrigger value="behavior">Behavior</TabsTrigger><TabsTrigger value="skills">Skills & safety</TabsTrigger><TabsTrigger value="releases">Releases</TabsTrigger>{canViewAnalytics && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview" className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Agent identity</CardTitle><CardDescription>This identity is customer-facing on WhatsApp.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="agent-name">Agent name</Label><Input id="agent-name" value={name} onChange={(e) => setName(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="agent-description">Purpose</Label><Textarea id="agent-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} /></div><Button disabled={busy || name.trim().length < 2} onClick={() => identityMutation.mutate()}>{identityMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save identity</Button></CardContent></Card>
@@ -180,6 +190,9 @@ export function AiAgentStudioPage() {
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><Rocket className="h-5 w-5" /> Create release</CardTitle><CardDescription>Freeze the current draft, skills and knowledge into an immutable version for evaluation.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="change-summary">What changed?</Label><Textarea id="change-summary" value={changeSummary} onChange={(e) => setChangeSummary(e.target.value)} placeholder="Added approved pricing answers and improved handover behavior" rows={5} /></div><Button disabled={busy || changeSummary.trim().length < 3} onClick={() => releaseMutation.mutate()}>{releaseMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}Create release</Button></CardContent></Card>
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Release history</CardTitle><CardDescription>Draft creation never changes the live WhatsApp agent.</CardDescription></CardHeader><CardContent className="space-y-3">{agent.releases.length === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground"><MessageCircle className="mx-auto mb-3 h-8 w-8" />No releases yet.</div> : [...agent.releases].sort((a, b) => b.releaseNumber - a.releaseNumber).map((release) => <div key={release.id} className="flex items-start justify-between gap-4 rounded-xl border p-4"><div><p className="font-semibold">Release v{release.releaseNumber}</p><p className="mt-1 text-sm text-muted-foreground">{release.changeSummary || 'Imported training snapshot'}</p><p className="mt-2 text-xs text-muted-foreground">{new Date(release.createdAt).toLocaleString()}</p></div><Badge variant={release.status === 'ACTIVE' ? 'default' : 'outline'}>{release.status.replace(/_/g, ' ')}</Badge></div>)}</CardContent></Card>
         </TabsContent>
+        {canViewAnalytics && <TabsContent value="analytics" className="space-y-5">
+          {analyticsQuery.isPending ? <LoadingState rows={5} /> : analyticsQuery.isError || !analyticsQuery.data ? <ErrorState message={analyticsQuery.isError ? getErrorMessage(analyticsQuery.error) : 'Analytics are unavailable.'} onRetry={() => analyticsQuery.refetch()} /> : <><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Card><CardHeader className="pb-2"><CardDescription>AI containment</CardDescription><CardTitle className="text-3xl">{analyticsQuery.data.runtime.containmentRate}%</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">{analyticsQuery.data.runtime.completed} of {analyticsQuery.data.runtime.executions} executions completed</CardContent></Card><Card><CardHeader className="pb-2"><CardDescription>Average confidence</CardDescription><CardTitle className="text-3xl">{analyticsQuery.data.runtime.averageConfidence}%</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">Handoff rate {analyticsQuery.data.runtime.handoffRate}%</CardContent></Card><Card><CardHeader className="pb-2"><CardDescription>Action conversion</CardDescription><CardTitle className="text-3xl">{analyticsQuery.data.actions.conversionRate}%</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">{analyticsQuery.data.actions.completed} completed · {analyticsQuery.data.actions.awaitingConfirmation} awaiting confirmation</CardContent></Card><Card><CardHeader className="pb-2"><CardDescription>Handoff SLA</CardDescription><CardTitle className="text-3xl">{analyticsQuery.data.handoffs.slaComplianceRate}%</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">{analyticsQuery.data.handoffs.slaBreached} breaches in the last 30 days</CardContent></Card></div><div className="grid gap-5 lg:grid-cols-3"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5" /> Runtime health</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="flex justify-between"><span>Failures</span><strong>{analyticsQuery.data.runtime.failed}</strong></div><div className="flex justify-between"><span>Average latency</span><strong>{Math.round(analyticsQuery.data.runtime.averageLatencyMs)} ms</strong></div><div className="flex justify-between"><span>Tokens</span><strong>{analyticsQuery.data.runtime.tokensUsed.toLocaleString()}</strong></div><div className="flex justify-between"><span>Estimated cost</span><strong>${analyticsQuery.data.runtime.estimatedCost.toFixed(4)}</strong></div></CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Quality gates</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="flex justify-between"><span>Evaluation pass rate</span><strong>{analyticsQuery.data.quality.passRate}%</strong></div><div className="flex justify-between"><span>Average score</span><strong>{analyticsQuery.data.quality.averageScore}</strong></div><div className="flex justify-between"><span>Critical failures</span><strong>{analyticsQuery.data.quality.criticalFailures}</strong></div><div className="flex justify-between"><span>Stale knowledge</span><strong>{analyticsQuery.data.knowledge.stale}</strong></div></CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5" /> Human operations</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="flex justify-between"><span>Open handoffs</span><strong>{analyticsQuery.data.handoffs.open}</strong></div><div className="flex justify-between"><span>Urgent handoffs</span><strong>{analyticsQuery.data.handoffs.urgent}</strong></div><div className="flex justify-between"><span>Average acknowledge</span><strong>{Math.round(analyticsQuery.data.handoffs.averageAcknowledgeSeconds)} sec</strong></div><div className="flex justify-between"><span>Approved knowledge</span><strong>{analyticsQuery.data.knowledge.approved}</strong></div></CardContent></Card></div><Card><CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Daily operations</CardTitle><CardDescription>Execution, handoff and action activity for the last 30 days.</CardDescription></CardHeader><CardContent className="space-y-2">{analyticsQuery.data.timeline.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No Agent Studio runtime activity yet.</p> : analyticsQuery.data.timeline.slice(-10).map((day) => <div key={day.date} className="grid grid-cols-[1fr_repeat(3,auto)] items-center gap-4 rounded-lg border px-3 py-2 text-sm"><span>{day.date}</span><span>{day.executions} runs</span><span className="text-emerald-600">{day.completed} completed</span><span className="text-amber-600">{day.handedOver} handoffs</span></div>)}</CardContent></Card></>}
+        </TabsContent>}
       </Tabs>
     </div>
   );

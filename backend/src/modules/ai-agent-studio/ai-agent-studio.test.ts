@@ -15,6 +15,7 @@ import { evaluateReleaseSnapshot } from './agent-evaluation.service';
 import { enforceRuntimePolicy } from './agent-runtime.service';
 import { handoffPriority } from '../conversations/handoff-operations.service';
 import { parseActionConfirmation } from './agent-action.service';
+import { percent } from './agent-analytics.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -160,4 +161,10 @@ test('Phase 9 migration enforces action idempotency and one pending confirmation
   );
   assert.match(sql, /ai_agent_actions_idempotencyKey_key/);
   assert.match(sql, /ai_agent_actions_one_pending_confirmation_key/);
+});
+
+test('Phase 10 analytics percentages are stable for empty and populated datasets', () => {
+  assert.equal(percent(0, 0), 0);
+  assert.equal(percent(3, 4), 75);
+  assert.equal(percent(1, 3), 33.33);
 });

@@ -57,6 +57,10 @@ export const reviewAgentKnowledgeSchema = z.object({
   freshnessDays: z.number().int().min(7).max(730).default(90),
 });
 
+export const agentAnalyticsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
 export type UpdateAgentDraftInput = z.infer<typeof updateAgentDraftSchema>;
 export type CreateAgentReleaseInput = z.infer<typeof createAgentReleaseSchema>;

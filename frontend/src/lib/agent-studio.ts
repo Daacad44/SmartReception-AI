@@ -68,3 +68,13 @@ export interface AgentDiscoveryReadiness {
   checks: Array<{ key: string; label: string; complete: boolean }>;
   readinessPercent: number;
 }
+
+export interface AgentStudioAnalytics {
+  period: { days: number; from: string; to: string };
+  runtime: { executions: number; completed: number; handedOver: number; failed: number; containmentRate: number; handoffRate: number; failureRate: number; averageConfidence: number; averageLatencyMs: number; tokensUsed: number; estimatedCost: number };
+  actions: { total: number; completed: number; awaitingConfirmation: number; cancelled: number; failed: number; expired: number; conversionRate: number; byType: Record<string, number> };
+  handoffs: { total: number; open: number; acknowledged: number; resolved: number; urgent: number; slaBreached: number; slaComplianceRate: number; averageAcknowledgeSeconds: number };
+  quality: { evaluationRuns: number; passRate: number; averageScore: number; criticalFailures: number };
+  knowledge: { total: number; approved: number; pending: number; stale: number };
+  timeline: Array<{ date: string; executions: number; completed: number; handedOver: number; failed: number; actions: number }>;
+}

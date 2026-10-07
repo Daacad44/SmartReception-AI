@@ -35,5 +35,6 @@ router.post('/:agentId/knowledge', authorize(PERMISSIONS['knowledge:write']), ai
 router.post('/:agentId/knowledge/:sourceId/review', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.reviewKnowledge);
 router.get('/:agentId/evaluations', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listEvaluations);
 router.post('/:agentId/releases/:releaseId/evaluate', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.evaluateRelease);
+router.get('/:agentId/analytics', authorize(PERMISSIONS['analytics:read']), aiAgentStudioController.getAnalytics);
 
 export default router;
