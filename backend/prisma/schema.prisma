@@ -686,6 +686,12 @@ model Business {
   aiCustomerMetrics             AiCustomerMetric[]
   aiBusinessSnapshot            AiBusinessSnapshot?
   aiTrainingSessionLogs         AiTrainingSessionLog[]
+  aiAgents                      AiAgent[]
+  aiAgentReleases               AiAgentRelease[]
+  aiAgentExecutions             AiAgentExecution[]
+  aiAgentEvaluationRuns         AiAgentEvaluationRun[]
+  aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
+  aiHandoffCases                AiHandoffCase[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -791,6 +797,11 @@ model User {
   aiTrainingAuditLogs          AiTrainingAuditLog[]                 @relation("AiTrainingAuditUser")
   aiTrainingVerifications      AiTrainingVerificationRequest[]      @relation("AiTrainingVerificationUser")
   aiTrainingSessionsOperated   AiTrainingSessionLog[]               @relation("AiTrainingSessionOperator")
+  aiAgentsCreated              AiAgent[]                            @relation("AiAgentCreatedBy")
+  aiAgentDraftsUpdated         AiAgentDraft[]                       @relation("AiAgentDraftUpdatedBy")
+  aiAgentReleasesCreated       AiAgentRelease[]                     @relation("AiAgentReleaseCreatedBy")
+  aiAgentReleaseApprovals      AiAgentReleaseApproval[]             @relation("AiAgentReleaseApprover")
+  aiAgentReleaseRequests       AiAgentReleaseApproval[]             @relation("AiAgentReleaseRequester")
   platformFeaturesCreated      PlatformFeature[]                    @relation("PlatformFeatureCreatedBy")
   platformFeaturesModified     PlatformFeature[]                    @relation("PlatformFeatureModifiedBy")
   platformFeatureVerifications PlatformFeatureVerificationRequest[] @relation("PlatformFeatureVerificationUser")
@@ -995,6 +1006,7 @@ model Conversation {
   messages        Message[]
   activities      ConversationActivity[]
   feedback        ConversationFeedback[]
+  handoffCases    AiHandoffCase[]
 
   @@index([businessId])
   @@index([businessId, status])
@@ -1774,6 +1786,7 @@ model KnowledgeDocument {
 
   knowledgeBase KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   chunks        KnowledgeChunk[]
+  agentSources  AiAgentKnowledgeSource[]
 
   @@index([knowledgeBaseId])
   @@index([knowledgeBaseId, type])
@@ -2954,6 +2967,85 @@ enum AiTrainingVerificationStatus {
   CANCELLED
 }
 
+enum AiAgentType {
+  RECEPTION
+  SALES
+  SUPPORT
+  BOOKING
+  MIXED
+}
+
+enum AiAgentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum AiAgentReleaseStatus {
+  DRAFT
+  BUILDING
+  EVALUATING
+  FAILED
+  READY_FOR_REVIEW
+  APPROVED
+  ACTIVE
+  RETIRED
+}
+
+enum AiAgentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AiAgentExecutionStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  HANDED_OVER
+  CANCELLED
+}
+
+enum AiAgentEvaluationStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  CANCELLED
+}
+
+enum AiAgentSkillRisk {
+  READ_ONLY
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AiAgentKnowledgeStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  STALE
+  ARCHIVED
+}
+
+enum AiHandoffStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  AI_RESUMED
+  CANCELLED
+}
+
+enum AiHandoffPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model AiTrainingWorkspace {
   id                  String    @id @default(uuid())
   businessId          String    @unique
@@ -3009,12 +3101,283 @@ model AiTrainingVersion {
   deploymentRequests   AiDeploymentRequest[]
   sandboxSessions      AiSandboxSession[]
   auditLogs            AiTrainingAuditLog[]
+  agentRelease         AiAgentRelease?
 
   @@unique([businessId, versionNumber])
   @@index([businessId])
   @@index([workspaceId])
   @@index([status])
   @@map("ai_training_versions")
+}
+
+model AiAgent {
+  id                String        @id @default(uuid())
+  businessId        String
+  name              String
+  slug              String
+  type              AiAgentType   @default(MIXED)
+  status            AiAgentStatus @default(DRAFT)
+  description       String?
+  channel           String        @default("WHATSAPP")
+  defaultLanguage   String        @default("so")
+  supportedLanguages String[]     @default(["so", "en"])
+  activeReleaseId   String?       @unique
+  createdByUserId   String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdByUser  User?           @relation("AiAgentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  activeRelease  AiAgentRelease? @relation("AiAgentActiveRelease", fields: [activeReleaseId], references: [id], onDelete: SetNull)
+  draft          AiAgentDraft?
+  releases       AiAgentRelease[] @relation("AiAgentReleases")
+  skills         AiAgentSkillConfiguration[]
+  executions     AiAgentExecution[]
+  evaluations    AiAgentEvaluationRun[]
+  knowledgeSources AiAgentKnowledgeSource[]
+
+  @@unique([businessId, slug])
+  @@index([businessId, status])
+  @@map("ai_agents")
+}
+
+model AiAgentDraft {
+  id               String   @id @default(uuid())
+  agentId          String   @unique
+  revision         Int      @default(1)
+  instructions     Json     @default("{}")
+  behaviorConfig   Json     @default("{}")
+  knowledgeConfig  Json     @default("{}")
+  escalationPolicy Json     @default("{}")
+  modelConfig      Json     @default("{}")
+  updatedByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  agent         AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  updatedByUser User?   @relation("AiAgentDraftUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("ai_agent_drafts")
+}
+
+model AiAgentRelease {
+  id                      String               @id @default(uuid())
+  agentId                 String
+  businessId              String
+  releaseNumber           Int
+  status                  AiAgentReleaseStatus @default(DRAFT)
+  sourceTrainingVersionId String?              @unique
+  snapshotData            Json
+  evaluationSummary       Json?
+  changeSummary           String?
+  createdByUserId         String?
+  activatedAt             DateTime?
+  retiredAt               DateTime?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  agent                 AiAgent                  @relation("AiAgentReleases", fields: [agentId], references: [id], onDelete: Cascade)
+  business              Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sourceTrainingVersion AiTrainingVersion?       @relation(fields: [sourceTrainingVersionId], references: [id], onDelete: SetNull)
+  createdByUser         User?                    @relation("AiAgentReleaseCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  activeForAgents       AiAgent[]                @relation("AiAgentActiveRelease")
+  approvals             AiAgentReleaseApproval[]
+  executions            AiAgentExecution[]
+  evaluationRuns        AiAgentEvaluationRun[]
+
+  @@unique([agentId, releaseNumber])
+  @@index([businessId, status])
+  @@map("ai_agent_releases")
+}
+
+model AiAgentReleaseApproval {
+  id             String                @id @default(uuid())
+  releaseId      String
+  status         AiAgentApprovalStatus @default(PENDING)
+  requestedById  String?
+  reviewedById   String?
+  reviewNotes    String?
+  rejectionReason String?
+  requestedAt    DateTime              @default(now())
+  reviewedAt     DateTime?
+
+  release      AiAgentRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  requestedBy  User?          @relation("AiAgentReleaseRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?          @relation("AiAgentReleaseApprover", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([releaseId, status])
+  @@map("ai_agent_release_approvals")
+}
+
+model AiAgentSkillConfiguration {
+  id                   String           @id @default(uuid())
+  agentId              String
+  skillKey             String
+  enabled              Boolean          @default(false)
+  riskLevel            AiAgentSkillRisk @default(READ_ONLY)
+  requiresConfirmation Boolean          @default(false)
+  configuration        Json             @default("{}")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillKey])
+  @@index([agentId, enabled])
+  @@map("ai_agent_skill_configurations")
+}
+
+model AiAgentExecution {
+  id                String                 @id @default(uuid())
+  businessId        String
+  agentId           String
+  releaseId         String?
+  conversationId    String?
+  inboundMessageId  String?                @unique
+  status            AiAgentExecutionStatus @default(RUNNING)
+  intent            String?
+  input              Json?
+  retrievedSources  Json?
+  proposedActions   Json?
+  executedActions   Json?
+  response           Json?
+  confidence         Float?
+  latencyMs          Int?
+  tokensUsed         Int                  @default(0)
+  estimatedCost      Decimal              @default(0) @db.Decimal(12, 6)
+  error              String?
+  startedAt          DateTime             @default(now())
+  completedAt        DateTime?
+
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  release  AiAgentRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  handoffCase AiHandoffCase?
+
+  @@index([businessId, startedAt])
+  @@index([agentId, status])
+  @@index([conversationId])
+  @@map("ai_agent_executions")
+}
+
+model AiAgentEvaluationRun {
+  id             String                  @id @default(uuid())
+  businessId     String
+  agentId        String
+  releaseId      String
+  status         AiAgentEvaluationStatus @default(QUEUED)
+  overallScore   Float?
+  criticalFailures Int                   @default(0)
+  summary        Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime                @default(now())
+
+  business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  release  AiAgentRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  cases    AiAgentEvaluationCase[]
+
+  @@index([businessId, createdAt])
+  @@index([releaseId, status])
+  @@map("ai_agent_evaluation_runs")
+}
+
+model AiAgentEvaluationCase {
+  id              String   @id @default(uuid())
+  runId           String
+  caseKey         String
+  category        String
+  input           Json
+  expected        Json?
+  actual          Json?
+  score           Float?
+  passed          Boolean?
+  criticalFailure Boolean  @default(false)
+  failureReason   String?
+  createdAt       DateTime @default(now())
+
+  run AiAgentEvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, caseKey])
+  @@index([runId, category])
+  @@map("ai_agent_evaluation_cases")
+}
+
+model AiAgentKnowledgeSource {
+  id                String                 @id @default(uuid())
+  businessId        String
+  agentId           String
+  documentId        String
+  status            AiAgentKnowledgeStatus @default(PENDING_REVIEW)
+  contentChecksum   String
+  sourceVersion     Int                    @default(1)
+  reviewNotes       String?
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  freshnessDueAt   DateTime?
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revisions AiAgentKnowledgeRevision[]
+
+  @@unique([agentId, documentId])
+  @@unique([agentId, contentChecksum])
+  @@index([businessId, status])
+  @@index([agentId, freshnessDueAt])
+  @@map("ai_agent_knowledge_sources")
+}
+
+model AiAgentKnowledgeRevision {
+  id              String   @id @default(uuid())
+  sourceId        String
+  version         Int
+  contentChecksum String
+  snapshotData    Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  source AiAgentKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, version])
+  @@map("ai_agent_knowledge_revisions")
+}
+
+model AiHandoffCase {
+  id                 String            @id @default(uuid())
+  businessId         String
+  conversationId     String
+  agentExecutionId   String?           @unique
+  status             AiHandoffStatus   @default(OPEN)
+  priority           AiHandoffPriority @default(NORMAL)
+  reason             String
+  contextSnapshot    Json
+  assignedToUserId   String?
+  assignedTeam       ConversationTeam?
+  slaDueAt           DateTime
+  acknowledgedAt     DateTime?
+  acknowledgedById  String?
+  resolutionSummary  String?
+  resolvedAt         DateTime?
+  resolvedById       String?
+  aiResumeSummary    String?
+  aiResumedAt        DateTime?
+  aiResumedById      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  business       Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agentExecution AiAgentExecution? @relation(fields: [agentExecutionId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status, priority, createdAt])
+  @@index([assignedToUserId, status])
+  @@index([slaDueAt, status])
+  @@map("ai_handoff_cases")
 }
 
 model AiTrainingJob {

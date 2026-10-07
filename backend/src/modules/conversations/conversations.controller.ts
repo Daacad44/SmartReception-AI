@@ -4,6 +4,20 @@ import { conversationsService } from './conversations.service';
 import { paginationSchema, sendMessageSchema, conversationAssignSchema, conversationTransferSchema } from '@smartreception/shared';
 
 export class ConversationsController {
+  async handoffQueue(req: Request, res: Response, next: NextFunction) {
+    try {
+      const mine = req.query.mine === 'true';
+      const data = await conversationsService.listHandoffQueue(req.user!.businessId!, mine ? req.user!.userId : undefined);
+      res.json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getHandoffCase(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await conversationsService.getHandoffCase(req.user!.businessId!, routeParam(req.params.id));
+      res.json({ success: true, data });
+    } catch (error) { next(error); }
+  }
   async list(req: Request, res: Response, next: NextFunction) {
     try {
       const params = paginationSchema.parse(req.query);
