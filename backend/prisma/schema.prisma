@@ -691,6 +691,7 @@ model Business {
   aiAgentExecutions             AiAgentExecution[]
   aiAgentEvaluationRuns         AiAgentEvaluationRun[]
   aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
+  aiHandoffCases                AiHandoffCase[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -1005,6 +1006,7 @@ model Conversation {
   messages        Message[]
   activities      ConversationActivity[]
   feedback        ConversationFeedback[]
+  handoffCases    AiHandoffCase[]
 
   @@index([businessId])
   @@index([businessId, status])
@@ -3030,6 +3032,20 @@ enum AiAgentKnowledgeStatus {
   ARCHIVED
 }
 
+enum AiHandoffStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  AI_RESUMED
+  CANCELLED
+}
+
+enum AiHandoffPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model AiTrainingWorkspace {
   id                  String    @id @default(uuid())
   businessId          String    @unique
@@ -3236,6 +3252,7 @@ model AiAgentExecution {
   business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   agent    AiAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
   release  AiAgentRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  handoffCase AiHandoffCase?
 
   @@index([businessId, startedAt])
   @@index([agentId, status])
@@ -3328,6 +3345,39 @@ model AiAgentKnowledgeRevision {
 
   @@unique([sourceId, version])
   @@map("ai_agent_knowledge_revisions")
+}
+
+model AiHandoffCase {
+  id                 String            @id @default(uuid())
+  businessId         String
+  conversationId     String
+  agentExecutionId   String?           @unique
+  status             AiHandoffStatus   @default(OPEN)
+  priority           AiHandoffPriority @default(NORMAL)
+  reason             String
+  contextSnapshot    Json
+  assignedToUserId   String?
+  assignedTeam       ConversationTeam?
+  slaDueAt           DateTime
+  acknowledgedAt     DateTime?
+  acknowledgedById  String?
+  resolutionSummary  String?
+  resolvedAt         DateTime?
+  resolvedById       String?
+  aiResumeSummary    String?
+  aiResumedAt        DateTime?
+  aiResumedById      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  business       Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agentExecution AiAgentExecution? @relation(fields: [agentExecutionId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status, priority, createdAt])
+  @@index([assignedToUserId, status])
+  @@index([slaDueAt, status])
+  @@map("ai_handoff_cases")
 }
 
 model AiTrainingJob {

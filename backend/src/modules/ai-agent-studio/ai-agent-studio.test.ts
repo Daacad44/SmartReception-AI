@@ -13,6 +13,7 @@ import { AGENT_DISCOVERY_TEMPLATES, templateForIndustry } from './agent-discover
 import { knowledgeChecksum } from './agent-knowledge.service';
 import { evaluateReleaseSnapshot } from './agent-evaluation.service';
 import { enforceRuntimePolicy } from './agent-runtime.service';
+import { handoffPriority } from '../conversations/handoff-operations.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -127,4 +128,19 @@ test('Phase 7 runtime hands over low-grounding responses and blocks unconfirmed 
   assert.equal(write.status, 'HANDED_OVER');
   assert.deepEqual(write.blockedActions, ['book_appointment']);
   assert.equal(write.response.actions.some((action) => action.type === 'book_appointment'), false);
+});
+
+test('Phase 8 handoff priority promotes safety and grounding failures', () => {
+  assert.equal(handoffPriority('Customer asked a normal question'), 'NORMAL');
+  assert.equal(handoffPriority('Missing knowledge', 'HANDED_OVER'), 'HIGH');
+  assert.equal(handoffPriority('Urgent emergency reported'), 'URGENT');
+});
+
+test('Phase 8 migration enforces one active handoff per conversation', () => {
+  const sql = readFileSync(
+    resolve(process.cwd(), 'prisma/migrations/20261009000000_ai_handoff_operations/migration.sql'),
+    'utf8'
+  );
+  assert.match(sql, /ai_handoff_cases_one_active_conversation_key/);
+  assert.match(sql, /WHERE "status" IN \('OPEN', 'ACKNOWLEDGED'\)/);
 });
