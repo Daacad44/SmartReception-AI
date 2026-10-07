@@ -29,6 +29,7 @@ import onboardingRoutes from '../modules/onboarding/onboarding.routes';
 import governanceRoutes from '../modules/governance/governance.routes';
 import aiTrainingRoutes from '../modules/ai-training/ai-training.routes';
 import aiTrainingMgmtRoutes from '../modules/ai-training-mgmt/ai-training-mgmt.routes';
+import aiAgentStudioRoutes from '../modules/ai-agent-studio/ai-agent-studio.routes';
 import aiTrainingAdminRoutes from '../modules/ai-training-mgmt/ai-training-admin.routes';
 import aiTrainingCenterRoutes from '../modules/ai-training-mgmt/ai-training-center.routes';
 import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
@@ -130,6 +131,7 @@ licensed.use('/financial-intelligence', financialIntelligenceRoutes);
 licensed.use('/enterprise-ai-intelligence', enterpriseAiIntelligenceRoutes);
 licensed.use('/business-intelligence', businessIntelligenceRoutes);
 licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);
+licensed.use('/ai-agent-studio', aiAgentStudioRoutes);
 
 router.use('/billing', billingRoutes);
 router.use(licensed);

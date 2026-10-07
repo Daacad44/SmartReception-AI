@@ -10,6 +10,7 @@ import {
 import { formatCustomerAlertIdentity } from '../../infrastructure/notifications/customer-alert-identity';
 import { logConversationActivity } from './conversation-activity.service';
 import { logger } from '../../core/logger';
+import { handoffOperationsService } from './handoff-operations.service';
 
 const ACTIVE_STATUSES: ConversationStatus[] = [
   'AI_HANDLING',
@@ -182,6 +183,14 @@ export async function initiateHumanHandoff(params: {
     },
   });
 
+  await handoffOperationsService.open({
+    businessId: params.businessId,
+    conversationId: params.conversationId,
+    reason: params.reason,
+    assignedToUserId: assigneeId,
+    assignedTeam: params.team ?? 'SUPPORT',
+  });
+
   if (!alreadyNotified) {
     await logConversationActivity({
       businessId: params.businessId,
@@ -246,6 +255,7 @@ export async function takeOverConversation(params: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
     },
   });
+  await handoffOperationsService.acknowledge(params.businessId, params.conversationId, params.userId);
 
   const actor = updated.assignedTo;
   await logConversationActivity({
@@ -269,6 +279,16 @@ export async function returnConversationToAi(params: {
   conversationId: string;
   actorUserId: string;
 }) {
+  const activeCase = await handoffOperationsService.active(params.businessId, params.conversationId);
+  if (activeCase?.status === 'OPEN') {
+    await handoffOperationsService.acknowledge(params.businessId, params.conversationId, params.actorUserId);
+  }
+  await handoffOperationsService.resumeAi(
+    params.businessId,
+    params.conversationId,
+    params.actorUserId,
+    'Operator verified the context and returned the conversation to AI.'
+  );
   const updated = await prisma.conversation.update({
     where: conversationScope(params.conversationId, params.businessId),
     data: {
@@ -338,6 +358,12 @@ export async function assignConversation(params: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
     },
   });
+  await handoffOperationsService.syncAssignment(
+    params.businessId,
+    params.conversationId,
+    params.assigneeId,
+    params.team ?? conversation.assignedTeam
+  );
 
   await logConversationActivity({
     businessId: params.businessId,
@@ -447,6 +473,12 @@ export async function resolveConversation(params: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
     },
   });
+  await handoffOperationsService.resolve(
+    params.businessId,
+    params.conversationId,
+    params.actorUserId,
+    `Conversation resolved by ${params.resolutionMethod === 'AI' ? 'AI' : 'human operator'}.`
+  );
 
   await logConversationActivity({
     businessId: params.businessId,
@@ -482,6 +514,12 @@ export async function closeConversation(params: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
     },
   });
+  await handoffOperationsService.resolve(
+    params.businessId,
+    params.conversationId,
+    params.actorUserId,
+    'Conversation closed by operator.'
+  );
 
   await logConversationActivity({
     businessId: params.businessId,

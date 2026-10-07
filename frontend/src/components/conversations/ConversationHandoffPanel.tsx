@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Bot,
   User,
@@ -40,6 +41,17 @@ import {
   getStatusLabel,
 } from '@/lib/conversation-status';
 import { formatRelativeTime } from '@/lib/utils';
+import api, { extractData } from '@/lib/api';
+
+interface HandoffCase {
+  id: string;
+  status: 'OPEN' | 'ACKNOWLEDGED';
+  priority: 'NORMAL' | 'HIGH' | 'URGENT';
+  reason: string;
+  slaDueAt: string;
+  assignedToUserId?: string | null;
+  contextSnapshot: { agentExecution?: { intent?: string; confidence?: number; error?: string } | null };
+}
 
 interface ConversationHandoffPanelProps {
   conversation: Conversation;
@@ -59,6 +71,12 @@ export function ConversationHandoffPanel({
 }: ConversationHandoffPanelProps) {
   const { data: activity, isLoading: activityLoading } = useConversationActivity(conversationId);
   const { data: teamMembers } = useTeamMembers();
+  const { data: handoffCase } = useQuery({
+    queryKey: ['handoff-case', conversationId],
+    queryFn: async () => extractData<HandoffCase | null>(await api.get(`/conversations/${conversationId}/handoff-case`)),
+    enabled: conversation.status === 'human_needed' || conversation.status === 'human_handling',
+    refetchInterval: 30_000,
+  });
   const [assigneeId, setAssigneeId] = useState('');
   const [team, setTeam] = useState<string>('SUPPORT');
 
@@ -119,6 +137,18 @@ export function ConversationHandoffPanel({
           <Clock className="h-3 w-3" />
           Awaiting customer feedback
         </Badge>
+      )}
+
+      {handoffCase && (
+        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase">Handoff case</span>
+            <Badge variant="outline" className={handoffCase.priority === 'URGENT' ? 'border-red-500 text-red-600' : handoffCase.priority === 'HIGH' ? 'border-orange-500 text-orange-600' : ''}>{handoffCase.priority}</Badge>
+          </div>
+          <p className="text-sm">{handoffCase.reason}</p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="h-3 w-3" /> SLA due {formatRelativeTime(handoffCase.slaDueAt)}</div>
+          {handoffCase.contextSnapshot.agentExecution?.intent && <p className="text-xs text-muted-foreground">AI intent: {handoffCase.contextSnapshot.agentExecution.intent} · Confidence: {Math.round((handoffCase.contextSnapshot.agentExecution.confidence ?? 0) * 100)}%</p>}
+        </div>
       )}
 
       <Separator />
