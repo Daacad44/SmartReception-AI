@@ -693,6 +693,9 @@ model Business {
   aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
   aiHandoffCases                AiHandoffCase[]
   aiAgentActions                AiAgentAction[]
+  aiAgentGovernancePolicies     AiAgentGovernancePolicy[]
+  aiAgentRolloutConfigs         AiAgentRolloutConfig[]
+  aiAgentRoutingRules           AiAgentRoutingRule[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -3154,6 +3157,9 @@ model AiAgent {
   executions     AiAgentExecution[]
   evaluations    AiAgentEvaluationRun[]
   knowledgeSources AiAgentKnowledgeSource[]
+  governancePolicy AiAgentGovernancePolicy?
+  rolloutConfig    AiAgentRolloutConfig?
+  routingRules     AiAgentRoutingRule[]
 
   @@unique([businessId, slug])
   @@index([businessId, status])
@@ -3431,6 +3437,75 @@ model AiAgentAction {
   @@index([conversationId, status])
   @@index([confirmationDueAt, status])
   @@map("ai_agent_actions")
+}
+
+model AiAgentGovernancePolicy {
+  id                          String   @id @default(uuid())
+  businessId                  String
+  agentId                     String   @unique
+  revision                    Int      @default(1)
+  minimumConfidence           Float    @default(0.3)
+  maximumHallucinationRisk    Float    @default(0.55)
+  requireHumanReleaseApproval Boolean  @default(true)
+  requireSeparateApprover     Boolean  @default(true)
+  highRiskActionConfirmation  Boolean  @default(true)
+  executionRetentionDays      Int      @default(90)
+  evidenceRetentionDays       Int      @default(365)
+  updatedByUserId             String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("ai_agent_governance_policies")
+}
+
+model AiAgentRolloutConfig {
+  id                    String   @id @default(uuid())
+  businessId            String
+  agentId               String   @unique
+  enabled               Boolean  @default(false)
+  trafficPercentage     Int      @default(0)
+  killSwitch            Boolean  @default(false)
+  fallbackToLegacy      Boolean  @default(true)
+  maxFailureRate        Float    @default(10)
+  maxHandoffRate        Float    @default(40)
+  minConfidence         Float    @default(50)
+  observationWindowMins Int      @default(60)
+  updatedByUserId       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, enabled])
+  @@map("ai_agent_rollout_configs")
+}
+
+model AiAgentRoutingRule {
+  id              String   @id @default(uuid())
+  businessId      String
+  agentId         String
+  name            String
+  priority        Int      @default(100)
+  intents         String[] @default([])
+  keywords        String[] @default([])
+  isFallback      Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+  @@index([businessId, enabled, priority])
+  @@index([agentId])
+  @@map("ai_agent_routing_rules")
 }
 
 model AiTrainingJob {

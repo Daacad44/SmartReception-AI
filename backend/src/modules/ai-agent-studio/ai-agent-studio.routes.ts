@@ -22,7 +22,12 @@ function requireAgentStudioV2(_req: Request, res: Response, next: NextFunction) 
 
 router.use(requireAgentStudioV2);
 router.get('/discovery/templates', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listDiscoveryTemplates);
+router.get('/routing-rules', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listRoutingRules);
+router.post('/routing-rules', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.createRoutingRule);
+router.put('/routing-rules/:ruleId', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateRoutingRule);
+router.delete('/routing-rules/:ruleId', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.deleteRoutingRule);
 router.get('/', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listAgents);
+router.post('/', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.createAgent);
 router.get('/:agentId', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.getAgent);
 router.patch('/:agentId', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateAgent);
 router.put('/:agentId/draft', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateDraft);
@@ -36,5 +41,13 @@ router.post('/:agentId/knowledge/:sourceId/review', authorize(PERMISSIONS['knowl
 router.get('/:agentId/evaluations', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.listEvaluations);
 router.post('/:agentId/releases/:releaseId/evaluate', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.evaluateRelease);
 router.get('/:agentId/analytics', authorize(PERMISSIONS['analytics:read']), aiAgentStudioController.getAnalytics);
+router.get('/:agentId/governance', authorize(PERMISSIONS['knowledge:read']), aiAgentStudioController.getGovernance);
+router.put('/:agentId/governance', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateGovernance);
+router.get('/:agentId/governance/export', authorize(PERMISSIONS['analytics:read']), aiAgentStudioController.exportGovernance);
+router.post('/:agentId/releases/:releaseId/approval', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.requestReleaseApproval);
+router.post('/:agentId/releases/:releaseId/review', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.reviewRelease);
+router.post('/:agentId/releases/:releaseId/activate', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.activateRelease);
+router.get('/:agentId/rollout', authorize(PERMISSIONS['analytics:read']), aiAgentStudioController.getRollout);
+router.put('/:agentId/rollout', authorize(PERMISSIONS['knowledge:write']), aiAgentStudioController.updateRollout);
 
 export default router;

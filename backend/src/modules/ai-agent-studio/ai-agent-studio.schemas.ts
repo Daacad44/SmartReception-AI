@@ -11,6 +11,14 @@ export const updateAgentSchema = z.object({
   supportedLanguages: z.array(z.string().trim().min(2).max(10)).min(1).max(10).optional(),
 });
 
+export const createAgentSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(500).optional(),
+  type: z.enum(['RECEPTION', 'SALES', 'SUPPORT', 'BOOKING', 'MIXED']),
+  defaultLanguage: z.string().trim().min(2).max(10).default('so'),
+  supportedLanguages: z.array(z.string().trim().min(2).max(10)).min(1).max(10).default(['so', 'en']),
+});
+
 export const updateAgentDraftSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   instructions: jsonObject.optional(),
@@ -61,10 +69,52 @@ export const agentAnalyticsQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
 });
 
+export const updateAgentGovernanceSchema = z.object({
+  expectedRevision: z.number().int().positive(),
+  minimumConfidence: z.number().min(0).max(1),
+  maximumHallucinationRisk: z.number().min(0).max(1),
+  requireHumanReleaseApproval: z.boolean(),
+  requireSeparateApprover: z.boolean(),
+  highRiskActionConfirmation: z.boolean(),
+  executionRetentionDays: z.number().int().min(7).max(730),
+  evidenceRetentionDays: z.number().int().min(30).max(2555),
+});
+
+export const reviewAgentReleaseSchema = z.object({
+  decision: z.enum(['APPROVE', 'REJECT']),
+  reviewNotes: z.string().trim().min(5).max(2000),
+});
+
+export const updateAgentRolloutSchema = z.object({
+  enabled: z.boolean(),
+  trafficPercentage: z.number().int().min(0).max(100),
+  killSwitch: z.boolean(),
+  fallbackToLegacy: z.boolean(),
+  maxFailureRate: z.number().min(0).max(100),
+  maxHandoffRate: z.number().min(0).max(100),
+  minConfidence: z.number().min(0).max(100),
+  observationWindowMins: z.number().int().min(5).max(1440),
+});
+
+export const upsertAgentRoutingRuleSchema = z.object({
+  agentId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  priority: z.number().int().min(1).max(10_000).default(100),
+  intents: z.array(z.string().trim().min(2).max(80)).max(30).default([]),
+  keywords: z.array(z.string().trim().min(2).max(100)).max(50).default([]),
+  isFallback: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+});
+
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
+export type CreateAgentInput = z.infer<typeof createAgentSchema>;
 export type UpdateAgentDraftInput = z.infer<typeof updateAgentDraftSchema>;
 export type CreateAgentReleaseInput = z.infer<typeof createAgentReleaseSchema>;
 export type UpsertAgentSkillInput = z.infer<typeof upsertAgentSkillSchema>;
 export type ApplyAgentDiscoveryInput = z.infer<typeof applyAgentDiscoverySchema>;
 export type AttachAgentKnowledgeInput = z.infer<typeof attachAgentKnowledgeSchema>;
 export type ReviewAgentKnowledgeInput = z.infer<typeof reviewAgentKnowledgeSchema>;
+export type UpdateAgentGovernanceInput = z.infer<typeof updateAgentGovernanceSchema>;
+export type ReviewAgentReleaseInput = z.infer<typeof reviewAgentReleaseSchema>;
+export type UpdateAgentRolloutInput = z.infer<typeof updateAgentRolloutSchema>;
+export type UpsertAgentRoutingRuleInput = z.infer<typeof upsertAgentRoutingRuleSchema>;

@@ -78,3 +78,38 @@ export interface AgentStudioAnalytics {
   knowledge: { total: number; approved: number; pending: number; stale: number };
   timeline: Array<{ date: string; executions: number; completed: number; handedOver: number; failed: number; actions: number }>;
 }
+
+export interface AgentGovernancePolicy {
+  revision: number;
+  minimumConfidence: number;
+  maximumHallucinationRisk: number;
+  requireHumanReleaseApproval: boolean;
+  requireSeparateApprover: boolean;
+  highRiskActionConfirmation: boolean;
+  executionRetentionDays: number;
+  evidenceRetentionDays: number;
+}
+
+export interface AgentRolloutConfig {
+  enabled: boolean;
+  trafficPercentage: number;
+  killSwitch: boolean;
+  fallbackToLegacy: boolean;
+  maxFailureRate: number;
+  maxHandoffRate: number;
+  minConfidence: number;
+  observationWindowMins: number;
+  health: { sampleSize: number; failureRate: number; handoffRate: number; averageConfidence: number; healthy: boolean; alerts: string[] };
+}
+
+export interface AgentRoutingRule {
+  id: string;
+  agentId: string;
+  name: string;
+  priority: number;
+  intents: string[];
+  keywords: string[];
+  isFallback: boolean;
+  enabled: boolean;
+  agent: { id: string; name: string; status: string; activeReleaseId?: string | null };
+}

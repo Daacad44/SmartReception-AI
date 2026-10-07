@@ -5,6 +5,11 @@ import {
   attachAgentKnowledgeSchema,
   reviewAgentKnowledgeSchema,
   agentAnalyticsQuerySchema,
+  createAgentSchema,
+  reviewAgentReleaseSchema,
+  updateAgentGovernanceSchema,
+  updateAgentRolloutSchema,
+  upsertAgentRoutingRuleSchema,
   createAgentReleaseSchema,
   updateAgentDraftSchema,
   updateAgentSchema,
@@ -14,8 +19,51 @@ import { agentDiscoveryService } from './agent-discovery.service';
 import { agentKnowledgeService } from './agent-knowledge.service';
 import { agentEvaluationService } from './agent-evaluation.service';
 import { agentAnalyticsService } from './agent-analytics.service';
+import { agentGovernanceService } from './agent-governance.service';
+import { agentRolloutService } from './agent-rollout.service';
+import { agentRoutingService } from './agent-routing.service';
 
 export class AiAgentStudioController {
+  createAgent = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.status(201).json({ success: true, data: await aiAgentStudioService.createAgent(req.user!.businessId!, createAgentSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  getGovernance = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentGovernanceService.get(req.user!.businessId!, String(req.params.agentId)) }); } catch (error) { next(error); }
+  };
+  updateGovernance = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentGovernanceService.update(req.user!.businessId!, String(req.params.agentId), updateAgentGovernanceSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  requestReleaseApproval = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.status(201).json({ success: true, data: await agentGovernanceService.requestReleaseApproval(req.user!.businessId!, String(req.params.agentId), String(req.params.releaseId), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  reviewRelease = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentGovernanceService.reviewRelease(req.user!.businessId!, String(req.params.agentId), String(req.params.releaseId), reviewAgentReleaseSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  activateRelease = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentGovernanceService.activateRelease(req.user!.businessId!, String(req.params.agentId), String(req.params.releaseId), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  exportGovernance = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.setHeader('Content-Disposition', `attachment; filename="agent-${String(req.params.agentId)}-governance.json"`); res.json({ success: true, data: await agentGovernanceService.exportEvidence(req.user!.businessId!, String(req.params.agentId)) }); } catch (error) { next(error); }
+  };
+  getRollout = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentRolloutService.get(req.user!.businessId!, String(req.params.agentId)) }); } catch (error) { next(error); }
+  };
+  updateRollout = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentRolloutService.update(req.user!.businessId!, String(req.params.agentId), updateAgentRolloutSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  listRoutingRules = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentRoutingService.list(req.user!.businessId!) }); } catch (error) { next(error); }
+  };
+  createRoutingRule = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.status(201).json({ success: true, data: await agentRoutingService.upsert(req.user!.businessId!, undefined, upsertAgentRoutingRuleSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  updateRoutingRule = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentRoutingService.upsert(req.user!.businessId!, String(req.params.ruleId), upsertAgentRoutingRuleSchema.parse(req.body), req.user!.userId) }); } catch (error) { next(error); }
+  };
+  deleteRoutingRule = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await agentRoutingService.remove(req.user!.businessId!, String(req.params.ruleId), req.user!.userId) }); } catch (error) { next(error); }
+  };
+
   getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { days } = agentAnalyticsQuerySchema.parse(req.query);
