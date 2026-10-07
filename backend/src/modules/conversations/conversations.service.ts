@@ -24,6 +24,7 @@ import {
   transferConversation,
 } from './conversation-handoff.service';
 import { handoffOperationsService } from './handoff-operations.service';
+import { agentActionService } from '../ai-agent-studio/agent-action.service';
 import { getConversationFeedback } from './conversation-feedback.service';
 import type { ConversationTeam } from '@prisma/client';
 
@@ -36,6 +37,12 @@ export class ConversationsService {
     const conversation = await conversationsRepository.exists(businessId, conversationId);
     if (!conversation) throw new NotFoundError('Conversation not found');
     return handoffOperationsService.active(businessId, conversationId);
+  }
+
+  async listAgentActions(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) throw new NotFoundError('Conversation not found');
+    return agentActionService.list(businessId, conversationId);
   }
   async list(
     businessId: string,

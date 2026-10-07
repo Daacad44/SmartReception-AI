@@ -6,6 +6,7 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { aiService } from '../../infrastructure/ai/conversation-ai.service';
 import type { AIAction, AIResponse } from '../../infrastructure/ai/ai.types';
 import type { RagPipelineMeta } from '../../infrastructure/ai/rag/rag-pipeline.service';
+import { agentActionService } from './agent-action.service';
 
 interface RuntimeInput {
   businessId: string;
@@ -92,6 +93,17 @@ export class AgentRuntimeService {
 
     const startedAt = Date.now();
     try {
+      const confirmationResponse = await agentActionService.handleCustomerConfirmation({
+        businessId: input.businessId,
+        conversationId: input.conversationId,
+        customerId: input.customerId,
+        message: input.customerMessage,
+        preferEnglish: input.preferEnglish === true,
+      });
+      if (confirmationResponse) {
+        await prisma.aiAgentExecution.update({ where: { id: execution.id }, data: { status: 'COMPLETED', intent: confirmationResponse.intent, response: inputJson(confirmationResponse), proposedActions: inputJson([]), executedActions: inputJson([]), confidence: confirmationResponse.confidence, latencyMs: Date.now() - startedAt, completedAt: new Date() } });
+        return { response: confirmationResponse, executionId: execution.id, runtime: 'AGENT_STUDIO' };
+      }
       const snapshot = agent.activeRelease.snapshotData as Record<string, unknown>;
       const draft = (snapshot.draft ?? {}) as Record<string, unknown>;
       const response = await aiService.generateResponse(input.businessId, input.conversationId, input.customerMessage, {
@@ -102,7 +114,13 @@ export class AgentRuntimeService {
         documentIds: knowledge.map((source) => source.documentId),
         agentInstructions: (draft.instructions ?? {}) as Record<string, unknown>,
       });
-      const governed = enforceRuntimePolicy(response, agent.skills, input.preferEnglish === true);
+      const appointmentAction = response.actions.find((action) => action.type === 'book_appointment');
+      const appointmentSkill = agent.skills.find((skill) => skill.skillKey === 'appointment.create');
+      let governed = enforceRuntimePolicy(response, agent.skills, input.preferEnglish === true);
+      if (appointmentAction && appointmentSkill?.enabled && !response._meta?.missingKnowledge && response.confidence >= 0.3) {
+        const proposal = await agentActionService.proposeAppointment({ businessId: input.businessId, conversationId: input.conversationId, executionId: execution.id, action: appointmentAction, preferEnglish: input.preferEnglish === true });
+        governed = { response: { ...response, content: proposal.confirmationPrompt ?? response.content, actions: [{ type: 'none' }] }, status: 'COMPLETED', blockedActions: ['book_appointment:awaiting_confirmation'] };
+      }
       await prisma.aiAgentExecution.update({ where: { id: execution.id }, data: { status: governed.status, intent: governed.response.intent, response: inputJson(governed.response), retrievedSources: inputJson(governed.response._meta?.chunks ?? []), proposedActions: inputJson(response.actions), executedActions: inputJson(governed.response.actions), confidence: governed.response.confidence, latencyMs: Date.now() - startedAt, completedAt: new Date(), error: governed.blockedActions.length ? `Blocked actions: ${governed.blockedActions.join(', ')}` : null } });
       return { response: governed.response, executionId: execution.id, runtime: 'AGENT_STUDIO' };
     } catch (error) {

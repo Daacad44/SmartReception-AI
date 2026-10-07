@@ -17,6 +17,7 @@ import { logPipelineStep } from '../whatsapp/message-pipeline.logger';
 import { shouldAiReply } from '../conversations/conversation-handoff.service';
 import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import { agentRuntimeService } from '../ai-agent-studio/agent-runtime.service';
+import { agentActionService } from '../ai-agent-studio/agent-action.service';
 
 export interface ProcessAiReplyParams {
   businessId: string;
@@ -228,9 +229,13 @@ export async function processAndSendAiReply(params: ProcessAiReplyParams): Promi
     .catch((error) => logger.warn('Failed to record Graph API result', { error }));
 
   if (leadData) {
-    void persistLeadData(businessId, conversation.customerId, leadData).catch((error) =>
-      logger.warn('Failed to persist lead data', { error })
-    );
+    void persistLeadData(businessId, conversation.customerId, leadData)
+      .then(async () => {
+        if (leadData.complete && runtimeResult.executionId) {
+          await agentActionService.recordLeadCapture({ businessId, conversationId, executionId: runtimeResult.executionId, customerId: conversation.customerId, payload: leadData as Record<string, unknown> });
+        }
+      })
+      .catch((error) => logger.warn('Failed to persist lead data', { error }));
   }
 
   if (aiResponse.actions.some((a) => a.type === 'escalate')) {

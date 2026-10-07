@@ -692,6 +692,7 @@ model Business {
   aiAgentEvaluationRuns         AiAgentEvaluationRun[]
   aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
   aiHandoffCases                AiHandoffCase[]
+  aiAgentActions                AiAgentAction[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -1007,6 +1008,7 @@ model Conversation {
   activities      ConversationActivity[]
   feedback        ConversationFeedback[]
   handoffCases    AiHandoffCase[]
+  agentActions    AiAgentAction[]
 
   @@index([businessId])
   @@index([businessId, status])
@@ -3046,6 +3048,23 @@ enum AiHandoffPriority {
   URGENT
 }
 
+enum AiAgentActionType {
+  APPOINTMENT_CREATE
+  LEAD_CAPTURE
+  ORDER_CREATE
+}
+
+enum AiAgentActionStatus {
+  PROPOSED
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  EXECUTING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
 model AiTrainingWorkspace {
   id                  String    @id @default(uuid())
   businessId          String    @unique
@@ -3253,6 +3272,7 @@ model AiAgentExecution {
   agent    AiAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
   release  AiAgentRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
   handoffCase AiHandoffCase?
+  actions     AiAgentAction[]
 
   @@index([businessId, startedAt])
   @@index([agentId, status])
@@ -3378,6 +3398,39 @@ model AiHandoffCase {
   @@index([assignedToUserId, status])
   @@index([slaDueAt, status])
   @@map("ai_handoff_cases")
+}
+
+model AiAgentAction {
+  id                  String              @id @default(uuid())
+  businessId          String
+  conversationId      String
+  executionId         String
+  type                AiAgentActionType
+  status              AiAgentActionStatus @default(PROPOSED)
+  idempotencyKey      String              @unique
+  payload             Json
+  result              Json?
+  requiresConfirmation Boolean            @default(true)
+  confirmationPrompt  String?
+  proposedAt          DateTime            @default(now())
+  confirmationDueAt   DateTime?
+  confirmedAt         DateTime?
+  confirmedBy         String?
+  executedAt          DateTime?
+  failedAt            DateTime?
+  failureReason       String?
+  cancelledAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  execution    AiAgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status, createdAt])
+  @@index([conversationId, status])
+  @@index([confirmationDueAt, status])
+  @@map("ai_agent_actions")
 }
 
 model AiTrainingJob {

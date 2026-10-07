@@ -14,6 +14,7 @@ import { knowledgeChecksum } from './agent-knowledge.service';
 import { evaluateReleaseSnapshot } from './agent-evaluation.service';
 import { enforceRuntimePolicy } from './agent-runtime.service';
 import { handoffPriority } from '../conversations/handoff-operations.service';
+import { parseActionConfirmation } from './agent-action.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -143,4 +144,20 @@ test('Phase 8 migration enforces one active handoff per conversation', () => {
   );
   assert.match(sql, /ai_handoff_cases_one_active_conversation_key/);
   assert.match(sql, /WHERE "status" IN \('OPEN', 'ACKNOWLEDGED'\)/);
+});
+
+test('Phase 9 action confirmation accepts explicit replies and rejects ambiguous text', () => {
+  assert.equal(parseActionConfirmation('haa'), 'CONFIRM');
+  assert.equal(parseActionConfirmation('confirm!'), 'CONFIRM');
+  assert.equal(parseActionConfirmation('maya'), 'CANCEL');
+  assert.equal(parseActionConfirmation('maybe later'), null);
+});
+
+test('Phase 9 migration enforces action idempotency and one pending confirmation', () => {
+  const sql = readFileSync(
+    resolve(process.cwd(), 'prisma/migrations/20261010000000_agent_business_actions/migration.sql'),
+    'utf8'
+  );
+  assert.match(sql, /ai_agent_actions_idempotencyKey_key/);
+  assert.match(sql, /ai_agent_actions_one_pending_confirmation_key/);
 });

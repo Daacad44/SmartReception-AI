@@ -65,6 +65,9 @@ router.get('/:id/feedback', authorize(PERMISSIONS['conversations:read']), (req, 
 router.get('/:id/handoff-case', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.getHandoffCase(req, res, next)
 );
+router.get('/:id/agent-actions', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.listAgentActions(req, res, next)
+);
 router.patch('/:id/read', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.markAsRead(req, res, next)
 );

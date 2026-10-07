@@ -18,6 +18,13 @@ export class ConversationsController {
       res.json({ success: true, data });
     } catch (error) { next(error); }
   }
+
+  async listAgentActions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await conversationsService.listAgentActions(req.user!.businessId!, routeParam(req.params.id));
+      res.json({ success: true, data });
+    } catch (error) { next(error); }
+  }
   async list(req: Request, res: Response, next: NextFunction) {
     try {
       const params = paginationSchema.parse(req.query);
