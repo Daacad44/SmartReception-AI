@@ -103,6 +103,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   '/appointments': PERMISSIONS['appointments:read'],
   '/appointments/automation': PERMISSIONS['appointments:write'],
   '/ai-training': PERMISSIONS['knowledge:read'],
+  '/ai-agent-studio': PERMISSIONS['knowledge:read'],
   '/knowledge': PERMISSIONS['knowledge:read'],
   '/analytics': PERMISSIONS['analytics:read'],
   '/ai-analytics': PERMISSIONS['analytics:read'],
