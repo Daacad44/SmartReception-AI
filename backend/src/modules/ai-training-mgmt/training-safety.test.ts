@@ -44,3 +44,17 @@ test('safety migration enforces active-job, pending-request, and production-vers
   assert.match(sql, /ai_deployment_requests_one_pending_per_version/);
   assert.match(sql, /ai_training_versions_one_production_per_business/);
 });
+
+test('transaction advisory locks use executeRaw so PostgreSQL void is not deserialized', () => {
+  const files = [
+    'training-job.service.ts',
+    'training-pipeline.service.ts',
+    'version.service.ts',
+    'deployment.service.ts',
+  ];
+  for (const file of files) {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/ai-training-mgmt', file), 'utf8');
+    assert.doesNotMatch(source, /\$queryRaw`SELECT pg_advisory_xact_lock/);
+    if (source.includes('pg_advisory_xact_lock')) assert.match(source, /\$executeRaw`SELECT pg_advisory_xact_lock/);
+  }
+});

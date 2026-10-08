@@ -25,7 +25,7 @@ export class AgentRoutingService {
     if (!agent) throw new NotFoundError('Routing target agent not found');
     if (!input.isFallback && input.keywords.length === 0 && input.intents.length === 0) throw new ValidationError('A routing rule requires keywords or intents');
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-routing:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-routing:${businessId}`}))`;
       if (input.isFallback && input.enabled) {
         await tx.aiAgentRoutingRule.updateMany({ where: { businessId, isFallback: true, enabled: true, ...(ruleId ? { id: { not: ruleId } } : {}) }, data: { enabled: false } });
       }

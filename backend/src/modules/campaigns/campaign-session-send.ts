@@ -1,7 +1,6 @@
 import type { CampaignMessageType } from '@prisma/client';
 import type { OutboundMessageType } from '../../infrastructure/whatsapp/whatsapp.types';
 import {
-  isMetaTemplateSlug,
   normalizeWhatsAppTemplateLanguage,
 } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 import {
@@ -74,8 +73,7 @@ export function resolveCampaignSessionSend(input: {
   }
 
   const linkedMetaTemplateName =
-    input.template?.whatsappTemplateName ??
-    (input.template && isMetaTemplateSlug(input.template.name) ? input.template.name.trim() : null);
+    input.template?.whatsappTemplateName ?? null;
 
   // A campaign explicitly linked to a Meta template must always be sent through
   // the template endpoint. Converting it to free-form TEXT during a locally

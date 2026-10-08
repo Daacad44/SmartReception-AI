@@ -269,7 +269,7 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     const version = await prisma.$transaction(async (tx) => {
       // Serialize version-number allocation per business. The existing unique
       // constraint remains the final database guard.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-training-version:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-training-version:${businessId}`}))`;
       const lastVersion = await tx.aiTrainingVersion.findFirst({
         where: { businessId },
         orderBy: { versionNumber: 'desc' },

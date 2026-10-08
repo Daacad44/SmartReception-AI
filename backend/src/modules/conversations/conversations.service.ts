@@ -212,10 +212,13 @@ export class ConversationsService {
     });
 
     if (!delivered.success) {
-      const errorMessage =
+      let errorMessage =
         typeof delivered.error?.message === 'string'
           ? delivered.error.message
           : 'WhatsApp failed to deliver the message';
+      if (delivered.error?.code === 132001) {
+        errorMessage = `Meta template "${templateMeta?.templateNameMeta ?? 'unknown'}" is not available for language "${templateMeta?.templateLanguage ?? 'en'}". Link this message to the exact approved Meta template name and language in Templates or WhatsApp Settings.`;
+      }
       throw new WhatsAppDeliveryError(errorMessage, delivered.error ?? undefined);
     }
 

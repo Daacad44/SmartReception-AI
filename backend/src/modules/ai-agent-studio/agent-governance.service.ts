@@ -33,7 +33,7 @@ export class AgentGovernanceService {
   async requestReleaseApproval(businessId: string, agentId: string, releaseId: string, userId: string) {
     const policy = await this.get(businessId, agentId);
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-approval:${releaseId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-approval:${releaseId}`}))`;
       const release = await tx.aiAgentRelease.findFirst({ where: { id: releaseId, agentId, businessId }, include: { evaluationRuns: { orderBy: { createdAt: 'desc' }, take: 1 } } });
       if (!release) throw new NotFoundError('Agent release not found');
       if (!['READY_FOR_REVIEW', 'APPROVED'].includes(release.status)) throw new ValidationError('Release must pass evaluation before approval');
@@ -50,7 +50,7 @@ export class AgentGovernanceService {
   async reviewRelease(businessId: string, agentId: string, releaseId: string, input: ReviewAgentReleaseInput, userId: string) {
     const policy = await this.get(businessId, agentId);
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-approval:${releaseId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-approval:${releaseId}`}))`;
       const request = await tx.aiAgentReleaseApproval.findFirst({ where: { releaseId, release: { agentId, businessId }, status: 'PENDING' }, orderBy: { requestedAt: 'desc' } });
       if (!request) throw new NotFoundError('Pending release approval not found');
       if (policy.requireSeparateApprover && request.requestedById === userId) throw new ValidationError('Release requester cannot approve their own release');
@@ -65,7 +65,7 @@ export class AgentGovernanceService {
   async activateRelease(businessId: string, agentId: string, releaseId: string, userId: string) {
     await this.get(businessId, agentId);
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-activate:${agentId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-activate:${agentId}`}))`;
       const release = await tx.aiAgentRelease.findFirst({ where: { id: releaseId, agentId, businessId }, include: { approvals: { where: { status: 'APPROVED' }, take: 1 } } });
       if (!release) throw new NotFoundError('Agent release not found');
       if (release.status !== 'APPROVED' || !release.approvals.length) throw new ValidationError('Only an approved release can be activated');

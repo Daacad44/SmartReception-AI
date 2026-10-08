@@ -42,7 +42,7 @@ export class AiAgentStudioService {
     if (!input.supportedLanguages.includes(input.defaultLanguage)) throw new ValidationError('Default language must be included in supported languages');
     const baseSlug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'agent';
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-create:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-create:${businessId}`}))`;
       const existing = await tx.aiAgent.findMany({ where: { businessId, slug: { startsWith: baseSlug } }, select: { slug: true } });
       const occupied = new Set(existing.map((item) => item.slug));
       let suffix = 1;
@@ -70,7 +70,7 @@ export class AiAgentStudioService {
     if (!business) throw new NotFoundError('Business not found');
 
     const agent = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-default:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-default:${businessId}`}))`;
       const existing = await tx.aiAgent.findUnique({
         where: { businessId_slug: { businessId, slug: DEFAULT_AGENT_SLUG } },
       });
@@ -129,7 +129,7 @@ export class AiAgentStudioService {
     if (!versions.length) return { synced: 0 };
 
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-sync:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-sync:${businessId}`}))`;
       let synced = 0;
       let activeReleaseId: string | null = null;
       for (const version of versions) {
@@ -307,7 +307,7 @@ export class AiAgentStudioService {
     const draft = agent.draft;
 
     const release = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-release:${agentId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-release:${agentId}`}))`;
       const latest = await tx.aiAgentRelease.findFirst({
         where: { agentId },
         orderBy: { releaseNumber: 'desc' },

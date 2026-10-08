@@ -30,7 +30,7 @@ export class AgentWorkflowService {
     const validation = validateWorkflow(input.nodes, input.edges);
     if (input.publish && !validation.valid) throw new ValidationError(validation.errors.join('; '));
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-workflow:${agentId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-workflow:${agentId}`}))`;
       const data = { name: input.name, description: input.description, triggerType: input.triggerType, nodes: json(input.nodes), edges: json(input.edges), validation: json(validation), status: input.publish ? 'ACTIVE' as const : validation.valid ? 'VALIDATED' as const : 'DRAFT' as const, ...(input.publish ? { publishedAt: new Date() } : {}), updatedByUserId: userId };
       const workflow = workflowId
         ? await tx.aiAutomationWorkflow.update({ where: { id: workflowId, businessId, agentId, revision: input.expectedRevision }, data: { ...data, revision: { increment: 1 } } }).catch(() => { throw new ValidationError('Workflow changed or was not found; refresh and try again'); })

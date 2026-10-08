@@ -31,7 +31,7 @@ export class TrainingJobService {
     let result: { existing: boolean; job: Awaited<ReturnType<typeof prisma.aiTrainingJob.create>> };
     try {
       result = await prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-training-job:${input.businessId}`}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-training-job:${input.businessId}`}))`;
 
         const running = await tx.aiTrainingJob.findFirst({
           where: {

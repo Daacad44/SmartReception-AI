@@ -74,7 +74,7 @@ export class VersionService {
     }
 
     const previousProductionId = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${businessId}`}))`;
       const workspace = await tx.aiTrainingWorkspace.findUniqueOrThrow({
         where: { businessId },
         select: { productionVersionId: true },

@@ -5,6 +5,7 @@ import {
   isPartialCampaignRetry,
   isPermanentCampaignFailure,
   isRetryableFailedRecipient,
+  isWhatsAppSessionFailure,
   MAX_CAMPAIGN_RETRIES,
 } from './campaign-retry.util';
 import { resolveCampaignSessionSend } from './campaign-session-send';
@@ -20,6 +21,7 @@ test('131047 session errors are retryable, not permanent', () => {
   assert.equal(isPermanentCampaignFailure('(#131047) Re-engagement message'), false);
   assert.equal(isPermanentCampaignFailure('Message failed to send because more than 24 hours have passed (131047)'), false);
   assert.equal(isPermanentCampaignFailure('Re-engagement message'), false);
+  assert.equal(isWhatsAppSessionFailure(null, 'Message failed because more than 24 hours have passed'), true);
 });
 
 test('isRetryableFailedRecipient skips opt-out, empty phone, and permanent fails', () => {
@@ -138,6 +140,22 @@ test('closed session TEXT send uses Meta template; missing template skips', () =
   });
   assert.ok(missing.skipReason);
   assert.match(missing.skipReason ?? '', /24-hour session/);
+
+  const unlinkedSlugIsNotAssumedApproved = resolveCampaignSessionSend({
+    messageType: 'TEXT',
+    sessionOpen: false,
+    template: {
+      name: 'welcome',
+      content: 'Welcome',
+      variables: [],
+      whatsappTemplateName: null,
+      whatsappTemplateLanguage: null,
+    },
+    reengagement: { name: null, language: 'en', hasBodyVariable: false },
+    personalization: { businessName: 'Botan', customer },
+  });
+  assert.ok(unlinkedSlugIsNotAssumedApproved.skipReason);
+  assert.equal(unlinkedSlugIsNotAssumedApproved.templateName, undefined);
 
   const openSession = resolveCampaignSessionSend({
     messageType: 'TEXT',

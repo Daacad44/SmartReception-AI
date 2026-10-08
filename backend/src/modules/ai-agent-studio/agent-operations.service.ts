@@ -26,7 +26,7 @@ export class AgentOperationsService {
     if (health.healthy) return { health, incident: null };
     const type = health.alerts.join('+');
     const incident = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-incident:${agentId}:${type}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-incident:${agentId}:${type}`}))`;
       const existing = await tx.aiAgentIncident.findFirst({ where: { businessId, agentId, status: { in: ['OPEN', 'ACKNOWLEDGED'] }, type } });
       if (existing) return existing;
       const created = await tx.aiAgentIncident.create({ data: { businessId, agentId, severity: health.failureRate > 25 ? 'CRITICAL' : 'HIGH', type, summary: `Agent health threshold breached: ${health.alerts.join(', ')}`, evidence: json(health) } });

@@ -70,7 +70,7 @@ export class DeploymentService {
     audit: AuditContext & { deploymentSummary?: string; sandboxTestSummary?: Record<string, unknown> }
   ) {
     const { request, created } = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-deployment:${businessId}:${versionId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-deployment:${businessId}:${versionId}`}))`;
 
       const pending = await tx.aiDeploymentRequest.findFirst({
         where: { businessId, versionId, status: 'PENDING' },
@@ -311,7 +311,7 @@ export class DeploymentService {
     }
 
     const { deployed, previousProductionId } = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${request.businessId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${request.businessId}`}))`;
       const workspace = await tx.aiTrainingWorkspace.findUniqueOrThrow({
         where: { businessId: request.businessId },
         select: { productionVersionId: true },
