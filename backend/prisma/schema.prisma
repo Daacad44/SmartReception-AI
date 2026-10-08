@@ -700,6 +700,8 @@ model Business {
   aiSimulationRuns              AiSimulationRun[]
   aiAgentIncidents              AiAgentIncident[]
   aiChannelBindings             AiChannelBinding[]
+  systemUpdateState             BusinessSystemUpdateState?
+  systemUpdateInstallations     BusinessSystemUpdateInstallation[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -3636,6 +3638,56 @@ model AiChannelBinding {
   @@unique([businessId, channel, externalRef])
   @@index([agentId, status])
   @@map("ai_channel_bindings")
+}
+
+model PlatformSystemRelease {
+  id              String   @id @default(uuid())
+  version         String   @unique
+  title           String
+  summary         String
+  releaseNotes    Json
+  minimumVersion  String?
+  isMandatory     Boolean  @default(false)
+  publishedAt     DateTime
+  createdAt       DateTime @default(now())
+
+  installations BusinessSystemUpdateInstallation[]
+
+  @@index([publishedAt])
+  @@map("platform_system_releases")
+}
+
+model BusinessSystemUpdateState {
+  id               String   @id @default(uuid())
+  businessId       String   @unique
+  installedVersion String   @default("1.1.1")
+  lastCheckedAt    DateTime?
+  lastUpdatedAt    DateTime?
+  updatedByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_system_update_states")
+}
+
+model BusinessSystemUpdateInstallation {
+  id          String   @id @default(uuid())
+  businessId  String
+  releaseId   String
+  fromVersion String
+  toVersion   String
+  status      String   @default("COMPLETED")
+  installedByUserId String?
+  installedAt DateTime @default(now())
+
+  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  release  PlatformSystemRelease @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, releaseId])
+  @@index([businessId, installedAt])
+  @@map("business_system_update_installations")
 }
 
 model AiTrainingJob {

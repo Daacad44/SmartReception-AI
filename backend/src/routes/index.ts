@@ -48,6 +48,7 @@ import {
   businessIntelligenceRoutes,
 } from '../modules/business-intelligence/business-intelligence.routes';
 import featureManagementRoutes from '../modules/feature-management/feature-management.routes';
+import systemUpdatesRoutes from '../modules/system-updates/system-updates.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -103,6 +104,7 @@ const licensed = Router();
 licensed.use(authenticate, requireBusiness, requireValidLicense());
 
 licensed.use('/business', businessRoutes);
+licensed.use('/system-updates', systemUpdatesRoutes);
 licensed.use('/customers', customersRoutes);
 licensed.use('/conversations', conversationsRoutes);
 licensed.use('/appointments', appointmentsRoutes);
