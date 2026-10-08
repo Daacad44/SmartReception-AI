@@ -229,6 +229,7 @@ async function startWorkers(): Promise<void> {
     getCampaignJourneyQueue,
     getEmployeeBroadcastQueue,
     getEmployeeBroadcastBatchQueue,
+    getAiTrainingQueue,
   } = await import('./infrastructure/queue/queues');
   for (const queue of [
     getAiQueue(),
@@ -238,6 +239,7 @@ async function startWorkers(): Promise<void> {
     getCampaignJourneyQueue(),
     getEmployeeBroadcastQueue(),
     getEmployeeBroadcastBatchQueue(),
+    getAiTrainingQueue(),
   ]) {
     if (!queue) continue;
     try {
@@ -256,6 +258,21 @@ async function startWorkers(): Promise<void> {
   }
 
   logger.info('BullMQ workers started', { count: workers.length });
+
+  const { trainingJobService } = await import(
+    './modules/ai-training-mgmt/training-job.service'
+  );
+  const TRAINING_RECOVERY_SCAN_MS = 5 * 60 * 1000;
+  const recoverTrainingJobs = () =>
+    trainingJobService.recoverStaleJobs().then((result) => {
+      if (result.failedRunning || result.requeued || result.pendingWithoutQueue) {
+        logger.warn('AI training stale-job recovery completed', result);
+      }
+    }).catch((error) => {
+      logger.warn('AI training stale-job recovery failed', { error });
+    });
+  setInterval(() => void recoverTrainingJobs(), TRAINING_RECOVERY_SCAN_MS);
+  void recoverTrainingJobs();
 
   // Fallback missed-appointment scan when delayed jobs were lost (every 5 minutes).
   const MISSED_SCAN_MS = 5 * 60 * 1000;

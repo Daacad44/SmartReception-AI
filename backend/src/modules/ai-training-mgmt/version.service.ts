@@ -1,7 +1,7 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { NotFoundError, ValidationError } from '../../core/errors';
-import { workspaceService } from './workspace.service';
 import { recordAiTrainingAudit, type AuditContext } from './audit.service';
+import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
 
 export class VersionService {
   async listVersions(businessId: string) {
@@ -73,27 +73,36 @@ export class VersionService {
       throw new ValidationError('Can only rollback to a previously deployed version');
     }
 
-    const workspace = await workspaceService.getWorkspace(businessId);
-    const previousProductionId = workspace.productionVersionId;
-
-    if (workspace.productionVersionId && workspace.productionVersionId !== versionId) {
-      await prisma.aiTrainingVersion.update({
-        where: { id: workspace.productionVersionId },
-        data: { status: 'ARCHIVED' },
+    const previousProductionId = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${businessId}`}))`;
+      const workspace = await tx.aiTrainingWorkspace.findUniqueOrThrow({
+        where: { businessId },
+        select: { productionVersionId: true },
       });
-    }
 
-    await prisma.aiTrainingVersion.update({
-      where: { id: versionId },
-      data: { status: 'PRODUCTION' },
+      if (workspace.productionVersionId && workspace.productionVersionId !== versionId) {
+        await tx.aiTrainingVersion.update({
+          where: { id: workspace.productionVersionId },
+          data: { status: 'ARCHIVED' },
+        });
+      }
+      await tx.aiTrainingVersion.update({
+        where: { id: versionId },
+        data: { status: 'PRODUCTION' },
+      });
+      await tx.aiTrainingWorkspace.update({
+        where: { businessId },
+        data: {
+          productionVersionId: versionId,
+          sandboxVersionId: versionId,
+          aiReadinessScore: version.readinessScore ?? undefined,
+          knowledgeScore: version.knowledgeScore ?? undefined,
+          confidenceScore: version.confidenceScore ?? undefined,
+        },
+      });
+      return workspace.productionVersionId;
     });
-
-    await workspaceService.updateWorkspaceMetrics(businessId, {
-      productionVersionId: versionId,
-      aiReadinessScore: version.readinessScore ?? undefined,
-      knowledgeScore: version.knowledgeScore ?? undefined,
-      confidenceScore: version.confidenceScore ?? undefined,
-    });
+    invalidateKnowledgeCache(businessId);
 
     await recordAiTrainingAudit(
       { ...audit, businessId, versionId },

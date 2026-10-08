@@ -29,6 +29,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { PwaInstallProvider, PwaGlobals } from '@/pwa';
+import { isAgentStudioV2Enabled } from '@/lib/agent-studio';
 
 const ConversationsPage = lazyWithRetry(() =>
   import('@/pages/ConversationsPage').then((m) => ({ default: m.ConversationsPage }))
@@ -47,6 +48,9 @@ const AppointmentAutomationPage = lazyWithRetry(() =>
 );
 const EnterpriseAiIntelligencePage = lazyWithRetry(() =>
   import('@/pages/EnterpriseAiIntelligencePage').then((m) => ({ default: m.EnterpriseAiIntelligencePage }))
+);
+const AiAgentStudioPage = lazyWithRetry(() =>
+  import('@/pages/AiAgentStudioPage').then((m) => ({ default: m.AiAgentStudioPage }))
 );
 const BusinessIntelligencePage = lazyWithRetry(() =>
   import('@/pages/BusinessIntelligencePage').then((m) => ({ default: m.BusinessIntelligencePage }))
@@ -350,6 +354,18 @@ export default function App() {
                   />
                   <Route path="/knowledge" element={<Navigate to="/enterprise-ai-intelligence" replace />} />
                   <Route path="/ai-training" element={<Navigate to="/enterprise-ai-intelligence" replace />} />
+                  <Route
+                    path="/ai-agent-studio"
+                    element={
+                      isAgentStudioV2Enabled ? (
+                        <PermissionRoute permission={PERMISSIONS['knowledge:read']}>
+                          <AiAgentStudioPage />
+                        </PermissionRoute>
+                      ) : (
+                        <Navigate to="/enterprise-ai-intelligence" replace />
+                      )
+                    }
+                  />
                   <Route path="/analytics" element={<Navigate to="/business-intelligence" replace />} />
                   <Route path="/ai-analytics" element={<Navigate to="/business-intelligence" replace />} />
                   <Route

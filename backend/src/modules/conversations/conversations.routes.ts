@@ -17,6 +17,9 @@ router.get('/summary', authorize(PERMISSIONS['conversations:read']), (req, res, 
 router.get('/templates', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.listTemplates(req, res, next)
 );
+router.get('/handoffs/queue', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.handoffQueue(req, res, next)
+);
 router.get('/:id/messages', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.getMessages(req, res, next)
 );
@@ -58,6 +61,12 @@ router.get('/:id/activity', authorize(PERMISSIONS['conversations:read']), (req, 
 );
 router.get('/:id/feedback', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
   conversationsController.getFeedback(req, res, next)
+);
+router.get('/:id/handoff-case', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.getHandoffCase(req, res, next)
+);
+router.get('/:id/agent-actions', authorize(PERMISSIONS['conversations:read']), (req, res, next) =>
+  conversationsController.listAgentActions(req, res, next)
 );
 router.patch('/:id/read', authorize(PERMISSIONS['conversations:write']), (req, res, next) =>
   conversationsController.markAsRead(req, res, next)

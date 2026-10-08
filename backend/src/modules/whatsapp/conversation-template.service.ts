@@ -8,7 +8,6 @@ import {
 import { getWhatsAppSessionWindow } from './whatsapp-session.service';
 import type { OutboundMessageType } from '../../infrastructure/whatsapp/whatsapp.types';
 import {
-  isMetaTemplateSlug,
   normalizeWhatsAppTemplateLanguage,
 } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
@@ -95,7 +94,6 @@ export async function resolveConversationTemplateSend(params: {
   if (!sessionWindow.isOpen) {
     const metaTemplateName =
       template.whatsappTemplateName ??
-      (isMetaTemplateSlug(template.name) ? template.name.trim() : null) ??
       whatsappAccount?.reengagementTemplateName ??
       null;
     const metaTemplateLanguage = normalizeWhatsAppTemplateLanguage(

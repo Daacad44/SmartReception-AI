@@ -3,7 +3,6 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { emailService } from '../../infrastructure/email/email.service';
 import { createNotification } from '../../infrastructure/notifications/notification-helper';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../core/errors';
-import { workspaceService } from './workspace.service';
 import { recordAiTrainingAudit, type AuditContext } from './audit.service';
 import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-search.service';
 import { sandboxService } from './sandbox.service';
@@ -16,6 +15,14 @@ export interface DeploymentReadiness {
   blockers: string[];
   checklist: Awaited<ReturnType<typeof sandboxService.getReadinessChecklist>>;
   threshold: number;
+}
+
+export function canApproveDeployment(status: string): boolean {
+  return status === 'PENDING' || status === 'CHANGES_REQUESTED';
+}
+
+export function canPublishDeployment(status: string): boolean {
+  return status === 'APPROVED';
 }
 
 export class DeploymentService {
@@ -62,47 +69,58 @@ export class DeploymentService {
     versionId: string,
     audit: AuditContext & { deploymentSummary?: string; sandboxTestSummary?: Record<string, unknown> }
   ) {
-    const version = await prisma.aiTrainingVersion.findFirst({
-      where: { id: versionId, businessId, status: 'SANDBOX' },
-    });
-    if (!version) {
-      throw new ValidationError('Only sandbox versions can be submitted for deployment');
-    }
+    const { request, created } = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-deployment:${businessId}:${versionId}`}))`;
 
-    const pending = await prisma.aiDeploymentRequest.findFirst({
-      where: { businessId, versionId, status: 'PENDING' },
-    });
-    if (pending) {
-      return pending;
-    }
+      const pending = await tx.aiDeploymentRequest.findFirst({
+        where: { businessId, versionId, status: 'PENDING' },
+        include: {
+          business: { select: { id: true, name: true } },
+          version: { select: { versionNumber: true } },
+          requestedByTrainer: { select: { firstName: true, lastName: true, username: true } },
+          requestedByUser: { select: { firstName: true, lastName: true, email: true } },
+        },
+      });
+      if (pending) return { request: pending, created: false };
 
-    const request = await prisma.aiDeploymentRequest.create({
-      data: {
-        businessId,
-        versionId,
-        status: 'PENDING',
-        requestedByUserId: audit.userId,
-        requestedByTrainerId: audit.trainerId,
-        knowledgeScore: version.knowledgeScore,
-        confidenceScore: version.confidenceScore,
-        readinessScore: version.readinessScore,
-        sandboxTestSummary: audit.sandboxTestSummary as Prisma.InputJsonValue | undefined,
-        deploymentSummary: audit.deploymentSummary,
-        ipAddress: audit.ipAddress,
-        userAgent: audit.userAgent,
-      },
-      include: {
-        business: { select: { id: true, name: true } },
-        version: { select: { versionNumber: true } },
-        requestedByTrainer: { select: { firstName: true, lastName: true, username: true } },
-        requestedByUser: { select: { firstName: true, lastName: true, email: true } },
-      },
+      const version = await tx.aiTrainingVersion.findFirst({
+        where: { id: versionId, businessId, status: 'SANDBOX' },
+      });
+      if (!version) {
+        throw new ValidationError('Only sandbox versions can be submitted for deployment');
+      }
+
+      const newRequest = await tx.aiDeploymentRequest.create({
+        data: {
+          businessId,
+          versionId,
+          status: 'PENDING',
+          requestedByUserId: audit.userId,
+          requestedByTrainerId: audit.trainerId,
+          knowledgeScore: version.knowledgeScore,
+          confidenceScore: version.confidenceScore,
+          readinessScore: version.readinessScore,
+          sandboxTestSummary: audit.sandboxTestSummary as Prisma.InputJsonValue | undefined,
+          deploymentSummary: audit.deploymentSummary,
+          ipAddress: audit.ipAddress,
+          userAgent: audit.userAgent,
+        },
+        include: {
+          business: { select: { id: true, name: true } },
+          version: { select: { versionNumber: true } },
+          requestedByTrainer: { select: { firstName: true, lastName: true, username: true } },
+          requestedByUser: { select: { firstName: true, lastName: true, email: true } },
+        },
+      });
+
+      await tx.aiTrainingVersion.update({
+        where: { id: versionId },
+        data: { status: 'PENDING_APPROVAL' },
+      });
+      return { request: newRequest, created: true };
     });
 
-    await prisma.aiTrainingVersion.update({
-      where: { id: versionId },
-      data: { status: 'PENDING_APPROVAL' },
-    });
+    if (!created) return request;
 
     await recordAiTrainingAudit(
       { ...audit, businessId, versionId },
@@ -110,17 +128,7 @@ export class DeploymentService {
       { entity: 'AiDeploymentRequest', entityId: request.id }
     );
 
-    const fullRequest = await prisma.aiDeploymentRequest.findUniqueOrThrow({
-      where: { id: request.id },
-      include: {
-        business: { select: { id: true, name: true } },
-        version: { select: { versionNumber: true } },
-        requestedByTrainer: { select: { firstName: true, lastName: true, username: true } },
-        requestedByUser: { select: { firstName: true, lastName: true, email: true } },
-      },
-    });
-
-    await this.notifySuperAdmins(fullRequest);
+    await this.notifySuperAdmins(request);
     return request;
   }
 
@@ -222,7 +230,7 @@ export class DeploymentService {
     opts: { override?: boolean } = {}
   ) {
     const request = await this.getRequest(requestId);
-    if (request.status !== 'PENDING' && request.status !== 'CHANGES_REQUESTED') {
+    if (!canApproveDeployment(request.status)) {
       throw new ValidationError('Request is not pending approval');
     }
 
@@ -235,14 +243,16 @@ export class DeploymentService {
       }
     }
 
-    return prisma.aiDeploymentRequest.update({
-      where: { id: requestId },
+    const approved = await prisma.aiDeploymentRequest.updateMany({
+      where: { id: requestId, status: { in: ['PENDING', 'CHANGES_REQUESTED'] } },
       data: {
         status: 'APPROVED',
         approvedByUserId: userId,
         reviewedAt: new Date(),
       },
     });
+    if (approved.count !== 1) throw new ValidationError('Request status changed during approval');
+    return this.getRequest(requestId);
   }
 
   async reject(requestId: string, userId: string, reason: string, audit: AuditContext) {
@@ -296,46 +306,65 @@ export class DeploymentService {
 
   async publishToProduction(requestId: string, userId: string, audit: AuditContext) {
     const request = await this.getRequest(requestId);
-    if (request.status !== 'APPROVED') {
+    if (!canPublishDeployment(request.status)) {
       throw new ForbiddenError('Deployment must be approved before publishing');
     }
 
-    const workspace = await workspaceService.getWorkspace(request.businessId);
-    const previousProductionId = workspace.productionVersionId;
-
-    if (previousProductionId) {
-      await prisma.aiTrainingVersion.update({
-        where: { id: previousProductionId },
-        data: { status: 'ARCHIVED' },
+    const { deployed, previousProductionId } = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-production:${request.businessId}`}))`;
+      const workspace = await tx.aiTrainingWorkspace.findUniqueOrThrow({
+        where: { businessId: request.businessId },
+        select: { productionVersionId: true },
       });
-    }
 
-    await prisma.aiTrainingVersion.update({
-      where: { id: request.versionId },
-      data: { status: 'PRODUCTION' },
-    });
+      if (workspace.productionVersionId && workspace.productionVersionId !== request.versionId) {
+        await tx.aiTrainingVersion.update({
+          where: { id: workspace.productionVersionId },
+          data: { status: 'ARCHIVED' },
+        });
+      }
 
-    await workspaceService.updateWorkspaceMetrics(request.businessId, {
-      productionVersionId: request.versionId,
-      sandboxVersionId: request.versionId,
-      aiReadinessScore: request.readinessScore ?? undefined,
-      knowledgeScore: request.knowledgeScore ?? undefined,
-      confidenceScore: request.confidenceScore ?? undefined,
+      await tx.aiTrainingVersion.update({
+        where: { id: request.versionId },
+        data: { status: 'PRODUCTION' },
+      });
+
+      await tx.aiTrainingWorkspace.update({
+        where: { businessId: request.businessId },
+        data: {
+          productionVersionId: request.versionId,
+          sandboxVersionId: request.versionId,
+          aiReadinessScore: request.readinessScore ?? undefined,
+          knowledgeScore: request.knowledgeScore ?? undefined,
+          confidenceScore: request.confidenceScore ?? undefined,
+        },
+      });
+
+      const transitioned = await tx.aiDeploymentRequest.updateMany({
+        where: { id: requestId, status: 'APPROVED' },
+        data: {
+          status: 'DEPLOYED',
+          deployedAt: new Date(),
+        },
+      });
+      if (transitioned.count !== 1) {
+        throw new ForbiddenError('Deployment approval was already consumed or changed');
+      }
+      const deployedRequest = await tx.aiDeploymentRequest.findUniqueOrThrow({
+        where: { id: requestId },
+        include: {
+          business: { select: { name: true } },
+          version: { select: { versionNumber: true } },
+        },
+      });
+
+      return {
+        deployed: deployedRequest,
+        previousProductionId: workspace.productionVersionId,
+      };
     });
 
     invalidateKnowledgeCache(request.businessId);
-
-    const deployed = await prisma.aiDeploymentRequest.update({
-      where: { id: requestId },
-      data: {
-        status: 'DEPLOYED',
-        deployedAt: new Date(),
-      },
-      include: {
-        business: { select: { name: true } },
-        version: { select: { versionNumber: true } },
-      },
-    });
 
     await recordAiTrainingAudit(
       { ...audit, businessId: request.businessId, versionId: request.versionId, userId },
@@ -365,81 +394,6 @@ export class DeploymentService {
     return deployed;
   }
 
-  async autoDeployValidatedVersion(
-    businessId: string,
-    versionId: string,
-    audit: AuditContext & { validationScore?: number }
-  ) {
-    const version = await prisma.aiTrainingVersion.findFirst({
-      where: { id: versionId, businessId, status: { in: ['SANDBOX', 'DRAFT'] } },
-    });
-    if (!version) {
-      throw new ValidationError('Version not available for auto-deployment');
-    }
-
-    const workspace = await workspaceService.getWorkspace(businessId);
-    const previousProductionId = workspace.productionVersionId;
-
-    if (previousProductionId) {
-      await prisma.aiTrainingVersion.update({
-        where: { id: previousProductionId },
-        data: { status: 'ARCHIVED' },
-      });
-    }
-
-    await prisma.aiTrainingVersion.update({
-      where: { id: versionId },
-      data: { status: 'PRODUCTION' },
-    });
-
-    await workspaceService.updateWorkspaceMetrics(businessId, {
-      productionVersionId: versionId,
-      sandboxVersionId: versionId,
-      aiReadinessScore: audit.validationScore ?? version.readinessScore ?? undefined,
-      knowledgeScore: version.knowledgeScore ?? undefined,
-      confidenceScore: version.confidenceScore ?? undefined,
-    });
-
-    invalidateKnowledgeCache(businessId);
-
-    const request = await prisma.aiDeploymentRequest.create({
-      data: {
-        businessId,
-        versionId,
-        status: 'DEPLOYED',
-        requestedByUserId: audit.userId,
-        approvedByUserId: audit.userId,
-        deployedAt: new Date(),
-        reviewedAt: new Date(),
-        knowledgeScore: version.knowledgeScore,
-        confidenceScore: version.confidenceScore,
-        readinessScore: version.readinessScore,
-        deploymentSummary: `Auto-deployed after validation score ${audit.validationScore ?? 'N/A'}`,
-      },
-    });
-
-    await recordAiTrainingAudit(
-      { ...audit, businessId, versionId },
-      'DEPLOYMENT_PUBLISHED',
-      {
-        entity: 'AiDeploymentRequest',
-        entityId: request.id,
-        oldData: { productionVersionId: previousProductionId },
-        newData: { productionVersionId: versionId, autoDeployed: true },
-      }
-    );
-
-    await createNotification({
-      businessId,
-      userId: audit.userId ?? undefined,
-      type: 'AI_TRAINING_COMPLETE',
-      title: 'AI deployed to production',
-      message: `Version ${version.versionNumber} passed validation and was automatically deployed.`,
-      data: { versionId, versionNumber: version.versionNumber },
-    });
-
-    return request;
-  }
 }
 
 export const deploymentService = new DeploymentService();
