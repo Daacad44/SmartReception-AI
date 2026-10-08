@@ -178,6 +178,7 @@ export function useTakeoverConversation() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['handoff-case', conversationId] });
       toast.success('You took over this conversation');
     },
     onError: (error) => {
@@ -215,6 +216,7 @@ export function useTransferToAi() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['handoff-case', conversationId] });
       toast.success('Conversation returned to AI');
     },
     onError: (error) => {
@@ -230,6 +232,7 @@ function invalidateConversationQueries(
   queryClient.invalidateQueries({ queryKey: ['conversations'] });
   queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
   queryClient.invalidateQueries({ queryKey: ['conversation-activity', conversationId] });
+  queryClient.invalidateQueries({ queryKey: ['handoff-case', conversationId] });
 }
 
 export function useAssignConversation() {

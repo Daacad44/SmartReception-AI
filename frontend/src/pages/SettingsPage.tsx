@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Bot, Bell, Shield, MessageCircle } from 'lucide-react';
+import { Building2, Bot, Bell, Shield, MessageCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,7 @@ import { WhatsAppSettings } from '@/components/settings/WhatsAppSettings';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PwaSettingsCard } from '@/pwa';
+import { SystemUpdatesSettings } from '@/components/settings/SystemUpdatesSettings';
 
 const businessSchema = z.object({
   name: z.string().min(1),
@@ -49,7 +50,8 @@ type AiForm = z.infer<typeof aiSchema>;
 
 export function SettingsPage() {
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'whatsapp' ? 'whatsapp' : 'business';
+  const requestedTab = searchParams.get('tab');
+  const initialTab = requestedTab === 'whatsapp' || requestedTab === 'updates' ? requestedTab : 'business';
   const [activeTab, setActiveTab] = useState(initialTab);
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = useBusinessSettings();
   const { data: aiConfig, isLoading: aiLoading } = useAiConfig();
@@ -160,6 +162,10 @@ export function SettingsPage() {
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="updates" className="gap-2">
+            <Download className="h-4 w-4" />
+            Updates
           </TabsTrigger>
         </TabsList>
 
@@ -324,6 +330,10 @@ export function SettingsPage() {
 
         <TabsContent value="security" className="mt-6 space-y-4">
           <TwoFactorSettings />
+        </TabsContent>
+
+        <TabsContent value="updates" className="mt-6">
+          <SystemUpdatesSettings canApply={hasPermission('settings:write')} />
         </TabsContent>
       </Tabs>
     </div>

@@ -29,16 +29,24 @@ export interface PipelineContext {
   documentIds?: string[];
 }
 
+class TrainingCancelledError extends Error {
+  constructor() {
+    super('Training was cancelled');
+    this.name = 'TrainingCancelledError';
+  }
+}
+
 async function updateJobProgress(
   jobId: string,
   progress: number,
   currentStep: string,
   totalSteps = 8
 ): Promise<void> {
-  await prisma.aiTrainingJob.update({
-    where: { id: jobId },
+  const updated = await prisma.aiTrainingJob.updateMany({
+    where: { id: jobId, status: { not: 'CANCELLED' } },
     data: { progress, currentStep, totalSteps },
   });
+  if (updated.count === 0) throw new TrainingCancelledError();
 }
 
 async function loadDocuments(
@@ -77,10 +85,18 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
   let embeddingsUpdated = 0;
   let embeddingsDeleted = 0;
 
-  await prisma.aiTrainingJob.update({
-    where: { id: jobId },
+  const claimed = await prisma.aiTrainingJob.updateMany({
+    where: { id: jobId, status: 'QUEUED' },
     data: { status: 'RUNNING', startedAt },
   });
+  if (claimed.count === 0) {
+    const current = await prisma.aiTrainingJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
+    if (current?.status === 'CANCELLED') return null;
+    throw new Error(`Training job cannot start from status ${current?.status ?? 'UNKNOWN'}`);
+  }
 
   await recordAiTrainingAudit(
     { businessId, userId, trainerId },
@@ -203,12 +219,12 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       }
     }
 
-    let documents = await loadDocuments(businessId, baseId, targetDocumentIds);
+    let documentsToProcess = await loadDocuments(businessId, baseId, targetDocumentIds);
 
     const toProcess =
       jobType === 'FULL_TRAIN' || jobType === 'RETRAIN'
-        ? documents.filter((d) => d.status !== 'INDEXED')
-        : documents.filter((d) => d.status !== 'INDEXED' || targetDocumentIds?.includes(d.id));
+        ? documentsToProcess.filter((d) => d.status !== 'INDEXED')
+        : documentsToProcess.filter((d) => d.status !== 'INDEXED' || targetDocumentIds?.includes(d.id));
 
     for (let i = 0; i < toProcess.length; i++) {
       await updateJobProgress(
@@ -220,7 +236,11 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       embeddingsCreated++;
     }
 
-    documents = await loadDocuments(businessId, baseId, targetDocumentIds);
+    // Incremental retraining limits expensive processing to changed documents,
+    // but every version must remain a complete, deployable knowledge snapshot.
+    // Loading only targetDocumentIds here would make the next production
+    // version forget every unchanged document.
+    const documents = await loadDocuments(businessId, baseId);
 
     await updateJobProgress(jobId, 55, 'Building training snapshot');
 
@@ -245,34 +265,38 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     await updateJobProgress(jobId, 70, 'Calculating quality scores');
     const scores = calculateQualityScores(snapshot);
 
-    const lastVersion = await prisma.aiTrainingVersion.findFirst({
-      where: { businessId },
-      orderBy: { versionNumber: 'desc' },
-      select: { versionNumber: true },
-    });
-    const versionNumber = (lastVersion?.versionNumber ?? 0) + 1;
-
     await updateJobProgress(jobId, 85, 'Creating sandbox version');
+    const version = await prisma.$transaction(async (tx) => {
+      // Serialize version-number allocation per business. The existing unique
+      // constraint remains the final database guard.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-training-version:${businessId}`}))`;
+      const lastVersion = await tx.aiTrainingVersion.findFirst({
+        where: { businessId },
+        orderBy: { versionNumber: 'desc' },
+        select: { versionNumber: true },
+      });
 
-    const version = await prisma.aiTrainingVersion.create({
-      data: {
-        workspaceId: workspace.id,
-        businessId,
-        versionNumber,
-        status: 'SANDBOX',
-        trainingNotes,
-        trainedByUserId: userId,
-        trainedByTrainerId: trainerId,
-        knowledgeScore: scores.knowledgeScore,
-        confidenceScore: scores.confidenceScore,
-        readinessScore: scores.readinessScore,
-        hallucinationRisk: scores.hallucinationRisk,
-        embeddingVersion: 'gemini-embedding-001',
-        snapshotData: snapshot as object,
-        documentCount: documents.length,
-        chunkCount: totalChunks,
-      },
+      return tx.aiTrainingVersion.create({
+        data: {
+          workspaceId: workspace.id,
+          businessId,
+          versionNumber: (lastVersion?.versionNumber ?? 0) + 1,
+          status: 'SANDBOX',
+          trainingNotes,
+          trainedByUserId: userId,
+          trainedByTrainerId: trainerId,
+          knowledgeScore: scores.knowledgeScore,
+          confidenceScore: scores.confidenceScore,
+          readinessScore: scores.readinessScore,
+          hallucinationRisk: scores.hallucinationRisk,
+          embeddingVersion: 'gemini-embedding-001',
+          snapshotData: snapshot as object,
+          documentCount: documents.length,
+          chunkCount: totalChunks,
+        },
+      });
     });
+    const versionNumber = version.versionNumber;
 
     await updateJobProgress(jobId, 92, 'Running post-training AI verification');
     const validation = await trainingValidationService.validateTrainingVersion(businessId, version.id);
@@ -393,12 +417,17 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       { entity: 'AiTrainingVersion', entityId: version.id }
     );
 
-    await updateJobProgress(jobId, 96, 'Auto-deploying validated version');
-    await deploymentService.autoDeployValidatedVersion(businessId, version.id, {
+    await updateJobProgress(jobId, 96, 'Requesting deployment approval');
+    const deploymentRequest = await deploymentService.requestDeployment(businessId, version.id, {
       businessId,
       userId,
       trainerId,
-      validationScore: validation.validationScore,
+      deploymentSummary: `Version ${versionNumber} passed automated validation with score ${validation.validationScore}. Human approval is required before production deployment.`,
+      sandboxTestSummary: {
+        automatedValidation: true,
+        validationScore: validation.validationScore,
+        threshold: validation.threshold,
+      },
     });
 
     await createNotification({
@@ -406,13 +435,22 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       userId: userId ?? undefined,
       type: 'AI_TRAINING_COMPLETE',
       title: 'AI training completed',
-      message: `Version ${versionNumber} passed validation and was automatically deployed to production.`,
-      data: { versionId: version.id, versionNumber, autoDeployed: true },
+      message: `Version ${versionNumber} passed automated validation and is awaiting deployment approval.`,
+      data: { versionId: version.id, versionNumber, deploymentRequestId: deploymentRequest.id },
     });
 
     return version.id;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Training failed';
+    if (error instanceof TrainingCancelledError) {
+      logger.info('Training pipeline stopped after cancellation', { jobId, businessId });
+      await trainingSessionLogService.finalizeLog(jobId, {
+        status: 'CANCELLED',
+        warnings: [message],
+        startedAt,
+      });
+      return null;
+    }
     logger.error('Training pipeline failed', { jobId, businessId, error: message });
 
     await prisma.aiTrainingJob.update({
