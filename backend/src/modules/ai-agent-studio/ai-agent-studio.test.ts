@@ -16,6 +16,11 @@ import { enforceRuntimePolicy } from './agent-runtime.service';
 import { handoffPriority } from '../conversations/handoff-operations.service';
 import { parseActionConfirmation } from './agent-action.service';
 import { percent } from './agent-analytics.service';
+import { isIncludedInRollout, rolloutBucket } from './agent-rollout.service';
+import { matchRoutingRule } from './agent-routing.service';
+import { validateWorkflow } from './agent-workflow.service';
+import { scoreSimulation } from './agent-simulation.service';
+import { normalizeChannelMessage } from './agent-operations.service';
 
 test('legacy release snapshots retain immutable version identity and knowledge', () => {
   assert.deepEqual(
@@ -167,4 +172,47 @@ test('Phase 10 analytics percentages are stable for empty and populated datasets
   assert.equal(percent(0, 0), 0);
   assert.equal(percent(3, 4), 75);
   assert.equal(percent(1, 3), 33.33);
+});
+
+test('Phase 11-13 migration creates governance, rollout and routing invariants', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/20261011000000_agent_governance_rollout_routing/migration.sql'), 'utf8');
+  assert.match(sql, /CREATE TABLE "ai_agent_governance_policies"/);
+  assert.match(sql, /ai_agent_rollout_traffic_check/);
+  assert.match(sql, /ai_agent_routing_rules_one_fallback_key/);
+});
+
+test('Phase 12 rollout assignment is deterministic and respects boundaries', () => {
+  assert.equal(rolloutBucket('business:conversation'), rolloutBucket('business:conversation'));
+  assert.equal(isIncludedInRollout('any', 0), false);
+  assert.equal(isIncludedInRollout('any', 100), true);
+});
+
+test('Phase 13 routing uses priority order and a safe fallback', () => {
+  const rules = [
+    { id: 'sales', keywords: ['price'], intents: ['buy'], isFallback: false },
+    { id: 'fallback', keywords: [], intents: [], isFallback: true },
+  ];
+  assert.equal(matchRoutingRule(rules, 'What is the price?')?.id, 'sales');
+  assert.equal(matchRoutingRule(rules, 'I need help')?.id, 'fallback');
+});
+
+test('Phase 14 workflow validation rejects cycles and accepts a safe graph', () => {
+  const nodes = [{ id: 'start', type: 'TRIGGER', config: {} }, { id: 'end', type: 'END', config: {} }];
+  assert.equal(validateWorkflow(nodes, [{ id: 'e1', source: 'start', target: 'end' }]).valid, true);
+  assert.equal(validateWorkflow(nodes, [{ id: 'e1', source: 'start', target: 'end' }, { id: 'e2', source: 'end', target: 'start' }]).valid, false);
+});
+
+test('Phase 15 simulation fails critical safety regressions', () => {
+  assert.deepEqual(scoreSimulation([{ passed: true, critical: true }, { passed: false, critical: true }]), { score: 50, criticalFailures: 1, passed: false });
+});
+
+test('Phase 17 channel envelope preserves channel identity', () => {
+  const message = normalizeChannelMessage('WHATSAPP', 'wamid.1', ' hello ');
+  assert.equal(message.channel, 'WHATSAPP');
+  assert.equal(message.text, 'hello');
+});
+
+test('Phase 14-17 migration creates workflow, simulation, incident and channel stores', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/20261012000000_agent_automation_testing_sre_channels/migration.sql'), 'utf8');
+  for (const table of ['ai_automation_workflows', 'ai_simulation_runs', 'ai_agent_incidents', 'ai_channel_bindings']) assert.match(sql, new RegExp(`CREATE TABLE "${table}"`));
 });

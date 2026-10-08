@@ -7,6 +7,8 @@ import { aiService } from '../../infrastructure/ai/conversation-ai.service';
 import type { AIAction, AIResponse } from '../../infrastructure/ai/ai.types';
 import type { RagPipelineMeta } from '../../infrastructure/ai/rag/rag-pipeline.service';
 import { agentActionService } from './agent-action.service';
+import { agentRoutingService } from './agent-routing.service';
+import { isIncludedInRollout } from './agent-rollout.service';
 
 interface RuntimeInput {
   businessId: string;
@@ -29,10 +31,11 @@ const HANDOVER = {
 export function enforceRuntimePolicy(
   response: StoredRuntimeResponse,
   skills: Array<{ skillKey: string; enabled: boolean; requiresConfirmation: boolean }>,
-  preferEnglish: boolean
+  preferEnglish: boolean,
+  policy: { minimumConfidence: number; maximumHallucinationRisk: number } = { minimumConfidence: 0.3, maximumHallucinationRisk: 0.55 }
 ): { response: StoredRuntimeResponse; status: AiAgentExecutionStatus; blockedActions: string[] } {
   const meta = response._meta;
-  const unsafeGrounding = Boolean(meta?.missingKnowledge) || (meta?.hallucinationRisk ?? 0) > 0.55 || response.confidence < 0.3;
+  const unsafeGrounding = Boolean(meta?.missingKnowledge) || (meta?.hallucinationRisk ?? 0) > policy.maximumHallucinationRisk || response.confidence < policy.minimumConfidence;
   if (unsafeGrounding) {
     return {
       response: { ...response, content: preferEnglish ? HANDOVER.en : HANDOVER.so, actions: [{ type: 'escalate' }], confidence: Math.min(response.confidence, 0.2) },
@@ -64,11 +67,16 @@ export class AgentRuntimeService {
       return { response: existing.response as unknown as StoredRuntimeResponse, executionId: existing.id, runtime: 'AGENT_STUDIO', reused: true };
     }
 
-    const agent = await prisma.aiAgent.findFirst({
+    const routedAgent = await agentRoutingService.resolve(input.businessId, input.customerMessage);
+    const agent = routedAgent ?? await prisma.aiAgent.findFirst({
       where: { businessId: input.businessId, channel: 'WHATSAPP', status: 'ACTIVE', activeRelease: { status: 'ACTIVE' } },
-      include: { activeRelease: true, skills: true },
+      include: { activeRelease: true, skills: true, governancePolicy: true, rolloutConfig: true },
     });
     if (!agent?.activeRelease) return { response: await this.generateLegacy(input), runtime: 'LEGACY' };
+    const rollout = agent.rolloutConfig;
+    if (!rollout?.enabled || rollout.killSwitch || !isIncludedInRollout(`${input.businessId}:${input.conversationId}`, rollout.trafficPercentage)) {
+      return { response: await this.generateLegacy(input), runtime: 'LEGACY' };
+    }
 
     const knowledge = await prisma.aiAgentKnowledgeSource.findMany({
       where: { agentId: agent.id, status: 'APPROVED', OR: [{ freshnessDueAt: null }, { freshnessDueAt: { gte: new Date() } }] },
@@ -116,8 +124,9 @@ export class AgentRuntimeService {
       });
       const appointmentAction = response.actions.find((action) => action.type === 'book_appointment');
       const appointmentSkill = agent.skills.find((skill) => skill.skillKey === 'appointment.create');
-      let governed = enforceRuntimePolicy(response, agent.skills, input.preferEnglish === true);
-      if (appointmentAction && appointmentSkill?.enabled && !response._meta?.missingKnowledge && response.confidence >= 0.3) {
+      const thresholds = agent.governancePolicy ?? { minimumConfidence: 0.3, maximumHallucinationRisk: 0.55 };
+      let governed = enforceRuntimePolicy(response, agent.skills, input.preferEnglish === true, thresholds);
+      if (appointmentAction && appointmentSkill?.enabled && !response._meta?.missingKnowledge && response.confidence >= thresholds.minimumConfidence) {
         const proposal = await agentActionService.proposeAppointment({ businessId: input.businessId, conversationId: input.conversationId, executionId: execution.id, action: appointmentAction, preferEnglish: input.preferEnglish === true });
         governed = { response: { ...response, content: proposal.confirmationPrompt ?? response.content, actions: [{ type: 'none' }] }, status: 'COMPLETED', blockedActions: ['book_appointment:awaiting_confirmation'] };
       }
@@ -126,6 +135,9 @@ export class AgentRuntimeService {
     } catch (error) {
       await prisma.aiAgentExecution.update({ where: { id: execution.id }, data: { status: 'FAILED', latencyMs: Date.now() - startedAt, completedAt: new Date(), error: error instanceof Error ? error.message : String(error) } }).catch(() => undefined);
       logger.error('Agent Studio runtime execution failed', { executionId: execution.id, businessId: input.businessId, error });
+      if (rollout.fallbackToLegacy) {
+        return { response: await this.generateLegacy(input), executionId: execution.id, runtime: 'LEGACY' };
+      }
       throw error;
     }
   }

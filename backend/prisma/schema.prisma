@@ -693,6 +693,13 @@ model Business {
   aiAgentKnowledgeSources       AiAgentKnowledgeSource[]
   aiHandoffCases                AiHandoffCase[]
   aiAgentActions                AiAgentAction[]
+  aiAgentGovernancePolicies     AiAgentGovernancePolicy[]
+  aiAgentRolloutConfigs         AiAgentRolloutConfig[]
+  aiAgentRoutingRules           AiAgentRoutingRule[]
+  aiAutomationWorkflows         AiAutomationWorkflow[]
+  aiSimulationRuns              AiSimulationRun[]
+  aiAgentIncidents              AiAgentIncident[]
+  aiChannelBindings             AiChannelBinding[]
   platformFeatureScopes         PlatformFeatureBusinessScope[]
   platformFeatureAuditLogs      PlatformFeatureAuditLog[]
   businessFinancialProfile      BusinessFinancialProfile?
@@ -3065,6 +3072,38 @@ enum AiAgentActionStatus {
   EXPIRED
 }
 
+enum AiAutomationWorkflowStatus {
+  DRAFT
+  VALIDATED
+  ACTIVE
+  ARCHIVED
+}
+enum AiSimulationRunStatus {
+  RUNNING
+  PASSED
+  FAILED
+  CANCELLED
+}
+enum AiAgentIncidentStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+enum AiChannelType {
+  WHATSAPP
+  INSTAGRAM
+  MESSENGER
+  TIKTOK
+  WEBCHAT
+}
+enum AiChannelBindingStatus {
+  DISCONNECTED
+  CONFIGURED
+  ACTIVE
+  DEGRADED
+  PAUSED
+}
+
 model AiTrainingWorkspace {
   id                  String    @id @default(uuid())
   businessId          String    @unique
@@ -3154,6 +3193,13 @@ model AiAgent {
   executions     AiAgentExecution[]
   evaluations    AiAgentEvaluationRun[]
   knowledgeSources AiAgentKnowledgeSource[]
+  governancePolicy AiAgentGovernancePolicy?
+  rolloutConfig    AiAgentRolloutConfig?
+  routingRules     AiAgentRoutingRule[]
+  workflows        AiAutomationWorkflow[]
+  simulationRuns   AiSimulationRun[]
+  incidents        AiAgentIncident[]
+  channelBindings  AiChannelBinding[]
 
   @@unique([businessId, slug])
   @@index([businessId, status])
@@ -3203,6 +3249,7 @@ model AiAgentRelease {
   approvals             AiAgentReleaseApproval[]
   executions            AiAgentExecution[]
   evaluationRuns        AiAgentEvaluationRun[]
+  simulationRuns        AiSimulationRun[]
 
   @@unique([agentId, releaseNumber])
   @@index([businessId, status])
@@ -3431,6 +3478,164 @@ model AiAgentAction {
   @@index([conversationId, status])
   @@index([confirmationDueAt, status])
   @@map("ai_agent_actions")
+}
+
+model AiAgentGovernancePolicy {
+  id                          String   @id @default(uuid())
+  businessId                  String
+  agentId                     String   @unique
+  revision                    Int      @default(1)
+  minimumConfidence           Float    @default(0.3)
+  maximumHallucinationRisk    Float    @default(0.55)
+  requireHumanReleaseApproval Boolean  @default(true)
+  requireSeparateApprover     Boolean  @default(true)
+  highRiskActionConfirmation  Boolean  @default(true)
+  executionRetentionDays      Int      @default(90)
+  evidenceRetentionDays       Int      @default(365)
+  updatedByUserId             String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("ai_agent_governance_policies")
+}
+
+model AiAgentRolloutConfig {
+  id                    String   @id @default(uuid())
+  businessId            String
+  agentId               String   @unique
+  enabled               Boolean  @default(false)
+  trafficPercentage     Int      @default(0)
+  killSwitch            Boolean  @default(false)
+  fallbackToLegacy      Boolean  @default(true)
+  maxFailureRate        Float    @default(10)
+  maxHandoffRate        Float    @default(40)
+  minConfidence         Float    @default(50)
+  observationWindowMins Int      @default(60)
+  updatedByUserId       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, enabled])
+  @@map("ai_agent_rollout_configs")
+}
+
+model AiAgentRoutingRule {
+  id              String   @id @default(uuid())
+  businessId      String
+  agentId         String
+  name            String
+  priority        Int      @default(100)
+  intents         String[] @default([])
+  keywords        String[] @default([])
+  isFallback      Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent    AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+  @@index([businessId, enabled, priority])
+  @@index([agentId])
+  @@map("ai_agent_routing_rules")
+}
+
+model AiAutomationWorkflow {
+  id String @id @default(uuid())
+  businessId String
+  agentId String
+  name String
+  description String?
+  status AiAutomationWorkflowStatus @default(DRAFT)
+  revision Int @default(1)
+  triggerType String @default("MESSAGE_RECEIVED")
+  nodes Json
+  edges Json
+  validation Json?
+  publishedAt DateTime?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  @@unique([agentId, name])
+  @@index([businessId, status])
+  @@map("ai_automation_workflows")
+}
+
+model AiSimulationRun {
+  id String @id @default(uuid())
+  businessId String
+  agentId String
+  releaseId String?
+  status AiSimulationRunStatus @default(RUNNING)
+  suiteType String
+  scenarios Json
+  results Json?
+  score Float?
+  criticalFailures Int @default(0)
+  createdByUserId String?
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  release AiAgentRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  @@index([businessId, startedAt])
+  @@index([agentId, status])
+  @@map("ai_simulation_runs")
+}
+
+model AiAgentIncident {
+  id String @id @default(uuid())
+  businessId String
+  agentId String
+  status AiAgentIncidentStatus @default(OPEN)
+  severity String
+  type String
+  summary String
+  evidence Json
+  acknowledgedById String?
+  acknowledgedAt DateTime?
+  resolvedById String?
+  resolvedAt DateTime?
+  resolutionNotes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  @@index([businessId, status, severity])
+  @@index([agentId, createdAt])
+  @@map("ai_agent_incidents")
+}
+
+model AiChannelBinding {
+  id String @id @default(uuid())
+  businessId String
+  agentId String
+  channel AiChannelType
+  status AiChannelBindingStatus @default(DISCONNECTED)
+  externalRef String @default("default")
+  configuration Json @default("{}")
+  capabilities Json @default("{}")
+  lastHealthAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  @@unique([businessId, channel, externalRef])
+  @@index([agentId, status])
+  @@map("ai_channel_bindings")
 }
 
 model AiTrainingJob {

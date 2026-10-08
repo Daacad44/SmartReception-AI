@@ -2,6 +2,7 @@ import type { AiAgentReleaseStatus, AiTrainingVersionStatus, Prisma } from '@pri
 import { prisma } from '../../infrastructure/database/prisma';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import type {
+  CreateAgentInput,
   CreateAgentReleaseInput,
   UpdateAgentDraftInput,
   UpdateAgentInput,
@@ -37,6 +38,30 @@ function inputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
 }
 
 export class AiAgentStudioService {
+  async createAgent(businessId: string, input: CreateAgentInput, userId: string) {
+    if (!input.supportedLanguages.includes(input.defaultLanguage)) throw new ValidationError('Default language must be included in supported languages');
+    const baseSlug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'agent';
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai-agent-create:${businessId}`}))`;
+      const existing = await tx.aiAgent.findMany({ where: { businessId, slug: { startsWith: baseSlug } }, select: { slug: true } });
+      const occupied = new Set(existing.map((item) => item.slug));
+      let suffix = 1;
+      let slug = baseSlug;
+      while (occupied.has(slug)) slug = `${baseSlug}-${++suffix}`;
+      const agent = await tx.aiAgent.create({ data: {
+        businessId, slug, name: input.name, description: input.description, type: input.type,
+        defaultLanguage: input.defaultLanguage, supportedLanguages: [...new Set(input.supportedLanguages)], createdByUserId: userId,
+        draft: { create: { instructions: { role: `${input.type.toLowerCase()} WhatsApp agent`, schemaVersion: 1 }, behaviorConfig: { channel: 'WHATSAPP', defaultLanguage: input.defaultLanguage }, escalationPolicy: { handoverOnMissingKnowledge: true, handoverOnLowConfidence: true }, modelConfig: { provider: 'configured-default' }, updatedByUserId: userId } },
+        skills: { create: [{ skillKey: 'knowledge.search', enabled: true, riskLevel: 'READ_ONLY' }, { skillKey: 'human.handover', enabled: true, riskLevel: 'LOW' }] },
+        governancePolicy: { create: { business: { connect: { id: businessId } } } },
+        rolloutConfig: { create: { business: { connect: { id: businessId } } } },
+        channelBindings: { create: { business: { connect: { id: businessId } }, channel: 'WHATSAPP', status: 'CONFIGURED', capabilities: { text: true, media: true, interactive: true, templates: true } } },
+      } });
+      await tx.auditLog.create({ data: { businessId, userId, action: 'CREATE', entity: 'AiAgent', entityId: agent.id, newData: inputJson({ name: input.name, type: input.type, slug }) } });
+      return agent;
+    });
+  }
+
   async ensureDefaultAgent(businessId: string, userId?: string) {
     const business = await prisma.business.findUnique({
       where: { id: businessId },
@@ -85,6 +110,9 @@ export class AiAgentStudioService {
               },
             ],
           },
+          governancePolicy: { create: { business: { connect: { id: businessId } } } },
+          rolloutConfig: { create: { business: { connect: { id: businessId } } } },
+          channelBindings: { create: { business: { connect: { id: businessId } }, channel: 'WHATSAPP', status: 'CONFIGURED', capabilities: { text: true, media: true, interactive: true, templates: true } } },
         },
       });
     });
@@ -173,6 +201,8 @@ export class AiAgentStudioService {
         activeRelease: true,
         draft: true,
         skills: { orderBy: { skillKey: 'asc' } },
+        governancePolicy: true,
+        rolloutConfig: true,
         _count: { select: { releases: true, executions: true } },
       },
     });
@@ -186,6 +216,8 @@ export class AiAgentStudioService {
         draft: true,
         skills: { orderBy: { skillKey: 'asc' } },
         releases: { orderBy: { releaseNumber: 'desc' }, take: 20 },
+        governancePolicy: true,
+        rolloutConfig: true,
         _count: { select: { executions: true, evaluations: true } },
       },
     });
