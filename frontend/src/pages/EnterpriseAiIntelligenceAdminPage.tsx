@@ -123,10 +123,10 @@ export function EnterpriseAiIntelligenceAdminPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <Brain className="h-6 w-6 text-accent" />
-            AI Training Management
+            AI Agent Studio Management
           </h1>
           <p className="text-muted-foreground">
-            Central management for AI training, upload, validation, deployment, and monitoring
+            Govern business agents, knowledge, training, validation, deployment, and production health
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -148,10 +148,37 @@ export function EnterpriseAiIntelligenceAdminPage() {
         </div>
       </div>
 
+      <Card className="border-accent/30 bg-gradient-to-r from-accent/10 via-background to-background">
+        <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-accent/15 p-2 text-accent">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">Agent Studio is active</p>
+                <Badge variant="secondary">WhatsApp-first</Badge>
+                <Badge variant="outline">Governed runtime</Badge>
+              </div>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Every business workspace now combines discovery, approved knowledge, immutable releases,
+                evaluations, human handover, safe actions, analytics, and production controls.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/ai-agent-studio">
+              <Bot className="mr-2 h-4 w-4" />
+              Open My Business Studio
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="training">
         <TabsList>
-          <TabsTrigger value="training">AI Training</TabsTrigger>
-          <TabsTrigger value="monitoring">AI Monitoring</TabsTrigger>
+          <TabsTrigger value="training">Business Agents</TabsTrigger>
+          <TabsTrigger value="monitoring">Production Monitoring</TabsTrigger>
         </TabsList>
 
         <TabsContent value="training" className="space-y-6">
@@ -159,7 +186,7 @@ export function EnterpriseAiIntelligenceAdminPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Shield className="h-4 w-4" />
-                Training Operations
+                Agent Training Operations
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
@@ -247,7 +274,7 @@ export function EnterpriseAiIntelligenceAdminPage() {
                     </div>
                     <Button size="sm" variant="secondary" className="w-full" asChild>
                       <Link to={`/admin/ai-training/business/${business.businessId}`}>
-                        <Brain className="mr-1 h-3 w-3" />Open AI Workspace
+                        <Brain className="mr-1 h-3 w-3" />Open Agent Studio Workspace
                       </Link>
                     </Button>
                     <div className="flex gap-2">

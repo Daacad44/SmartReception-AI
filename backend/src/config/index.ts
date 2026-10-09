@@ -186,6 +186,12 @@ export const config = {
     maxContextMessages: parseInt(process.env.AI_MAX_CONTEXT_MESSAGES || '20', 10),
     timeoutMs: parseInt(process.env.AI_REPLY_TIMEOUT_MS || '5000', 10),
   },
+
+  features: {
+    // Agent Studio is the primary runtime after the phased rollout. Operators
+    // can still set this to `false` as an emergency rollback switch.
+    agentStudioV2: process.env.AGENT_STUDIO_V2_ENABLED !== 'false',
+  },
 } as const;
 
 const INSECURE_JWT_SECRETS = new Set([

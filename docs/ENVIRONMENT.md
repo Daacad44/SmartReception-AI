@@ -65,3 +65,9 @@ Webhook: `https://<domain>/api/v1/webhooks/whatsapp`
 | Variable | Where | Description |
 |----------|-------|-------------|
 | `REDIS_URL` | Backend | BullMQ worker + distributed rate limits |
+## AI Agent Studio rollout
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGENT_STUDIO_V2_ENABLED` | `true` | Enables the protected Agent Studio backend API. Set explicitly to `false` only for an emergency runtime rollback. |
+| `VITE_AGENT_STUDIO_V2_ENABLED` | `true` | Shows Agent Studio navigation in the frontend build. Set explicitly to `false` only for an emergency UI rollback, then rebuild the frontend. |

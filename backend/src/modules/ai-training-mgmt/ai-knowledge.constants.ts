@@ -27,6 +27,35 @@ export function handoverReply(preferEnglish: boolean): string {
  */
 export const NO_KNOWLEDGE_REPLY = HANDOVER_REPLY_EN;
 
+/** Recognize both the canonical handover copy and its legacy safe fallback. */
+export function isNoKnowledgeAnswer(answer: string): boolean {
+  const normalized = answer.toLowerCase();
+  return answer === NO_KNOWLEDGE_REPLY ||
+    normalized.includes("don't have verified information") ||
+    normalized.includes('not currently available in the company');
+}
+
+function factualTokens(value: string): Set<string> {
+  const matches = value.toLowerCase().match(
+    /(?:https?:\/\/|www\.)[^\s]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:[$€£]|usd|eur|gbp)\s*\d[\d.,]*|\+?\d[\d\s()./-]{2,}\d/gi
+  );
+  return new Set((matches ?? []).map((token) => token.replace(/[\s(),.-]/g, '')));
+}
+
+/**
+ * Deterministic hallucination guard for validation responses.
+ *
+ * Natural-language word overlap is not safe for a multilingual product: a
+ * grounded Somali fact translated into English can have almost no shared
+ * words with its source. Instead, reject newly invented high-risk factual
+ * tokens (amounts, dates/numbers, phone numbers, emails and URLs).
+ */
+export function hasUnsupportedFactualClaims(answer: string, context: string): boolean {
+  if (isNoKnowledgeAnswer(answer)) return false;
+  const contextFacts = factualTokens(context);
+  return [...factualTokens(answer)].some((fact) => !contextFacts.has(fact));
+}
+
 /** Minimum grounded-confidence percentage a version must clear to pass evaluation. */
 export const VALIDATION_THRESHOLD = 70;
 

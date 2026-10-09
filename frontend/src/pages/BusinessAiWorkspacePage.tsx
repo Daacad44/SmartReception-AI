@@ -99,6 +99,18 @@ interface BusinessWorkspaceDetail extends TrainingBusinessCard {
     currentStep?: string | null;
     createdAt: string;
     completedAt?: string | null;
+    error?: string | null;
+    result?: {
+      validation?: {
+        validationScore?: number;
+        threshold?: number;
+        retrievalSuccessRate?: number;
+        answerQualityRate?: number;
+        hallucinationRate?: number;
+        warnings?: string[];
+        errors?: string[];
+      };
+    } | null;
     version?: { versionNumber: number; status: string } | null;
     createdByUser?: { firstName: string; lastName: string } | null;
   }>;
@@ -106,6 +118,18 @@ interface BusinessWorkspaceDetail extends TrainingBusinessCard {
   deployments: DeploymentRecord[];
   validationReport?: Record<string, unknown> | null;
   uploadCenter?: { supportedFormats: string[]; businessIsolation: boolean };
+  readinessAssessment?: {
+    scores: {
+      readinessScore: number;
+      knowledgeCompleteness: number;
+      knowledgeCoverage: number;
+      contentQuality: number;
+      embeddingQuality: number;
+      knowledgeFreshness: number;
+    };
+    checks: Array<{ key: string; label: string; score: number; complete: boolean }>;
+    gaps: string[];
+  } | null;
 }
 
 interface WorkspaceAnalytics {
@@ -314,7 +338,7 @@ export function BusinessAiWorkspacePage() {
       <Button variant="ghost" size="sm" asChild className="-ml-2 gap-2 text-muted-foreground">
         <Link to="/admin/enterprise-ai-intelligence">
           <ArrowLeft className="h-4 w-4" />
-          AI Training Management
+          AI Agent Studio Management
         </Link>
       </Button>
 
@@ -480,6 +504,58 @@ function OverviewSection({
         <ScoreRing label="AI Readiness" score={readiness} />
         <ScoreRing label="Knowledge Coverage" score={coverage} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Gauge className="h-4 w-4" />
+            Professional Readiness to 100%
+          </CardTitle>
+          <CardDescription>
+            Transparent, evidence-based requirements—scores never increase from document volume alone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!detail.readinessAssessment ? (
+            <p className="text-sm text-muted-foreground">Run training once to generate a complete readiness assessment.</p>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {detail.readinessAssessment.checks.map((check) => (
+                  <div key={check.key} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium">{check.label}</p>
+                      {check.complete && <CheckCircle2 className="h-4 w-4 flex-none text-emerald-500" />}
+                    </div>
+                    <p className={check.complete ? 'mt-2 text-lg font-bold text-emerald-500' : 'mt-2 text-lg font-bold text-amber-500'}>
+                      {Math.round(check.score)}%
+                    </p>
+                    <Progress value={check.score} className="mt-2 h-1" />
+                  </div>
+                ))}
+              </div>
+              {detail.readinessAssessment.gaps.length > 0 ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <p className="text-sm font-semibold">Actions required to reach 100%</p>
+                  <ul className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    {detail.readinessAssessment.gaps.map((gap) => (
+                      <li key={gap} className="flex gap-2">
+                        <span className="text-amber-500">•</span>
+                        <span>{gap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  All knowledge-quality requirements are complete. Run validation to confirm production readiness.
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Embedding Status" value={detail.embeddingStatus} hint={`${formatNumber(detail.embeddingsCount)} embeddings`} icon={Zap} />
@@ -884,36 +960,65 @@ function TrainingSection({
           ) : (
             <div className="space-y-2">
               {detail.jobs.slice(0, 12).map((job) => (
-                <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{job.type}</span>
-                      {job.version && <Badge variant="outline">v{job.version.versionNumber}</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {fmtDate(job.createdAt)}
-                      {job.createdByUser && ` · ${job.createdByUser.firstName} ${job.createdByUser.lastName}`}
-                      {job.currentStep && ` · ${job.currentStep}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {['RUNNING', 'QUEUED'].includes(job.status) && (
-                      <div className="w-24">
-                        <Progress value={job.progress} />
+                <div key={job.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{job.type}</span>
+                        {job.version && <Badge variant="outline">v{job.version.versionNumber}</Badge>}
                       </div>
-                    )}
-                    <Badge
-                      variant={
-                        job.status === 'COMPLETED'
-                          ? 'default'
-                          : job.status === 'FAILED'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {job.status}
-                    </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {fmtDate(job.createdAt)}
+                        {job.createdByUser && ` · ${job.createdByUser.firstName} ${job.createdByUser.lastName}`}
+                        {job.currentStep && ` · ${job.currentStep}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {['RUNNING', 'QUEUED'].includes(job.status) && (
+                        <div className="w-24">
+                          <Progress value={job.progress} />
+                        </div>
+                      )}
+                      <Badge
+                        variant={
+                          job.status === 'COMPLETED'
+                            ? 'default'
+                            : job.status === 'FAILED'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
                   </div>
+                  {job.status === 'FAILED' && (
+                    <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs">
+                      <p className="font-medium text-destructive">Why this training failed</p>
+                      <p className="mt-1 text-muted-foreground">
+                        {job.error ?? 'The candidate did not pass the production quality gate.'}
+                      </p>
+                      {job.result?.validation && (
+                        <>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                            <span>Score: {Math.round(job.result.validation.validationScore ?? 0)}% / {Math.round(job.result.validation.threshold ?? 70)}%</span>
+                            <span>Retrieval: {Math.round(job.result.validation.retrievalSuccessRate ?? 0)}%</span>
+                            <span>Answer quality: {Math.round(job.result.validation.answerQualityRate ?? 0)}%</span>
+                            <span>
+                              Hallucination: {Math.round(job.result.validation.hallucinationRate ?? 0)}%
+                              {' '}(must be below 30%)
+                            </span>
+                          </div>
+                          {[...(job.result.validation.errors ?? []), ...(job.result.validation.warnings ?? [])].length > 0 && (
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+                              {[...(job.result.validation.errors ?? []), ...(job.result.validation.warnings ?? [])]
+                                .map((reason, index) => <li key={`${index}-${reason}`}>{reason}</li>)}
+                            </ul>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

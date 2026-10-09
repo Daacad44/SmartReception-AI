@@ -2,24 +2,14 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { searchVersionKnowledgeContext } from '../../infrastructure/ai/knowledge-search.service';
 import { answerQuestion } from '../../infrastructure/ai/gemini.service';
 import { logger } from '../../core/logger';
-import { NO_KNOWLEDGE_REPLY, VALIDATION_THRESHOLD } from './ai-knowledge.constants';
+import {
+  isNoKnowledgeAnswer,
+  hasUnsupportedFactualClaims,
+  NO_KNOWLEDGE_REPLY,
+  VALIDATION_THRESHOLD,
+} from './ai-knowledge.constants';
 
 const MAX_QUESTIONS = 50;
-
-const VALIDATION_TEMPLATES = [
-  'What is the company name?',
-  'What services do you offer?',
-  'What are your pricing details?',
-  'What is your refund policy?',
-  'What are your business hours?',
-  'How can customers contact you?',
-  'How do appointments work?',
-  'What products do you sell?',
-  'What are your FAQs?',
-  'What are your terms and conditions?',
-  'What are your business rules?',
-  'What is your opening hours?',
-];
 
 export interface ValidationQuestionResult {
   question: string;
@@ -110,20 +100,22 @@ export class TrainingValidationService {
 
         const missingKnowledge = !retrieved;
         let aiAnswer: string;
+        let generatedHallucination = false;
 
         if (missingKnowledge) {
           aiAnswer = NO_KNOWLEDGE_REPLY;
         } else {
           aiAnswer = await answerQuestion(question, context);
-          if (this.detectHallucination(aiAnswer, context)) {
+          generatedHallucination = this.detectHallucination(aiAnswer, context);
+          if (generatedHallucination) {
             hallucinationCount++;
           }
         }
 
         const accuracy = this.scoreAccuracy(aiAnswer, expectedAnswer, context);
         const confidence = retrieved ? Math.min(0.95, 0.5 + (context?.length ?? 0) / 2000) : 0.25;
-        const hallucinationDetected =
-          missingKnowledge && !aiAnswer.includes("don't have verified information");
+        const hallucinationDetected = generatedHallucination ||
+          (missingKnowledge && !isNoKnowledgeAnswer(aiAnswer));
         const groundingScore = retrieved ? Math.min(100, (context?.length ?? 0) / 30) : 0;
         const contextMatch = retrieved ? Math.min(100, retrievalHits * 10) : 0;
         const responseQuality = this.scoreResponseQuality(aiAnswer, retrieved);
@@ -161,7 +153,10 @@ export class TrainingValidationService {
     const answerQualityRate = (answerHits / questionsTested) * 100;
     const accuracy = answerQualityRate;
     const hallucinationRate = (hallucinationCount / questionsTested) * 100;
-    const knowledgeCoverage = Math.min(100, (questions.length / MAX_QUESTIONS) * 100);
+    // Questions are generated only from facts that actually exist in this
+    // immutable snapshot. A small business is not penalized simply because it
+    // does not have 50 documents; every available fact still has to be tested.
+    const knowledgeCoverage = testQuestions.length > 0 ? 100 : 0;
 
     const qualityScore = Math.round(
       retrievalSuccessRate * 0.25 +
@@ -174,6 +169,7 @@ export class TrainingValidationService {
     const validationScore = qualityScore;
     const passed =
       isolationVerified &&
+      retrievalHits > 0 &&
       validationScore >= VALIDATION_THRESHOLD &&
       hallucinationRate < 30 &&
       errors.length === 0 &&
@@ -183,8 +179,17 @@ export class TrainingValidationService {
       (r) => r.accuracy < 50 || r.hallucinationDetected
     );
 
-    if (!passed && !errors.length) {
-      warnings.push('Quality thresholds not met — training requires review');
+    if (retrievalHits === 0) {
+      warnings.push('No validation question retrieved grounded knowledge from this version');
+    }
+    if (validationScore < VALIDATION_THRESHOLD) {
+      warnings.push(`Validation score ${validationScore}% is below the required ${VALIDATION_THRESHOLD}%`);
+    }
+    if (hallucinationRate >= 30) {
+      warnings.push(`Hallucination rate ${Math.round(hallucinationRate)}% must be below 30%`);
+    }
+    if ((version.readinessScore ?? 0) < 30) {
+      warnings.push(`Snapshot readiness ${Math.round(version.readinessScore ?? 0)}% must be at least 30%`);
     }
 
     const samples = detailedResults.map((r) => ({
@@ -237,6 +242,13 @@ export class TrainingValidationService {
       });
     }
 
+    if (profile?.services?.length) {
+      questions.push({
+        question: 'What services do you offer?',
+        expectedAnswer: profile.services.join(', '),
+      });
+    }
+
     for (const doc of documents) {
       if (doc.type === 'FAQ' && doc.question) {
         questions.push({ question: doc.question, expectedAnswer: doc.answer });
@@ -256,26 +268,15 @@ export class TrainingValidationService {
       }
     }
 
-    for (const template of VALIDATION_TEMPLATES) {
-      if (!questions.some((q) => q.question === template)) {
-        questions.push({ question: template });
-      }
-    }
-
     return questions;
   }
 
   private detectHallucination(answer: string, context: string): boolean {
-    if (answer.includes("don't have verified information")) return false;
-    const contextWords = new Set(context.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
-    const answerWords = answer.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-    if (!answerWords.length) return true;
-    const overlap = answerWords.filter((w) => contextWords.has(w)).length;
-    return overlap / answerWords.length < 0.15 && answer.length > 80;
+    return hasUnsupportedFactualClaims(answer, context);
   }
 
   private scoreAccuracy(answer: string, expected?: string, context?: string): number {
-    if (answer.includes("don't have verified information")) {
+    if (isNoKnowledgeAnswer(answer)) {
       return expected ? 20 : 80;
     }
     if (expected) {
@@ -289,7 +290,7 @@ export class TrainingValidationService {
   }
 
   private scoreResponseQuality(answer: string, retrieved: boolean): number {
-    if (!retrieved && answer.includes("don't have verified information")) return 90;
+    if (!retrieved && isNoKnowledgeAnswer(answer)) return 90;
     if (!retrieved) return 20;
     if (answer.length < 10) return 30;
     if (answer.length > 500) return 60;
