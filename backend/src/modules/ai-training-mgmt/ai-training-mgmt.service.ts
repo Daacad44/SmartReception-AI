@@ -65,12 +65,17 @@ export class AiTrainingMgmtService {
             question: true,
             answer: true,
             embedding: true,
+            category: true,
           },
           orderBy: { updatedAt: 'desc' },
         })
       : [];
 
     const faqs = baseId ? await knowledgeService.listFaqs(businessId, baseId) : [];
+    const serviceCount = await prisma.service.count({ where: { businessId } });
+    const productCount = documents.filter((document) =>
+      document.category?.toLowerCase().includes('product')
+    ).length;
     const indexedCount = documents.filter((d) => d.status === 'INDEXED').length;
     const processingCount = documents.filter((d) =>
       ['UPLOADED', 'PROCESSING', 'INDEXING', 'PENDING'].includes(d.status)
@@ -90,6 +95,8 @@ export class AiTrainingMgmtService {
             indexedCount,
             embeddingCount: workspace.embeddingCount ?? 0,
             totalChunks: workspace.embeddingCount ?? 0,
+            serviceCount,
+            productCount,
             capturedAt: new Date().toISOString(),
           });
 

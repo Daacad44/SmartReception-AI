@@ -7,7 +7,7 @@ import { invalidateKnowledgeCache } from '../../infrastructure/ai/knowledge-sear
 import { workspaceService } from './workspace.service';
 import {
   buildSnapshotDocument,
-  calculateQualityScores,
+  assessTrainingSnapshot,
   type TrainingSnapshot,
 } from './quality.service';
 import { recordAiTrainingAudit } from './audit.service';
@@ -265,7 +265,8 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
     };
 
     await updateJobProgress(jobId, 70, 'Calculating quality scores');
-    const scores = calculateQualityScores(snapshot);
+    const assessment = assessTrainingSnapshot(snapshot);
+    const scores = assessment.scores;
 
     await updateJobProgress(jobId, 85, 'Creating sandbox version');
     const version = await prisma.$transaction(async (tx) => {
@@ -357,7 +358,7 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
           completedAt: new Date(),
           versionId: version.id,
           error: validationFailure,
-          result: { versionId: version.id, validation } as unknown as Prisma.InputJsonValue,
+          result: { versionId: version.id, scores, assessment, validation } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -397,7 +398,7 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
         currentStep: 'Completed',
         completedAt: new Date(),
         versionId: version.id,
-        result: { versionId: version.id, versionNumber, scores, validation } as unknown as Prisma.InputJsonValue,
+        result: { versionId: version.id, versionNumber, scores, assessment, validation } as unknown as Prisma.InputJsonValue,
       },
     });
 

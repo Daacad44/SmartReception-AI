@@ -118,6 +118,18 @@ interface BusinessWorkspaceDetail extends TrainingBusinessCard {
   deployments: DeploymentRecord[];
   validationReport?: Record<string, unknown> | null;
   uploadCenter?: { supportedFormats: string[]; businessIsolation: boolean };
+  readinessAssessment?: {
+    scores: {
+      readinessScore: number;
+      knowledgeCompleteness: number;
+      knowledgeCoverage: number;
+      contentQuality: number;
+      embeddingQuality: number;
+      knowledgeFreshness: number;
+    };
+    checks: Array<{ key: string; label: string; score: number; complete: boolean }>;
+    gaps: string[];
+  } | null;
 }
 
 interface WorkspaceAnalytics {
@@ -492,6 +504,58 @@ function OverviewSection({
         <ScoreRing label="AI Readiness" score={readiness} />
         <ScoreRing label="Knowledge Coverage" score={coverage} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Gauge className="h-4 w-4" />
+            Professional Readiness to 100%
+          </CardTitle>
+          <CardDescription>
+            Transparent, evidence-based requirements—scores never increase from document volume alone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!detail.readinessAssessment ? (
+            <p className="text-sm text-muted-foreground">Run training once to generate a complete readiness assessment.</p>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {detail.readinessAssessment.checks.map((check) => (
+                  <div key={check.key} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium">{check.label}</p>
+                      {check.complete && <CheckCircle2 className="h-4 w-4 flex-none text-emerald-500" />}
+                    </div>
+                    <p className={check.complete ? 'mt-2 text-lg font-bold text-emerald-500' : 'mt-2 text-lg font-bold text-amber-500'}>
+                      {Math.round(check.score)}%
+                    </p>
+                    <Progress value={check.score} className="mt-2 h-1" />
+                  </div>
+                ))}
+              </div>
+              {detail.readinessAssessment.gaps.length > 0 ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <p className="text-sm font-semibold">Actions required to reach 100%</p>
+                  <ul className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    {detail.readinessAssessment.gaps.map((gap) => (
+                      <li key={gap} className="flex gap-2">
+                        <span className="text-amber-500">•</span>
+                        <span>{gap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  All knowledge-quality requirements are complete. Run validation to confirm production readiness.
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Embedding Status" value={detail.embeddingStatus} hint={`${formatNumber(detail.embeddingsCount)} embeddings`} icon={Zap} />
@@ -940,7 +1004,10 @@ function TrainingSection({
                             <span>Score: {Math.round(job.result.validation.validationScore ?? 0)}% / {Math.round(job.result.validation.threshold ?? 70)}%</span>
                             <span>Retrieval: {Math.round(job.result.validation.retrievalSuccessRate ?? 0)}%</span>
                             <span>Answer quality: {Math.round(job.result.validation.answerQualityRate ?? 0)}%</span>
-                            <span>Hallucination: {Math.round(job.result.validation.hallucinationRate ?? 0)}%</span>
+                            <span>
+                              Hallucination: {Math.round(job.result.validation.hallucinationRate ?? 0)}%
+                              {' '}(must be below 30%)
+                            </span>
                           </div>
                           {[...(job.result.validation.errors ?? []), ...(job.result.validation.warnings ?? [])].length > 0 && (
                             <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">

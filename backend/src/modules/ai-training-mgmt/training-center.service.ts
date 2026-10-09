@@ -4,6 +4,7 @@ import { workspaceService } from './workspace.service';
 import { trainingEngineService } from './training-engine.service';
 import { trainingSessionLogService } from './training-session-log.service';
 import { versionService } from './version.service';
+import { assessTrainingSnapshot, type TrainingSnapshot } from './quality.service';
 
 export class TrainingCenterService {
   async listBusinessCards(page = 1, limit = 50, search?: string) {
@@ -171,12 +172,18 @@ export class TrainingCenterService {
       }),
     ]);
 
+    const latestSnapshot = versions[0]?.snapshotData as unknown as TrainingSnapshot | null;
+    const readinessAssessment = latestSnapshot?.capturedAt
+      ? assessTrainingSnapshot(latestSnapshot)
+      : null;
+
     return {
       ...(card ?? { businessId }),
       versions,
       sessions: sessions.data,
       jobs,
       insights,
+      readinessAssessment,
     };
   }
 

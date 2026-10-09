@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../config';
 import { logger } from '../../core/logger';
 import { GEMINI_ERROR_MESSAGE_SO } from './smartreception-knowledge';
+import { NO_KNOWLEDGE_REPLY } from '../../modules/ai-training-mgmt/ai-knowledge.constants';
 import { requestsEnglish } from './somali-menu';
 import type { AIResponse } from './ai.types';
 import { resolveAiProvider, resolveEmbeddingProvider } from './providers/provider-factory';
@@ -81,7 +82,12 @@ export async function answerQuestion(question: string, context: string): Promise
     const provider = resolveAiProvider();
     const preferEnglish = requestsEnglish(question);
     const response = await provider.chat({
-      systemPrompt: preferEnglish ? 'Reply in English.' : 'Reply in Somali.',
+      systemPrompt: [
+        preferEnglish ? 'Reply in English.' : 'Reply in Somali.',
+        'Answer strictly from the supplied context.',
+        'Never infer or introduce a name, price, date, phone number, email, URL, policy, product, or service that is not explicitly present in the context.',
+        `If the context cannot answer the question, reply exactly: ${NO_KNOWLEDGE_REPLY}`,
+      ].join(' '),
       userPrompt: `Context:\n${context}\n\nQuestion: ${question}`,
       maxOutputTokens: 400,
     });

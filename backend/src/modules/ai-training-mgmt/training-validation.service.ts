@@ -4,6 +4,7 @@ import { answerQuestion } from '../../infrastructure/ai/gemini.service';
 import { logger } from '../../core/logger';
 import {
   isNoKnowledgeAnswer,
+  hasUnsupportedFactualClaims,
   NO_KNOWLEDGE_REPLY,
   VALIDATION_THRESHOLD,
 } from './ai-knowledge.constants';
@@ -271,12 +272,7 @@ export class TrainingValidationService {
   }
 
   private detectHallucination(answer: string, context: string): boolean {
-    if (isNoKnowledgeAnswer(answer)) return false;
-    const contextWords = new Set(context.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
-    const answerWords = answer.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-    if (!answerWords.length) return true;
-    const overlap = answerWords.filter((w) => contextWords.has(w)).length;
-    return overlap / answerWords.length < 0.15 && answer.length > 80;
+    return hasUnsupportedFactualClaims(answer, context);
   }
 
   private scoreAccuracy(answer: string, expected?: string, context?: string): number {
