@@ -13,6 +13,7 @@ import { resolveStoredToken } from '../../infrastructure/crypto/token-crypto';
 import {
   getCampaignRetryBlockReason,
   isRetryableFailedRecipient,
+  isWhatsAppSessionFailure,
 } from './campaign-retry.util';
 import { logCampaignEvent } from '../whatsapp/whatsapp-observability';
 
@@ -615,7 +616,13 @@ export class CampaignsService {
 
   async retryFailed(businessId: string, id: string, userId: string) {
     const startedAt = Date.now();
-    const campaign = await prisma.campaign.findFirst({ where: { id, businessId } });
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, businessId },
+      include: {
+        template: { select: { whatsappTemplateName: true } },
+        business: { select: { whatsappAccounts: { where: { isActive: true }, select: { reengagementTemplateName: true }, take: 1 } } },
+      },
+    });
     if (!campaign) throw new NotFoundError('Campaign not found');
 
     const blocked = getCampaignRetryBlockReason({
@@ -651,6 +658,13 @@ export class CampaignsService {
       throw new ValidationError(
         'No retryable failed recipients. Permanently failed numbers (opted out, blocked, invalid) are skipped.'
       );
+    }
+
+    const sessionFailures = retryable.some((recipient) =>
+      isWhatsAppSessionFailure(recipient.failureCode, recipient.failedReason, recipient.failureTitle, recipient.failureMessage, recipient.failureDetails)
+    );
+    if (sessionFailures && !campaign.template?.whatsappTemplateName && !campaign.business.whatsappAccounts[0]?.reengagementTemplateName) {
+      throw new ValidationError('This retry requires an approved Meta template because the WhatsApp 24-hour session expired. Link the campaign template to its exact Meta name or configure a Re-engagement Template in WhatsApp Settings.');
     }
 
     const nextRunVersion = campaign.runVersion + 1;

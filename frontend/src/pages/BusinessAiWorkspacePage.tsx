@@ -99,6 +99,18 @@ interface BusinessWorkspaceDetail extends TrainingBusinessCard {
     currentStep?: string | null;
     createdAt: string;
     completedAt?: string | null;
+    error?: string | null;
+    result?: {
+      validation?: {
+        validationScore?: number;
+        threshold?: number;
+        retrievalSuccessRate?: number;
+        answerQualityRate?: number;
+        hallucinationRate?: number;
+        warnings?: string[];
+        errors?: string[];
+      };
+    } | null;
     version?: { versionNumber: number; status: string } | null;
     createdByUser?: { firstName: string; lastName: string } | null;
   }>;
@@ -314,7 +326,7 @@ export function BusinessAiWorkspacePage() {
       <Button variant="ghost" size="sm" asChild className="-ml-2 gap-2 text-muted-foreground">
         <Link to="/admin/enterprise-ai-intelligence">
           <ArrowLeft className="h-4 w-4" />
-          AI Training Management
+          AI Agent Studio Management
         </Link>
       </Button>
 
@@ -884,36 +896,62 @@ function TrainingSection({
           ) : (
             <div className="space-y-2">
               {detail.jobs.slice(0, 12).map((job) => (
-                <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{job.type}</span>
-                      {job.version && <Badge variant="outline">v{job.version.versionNumber}</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {fmtDate(job.createdAt)}
-                      {job.createdByUser && ` · ${job.createdByUser.firstName} ${job.createdByUser.lastName}`}
-                      {job.currentStep && ` · ${job.currentStep}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {['RUNNING', 'QUEUED'].includes(job.status) && (
-                      <div className="w-24">
-                        <Progress value={job.progress} />
+                <div key={job.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{job.type}</span>
+                        {job.version && <Badge variant="outline">v{job.version.versionNumber}</Badge>}
                       </div>
-                    )}
-                    <Badge
-                      variant={
-                        job.status === 'COMPLETED'
-                          ? 'default'
-                          : job.status === 'FAILED'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {job.status}
-                    </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {fmtDate(job.createdAt)}
+                        {job.createdByUser && ` · ${job.createdByUser.firstName} ${job.createdByUser.lastName}`}
+                        {job.currentStep && ` · ${job.currentStep}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {['RUNNING', 'QUEUED'].includes(job.status) && (
+                        <div className="w-24">
+                          <Progress value={job.progress} />
+                        </div>
+                      )}
+                      <Badge
+                        variant={
+                          job.status === 'COMPLETED'
+                            ? 'default'
+                            : job.status === 'FAILED'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
                   </div>
+                  {job.status === 'FAILED' && (
+                    <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs">
+                      <p className="font-medium text-destructive">Why this training failed</p>
+                      <p className="mt-1 text-muted-foreground">
+                        {job.error ?? 'The candidate did not pass the production quality gate.'}
+                      </p>
+                      {job.result?.validation && (
+                        <>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                            <span>Score: {Math.round(job.result.validation.validationScore ?? 0)}% / {Math.round(job.result.validation.threshold ?? 70)}%</span>
+                            <span>Retrieval: {Math.round(job.result.validation.retrievalSuccessRate ?? 0)}%</span>
+                            <span>Answer quality: {Math.round(job.result.validation.answerQualityRate ?? 0)}%</span>
+                            <span>Hallucination: {Math.round(job.result.validation.hallucinationRate ?? 0)}%</span>
+                          </div>
+                          {[...(job.result.validation.errors ?? []), ...(job.result.validation.warnings ?? [])].length > 0 && (
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+                              {[...(job.result.validation.errors ?? []), ...(job.result.validation.warnings ?? [])]
+                                .map((reason, index) => <li key={`${index}-${reason}`}>{reason}</li>)}
+                            </ul>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

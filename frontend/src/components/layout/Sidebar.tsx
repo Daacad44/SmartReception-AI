@@ -35,6 +35,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { usePlatformFeatures } from '@/hooks/usePlatformFeatures';
 import { ROUTE_PERMISSIONS, PERMISSIONS } from '@/lib/permissions';
 import { normalizeUsageMetric } from '@/lib/dashboard-data';
+import { isAgentStudioV2Enabled } from '@/lib/agent-studio';
 
 const navGroups = [
   {
@@ -52,6 +53,9 @@ const navGroups = [
   {
     heading: 'Intelligence',
     items: [
+      ...(isAgentStudioV2Enabled
+        ? [{ to: '/ai-agent-studio', icon: Sparkles, label: 'AI Agent Studio', permission: 'knowledge:read' as const }]
+        : []),
       { to: '/enterprise-ai-intelligence', icon: BookOpen, label: 'Enterprise AI Intelligence', featureKey: 'enterprise-ai-intelligence' },
       { to: '/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'analytics:read' as const, featureKey: 'business-intelligence' },
     ],
@@ -75,7 +79,7 @@ const navGroups = [
     heading: 'Super Admin',
     items: [
       { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
-      { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
+      { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Agent Studio', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
       { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
       { to: '/admin/applications', icon: ClipboardCheck, label: 'Business Applications', permission: 'platform:admin' as const },
       { to: '/admin/users', icon: UserCog, label: 'Users', permission: 'platform:admin' as const },

@@ -23,10 +23,27 @@ import {
   resolveConversation,
   transferConversation,
 } from './conversation-handoff.service';
+import { handoffOperationsService } from './handoff-operations.service';
+import { agentActionService } from '../ai-agent-studio/agent-action.service';
 import { getConversationFeedback } from './conversation-feedback.service';
 import type { ConversationTeam } from '@prisma/client';
 
 export class ConversationsService {
+  listHandoffQueue(businessId: string, userId?: string) {
+    return handoffOperationsService.queue(businessId, userId);
+  }
+
+  async getHandoffCase(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) throw new NotFoundError('Conversation not found');
+    return handoffOperationsService.active(businessId, conversationId);
+  }
+
+  async listAgentActions(businessId: string, conversationId: string) {
+    const conversation = await conversationsRepository.exists(businessId, conversationId);
+    if (!conversation) throw new NotFoundError('Conversation not found');
+    return agentActionService.list(businessId, conversationId);
+  }
   async list(
     businessId: string,
     params: PaginationInput & { status?: string; assignedToId?: string }
@@ -195,10 +212,13 @@ export class ConversationsService {
     });
 
     if (!delivered.success) {
-      const errorMessage =
+      let errorMessage =
         typeof delivered.error?.message === 'string'
           ? delivered.error.message
           : 'WhatsApp failed to deliver the message';
+      if (delivered.error?.code === 132001) {
+        errorMessage = `Meta template "${templateMeta?.templateNameMeta ?? 'unknown'}" is not available for language "${templateMeta?.templateLanguage ?? 'en'}". Link this message to the exact approved Meta template name and language in Templates or WhatsApp Settings.`;
+      }
       throw new WhatsAppDeliveryError(errorMessage, delivered.error ?? undefined);
     }
 

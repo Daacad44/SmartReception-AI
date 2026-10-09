@@ -19,6 +19,8 @@ export interface TrainingSnapshot {
   indexedCount: number;
   embeddingCount: number;
   totalChunks: number;
+  serviceCount?: number;
+  productCount?: number;
   capturedAt: string;
 }
 
@@ -71,9 +73,15 @@ export function calculateQualityScores(snapshot: TrainingSnapshot): QualityScore
 
   const hasFaqs = snapshot.faqCount > 0 || docs.some((d) => d.type === 'FAQ');
   const hasDocs = indexed.length > 0;
+  const hasServices = (snapshot.serviceCount ?? 0) > 0;
+  const hasProducts = (snapshot.productCount ?? 0) > 0;
   const knowledgeCoverage = Math.min(
     100,
-    (hasFaqs ? 35 : 0) + (hasDocs ? 45 : 0) + Math.min(20, indexed.length * 4)
+    (hasFaqs ? 20 : 0) +
+      (hasDocs ? 30 : 0) +
+      (hasServices ? 25 : 0) +
+      (hasProducts ? 15 : 0) +
+      Math.min(10, indexed.length * 2)
   );
 
   const embeddingQuality =

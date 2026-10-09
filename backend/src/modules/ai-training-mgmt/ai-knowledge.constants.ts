@@ -27,6 +27,14 @@ export function handoverReply(preferEnglish: boolean): string {
  */
 export const NO_KNOWLEDGE_REPLY = HANDOVER_REPLY_EN;
 
+/** Recognize both the canonical handover copy and its legacy safe fallback. */
+export function isNoKnowledgeAnswer(answer: string): boolean {
+  const normalized = answer.toLowerCase();
+  return answer === NO_KNOWLEDGE_REPLY ||
+    normalized.includes("don't have verified information") ||
+    normalized.includes('not currently available in the company');
+}
+
 /** Minimum grounded-confidence percentage a version must clear to pass evaluation. */
 export const VALIDATION_THRESHOLD = 70;
 

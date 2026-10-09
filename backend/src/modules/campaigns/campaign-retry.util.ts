@@ -3,10 +3,14 @@ export const CAMPAIGN_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
 
 const BLOCKED_RETRY_STATUSES = new Set(['RUNNING', 'SENDING', 'ARCHIVED', 'CANCELLED']);
 
+export function isWhatsAppSessionFailure(...values: Array<string | null | undefined>): boolean {
+  return /\b131047\b|more than 24 hours|re-engagement message/i.test(values.filter(Boolean).join(' '));
+}
+
 /** Permanent Graph / policy failures that must not be retried. 131047 (session) is retryable. */
 export function isPermanentCampaignFailure(reason: string | null | undefined): boolean {
   if (!reason) return false;
-  if (/\b131047\b/.test(reason)) return false;
+  if (isWhatsAppSessionFailure(reason)) return false;
 
   const text = reason.toLowerCase();
   if (/\b131026\b/.test(reason)) return true;
