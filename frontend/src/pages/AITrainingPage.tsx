@@ -275,7 +275,7 @@ export function AITrainingPage() {
             <div className="flex items-center gap-2">
               <Brain className="h-7 w-7 text-accent" />
               <h1 className="text-2xl font-bold">
-                {isAdmin ? adminData?.name ?? 'AI Training' : 'AI Training Management'}
+                {isAdmin ? adminData?.name ?? 'AI Agent Studio' : 'AI Agent Studio'}
               </h1>
             </div>
             <p className="mt-1 text-muted-foreground">

@@ -3,7 +3,6 @@ import { ConflictError, NotFoundError } from '../../core/errors';
 import { CreateMessageTemplateInput, UpdateMessageTemplateInput } from '@smartreception/shared';
 import {
   normalizeWhatsAppTemplateLanguage,
-  isMetaTemplateSlug,
 } from '../../infrastructure/whatsapp/whatsapp-template-language.util';
 
 export class MessageTemplatesService {
@@ -56,9 +55,7 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables ?? [],
-        whatsappTemplateName:
-          input.whatsappTemplateName ??
-          (isMetaTemplateSlug(input.name) ? input.name.trim() : null),
+        whatsappTemplateName: input.whatsappTemplateName?.trim() || null,
         whatsappTemplateLanguage: input.whatsappTemplateLanguage
           ? normalizeWhatsAppTemplateLanguage(input.whatsappTemplateLanguage)
           : null,
@@ -86,9 +83,9 @@ export class MessageTemplatesService {
         content: input.content,
         type: input.type,
         variables: input.variables,
-        whatsappTemplateName:
-          input.whatsappTemplateName ??
-          (input.name && isMetaTemplateSlug(input.name) ? input.name.trim() : undefined),
+        whatsappTemplateName: input.whatsappTemplateName === undefined
+          ? undefined
+          : input.whatsappTemplateName?.trim() || null,
         whatsappTemplateLanguage: input.whatsappTemplateLanguage
           ? normalizeWhatsAppTemplateLanguage(input.whatsappTemplateLanguage)
           : input.whatsappTemplateLanguage,

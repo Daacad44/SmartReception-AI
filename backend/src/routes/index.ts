@@ -29,6 +29,7 @@ import onboardingRoutes from '../modules/onboarding/onboarding.routes';
 import governanceRoutes from '../modules/governance/governance.routes';
 import aiTrainingRoutes from '../modules/ai-training/ai-training.routes';
 import aiTrainingMgmtRoutes from '../modules/ai-training-mgmt/ai-training-mgmt.routes';
+import aiAgentStudioRoutes from '../modules/ai-agent-studio/ai-agent-studio.routes';
 import aiTrainingAdminRoutes from '../modules/ai-training-mgmt/ai-training-admin.routes';
 import aiTrainingCenterRoutes from '../modules/ai-training-mgmt/ai-training-center.routes';
 import trainerPortalRoutes from '../modules/ai-training-mgmt/trainer/trainer.routes';
@@ -47,6 +48,7 @@ import {
   businessIntelligenceRoutes,
 } from '../modules/business-intelligence/business-intelligence.routes';
 import featureManagementRoutes from '../modules/feature-management/feature-management.routes';
+import systemUpdatesRoutes from '../modules/system-updates/system-updates.routes';
 import {
   subscriptionAdminRoutes,
   subscriptionRoutes,
@@ -102,6 +104,7 @@ const licensed = Router();
 licensed.use(authenticate, requireBusiness, requireValidLicense());
 
 licensed.use('/business', businessRoutes);
+licensed.use('/system-updates', systemUpdatesRoutes);
 licensed.use('/customers', customersRoutes);
 licensed.use('/conversations', conversationsRoutes);
 licensed.use('/appointments', appointmentsRoutes);
@@ -130,6 +133,7 @@ licensed.use('/financial-intelligence', financialIntelligenceRoutes);
 licensed.use('/enterprise-ai-intelligence', enterpriseAiIntelligenceRoutes);
 licensed.use('/business-intelligence', businessIntelligenceRoutes);
 licensed.use('/ai-training-mgmt', aiTrainingMgmtRoutes);
+licensed.use('/ai-agent-studio', aiAgentStudioRoutes);
 
 router.use('/billing', billingRoutes);
 router.use(licensed);

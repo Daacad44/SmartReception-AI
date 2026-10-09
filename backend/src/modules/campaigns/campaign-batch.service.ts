@@ -6,7 +6,7 @@ import { syncCampaignDeliveryStats } from './campaign-stats.service';
 import { logger } from '../../core/logger';
 import { getWhatsAppSessionWindow } from '../whatsapp/whatsapp-session.service';
 import { resolveCampaignSessionSend } from './campaign-session-send';
-import { isPartialCampaignRetry } from './campaign-retry.util';
+import { isPartialCampaignRetry, isWhatsAppSessionFailure } from './campaign-retry.util';
 
 const BATCH_SIZE = 50;
 
@@ -94,7 +94,7 @@ export async function sendCampaignBatch(data: CampaignBatchJobData): Promise<{ s
 
       const phone = recipient.customer.whatsappNumber || recipient.customer.phone;
       const sessionWindow = await getWhatsAppSessionWindow('', recipient.customerId);
-      const metaRejectedFreeForm = recipient.failureCode === '131047';
+      const metaRejectedFreeForm = isWhatsAppSessionFailure(recipient.failureCode, recipient.failedReason, recipient.failureTitle, recipient.failureMessage, recipient.failureDetails);
       const outbound = resolveCampaignSessionSend({
         messageType: campaign.messageType,
         // Meta is the source of truth. Once it reports 131047, do not repeat the
