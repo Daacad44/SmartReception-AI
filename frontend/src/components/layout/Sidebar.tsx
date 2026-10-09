@@ -79,7 +79,7 @@ const navGroups = [
     heading: 'Super Admin',
     items: [
       { to: '/super-admin', icon: Crown, label: 'Super Admin', permission: 'platform:admin' as const, featureKey: 'super-admin' },
-      { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Training Management', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
+      { to: '/admin/enterprise-ai-intelligence', icon: Bot, label: 'AI Agent Studio', permission: 'platform:admin' as const, featureKey: 'enterprise-ai-intelligence-admin' },
       { to: '/admin/business-intelligence', icon: BarChart3, label: 'Business Intelligence', permission: 'platform:admin' as const, featureKey: 'business-intelligence-admin' },
       { to: '/admin/applications', icon: ClipboardCheck, label: 'Business Applications', permission: 'platform:admin' as const },
       { to: '/admin/users', icon: UserCog, label: 'Users', permission: 'platform:admin' as const },

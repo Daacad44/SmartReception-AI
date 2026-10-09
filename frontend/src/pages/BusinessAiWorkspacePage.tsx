@@ -314,7 +314,7 @@ export function BusinessAiWorkspacePage() {
       <Button variant="ghost" size="sm" asChild className="-ml-2 gap-2 text-muted-foreground">
         <Link to="/admin/enterprise-ai-intelligence">
           <ArrowLeft className="h-4 w-4" />
-          AI Training Management
+          AI Agent Studio Management
         </Link>
       </Button>
 

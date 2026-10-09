@@ -188,9 +188,9 @@ export const config = {
   },
 
   features: {
-    // Phase 0 compatibility gate. The current UI/API remains the default until
-    // the Agent Studio domain and migration are ready for tenant rollout.
-    agentStudioV2: process.env.AGENT_STUDIO_V2_ENABLED === 'true',
+    // Agent Studio is the primary runtime after the phased rollout. Operators
+    // can still set this to `false` as an emergency rollback switch.
+    agentStudioV2: process.env.AGENT_STUDIO_V2_ENABLED !== 'false',
   },
 } as const;
 

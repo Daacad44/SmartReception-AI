@@ -1,5 +1,8 @@
+// Agent Studio is now the primary experience. Keep an explicit `false` as an
+// emergency rollback switch, but do not hide the completed product when a
+// deployment has not defined the optional build-time variable.
 export const isAgentStudioV2Enabled =
-  String(import.meta.env.VITE_AGENT_STUDIO_V2_ENABLED).toLowerCase() === 'true';
+  String(import.meta.env.VITE_AGENT_STUDIO_V2_ENABLED ?? 'true').toLowerCase() !== 'false';
 
 export interface AgentStudioDraft {
   id: string;
