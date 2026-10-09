@@ -38,6 +38,7 @@ export class TrainingCenterService {
                   versionNumber: true,
                   status: true,
                   embeddingVersion: true,
+                  knowledgeScore: true,
                   readinessScore: true,
                   createdAt: true,
                 },
@@ -105,7 +106,7 @@ export class TrainingCenterService {
             ? 'IN_PROGRESS'
             : production?.status ?? 'NOT_STARTED';
 
-        const knowledgeHealth = workspace.aiReadinessScore ?? production?.readinessScore ?? 0;
+        const knowledgeHealth = workspace.knowledgeScore ?? production?.knowledgeScore ?? 0;
         const estimatedTrainingCost = trainingEngineService.estimateTrainingCost(docCount, chunks);
 
         return {

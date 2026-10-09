@@ -259,6 +259,8 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
       indexedCount,
       embeddingCount,
       totalChunks,
+      serviceCount,
+      productCount,
       capturedAt: new Date().toISOString(),
     };
 
@@ -309,6 +311,23 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
         data: { status: 'DRAFT' },
       });
 
+      // Keep the workspace dashboard honest even when a candidate fails. The
+      // previous successful score must not be shown as if it described the
+      // newly evaluated knowledge snapshot.
+      await workspaceService.updateWorkspaceMetrics(businessId, {
+        aiReadinessScore: validation.qualityScore,
+        knowledgeScore: scores.knowledgeScore,
+        confidenceScore: scores.confidenceScore,
+        embeddingCount,
+        documentCount: documents.length,
+      });
+
+      const validationFailure = [
+        `Validation score ${validation.validationScore}% (required ${validation.threshold}%)`,
+        ...validation.errors,
+        ...validation.warnings,
+      ].join('; ');
+
       await trainingSessionLogService.finalizeLog(jobId, {
         status: 'FAILED',
         knowledgeCount: documents.length,
@@ -337,7 +356,7 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
           currentStep: 'Validation failed',
           completedAt: new Date(),
           versionId: version.id,
-          error: 'Post-training AI verification failed',
+          error: validationFailure,
           result: { versionId: version.id, validation } as unknown as Prisma.InputJsonValue,
         },
       });
@@ -348,7 +367,10 @@ export async function executeTrainingPipeline(ctx: PipelineContext): Promise<str
         { entity: 'AiTrainingJob', entityId: jobId, newData: { validation } }
       );
 
-      throw new Error('Training validation failed — version not marked successful');
+      // A quality-gate rejection is a final business outcome, not a transient
+      // worker exception. Returning keeps the detailed validation report and
+      // prevents the generic catch block from overwriting it.
+      return version.id;
     }
 
     const isRetrain = ['RETRAIN', 'INCREMENTAL_RETRAIN', 'PARTIAL_RETRAIN'].includes(jobType);
